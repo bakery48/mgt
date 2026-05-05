@@ -9,6 +9,9 @@ ALTER TABLE cards ALTER COLUMN creator_id DROP NOT NULL;
 ALTER TABLE cards ALTER COLUMN power DROP NOT NULL;
 ALTER TABLE cards ALTER COLUMN toughness DROP NOT NULL;
 
+-- creator_id=null のシステムカード挿入中はトリガーを無効化
+ALTER TABLE cards DISABLE TRIGGER ALL;
+
 INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price) VALUES
 
 -- ── 土地 ──────────────────────────────────────────────────────
@@ -203,3 +206,6 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 ('簒奪の女王', 'creature', 'multicolor', '{3}{B}{W}', 3, 3,
  '飛行\n簒奪 1（ダメージ時）\nこのクリーチャーがダメージを与えるたび、対戦相手から勝利点を1奪う。',
  '[{"type":"flying"},{"type":"簒奪","value":1,"trigger":"damage"}]', 3000);
+
+-- トリガーを再有効化
+ALTER TABLE cards ENABLE TRIGGER ALL;
