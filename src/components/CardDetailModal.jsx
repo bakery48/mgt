@@ -182,7 +182,7 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
           {/* 効果テキスト */}
           {card.effect_text && (
             <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap bg-gray-800/60 rounded-lg p-3">
-              {card.effect_text}
+              {card.effect_text.replace(/\\n/g, '\n')}
             </p>
           )}
           {!card.effect_text && keywords.length === 0 && (

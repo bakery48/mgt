@@ -142,8 +142,8 @@ function CardItem({ card, onClick }) {
         </div>
 
         {card.effect_text && (
-          <p className="text-xs text-gray-400 leading-relaxed mb-3 line-clamp-3">
-            {card.effect_text}
+          <p className="text-xs text-gray-400 leading-relaxed mb-3 line-clamp-3 whitespace-pre-wrap">
+            {card.effect_text.replace(/\\n/g, '\n')}
           </p>
         )}
 
