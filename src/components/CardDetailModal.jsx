@@ -84,7 +84,7 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
       onClick={onClose}
     >
       <div
-        className="relative bg-gray-900 border border-gray-600 rounded-2xl overflow-y-auto shadow-2xl flex flex-col sm:flex-row max-w-xl w-full max-h-[90vh]"
+        className="relative bg-gray-900 border border-gray-600 rounded-2xl overflow-hidden shadow-2xl flex flex-col sm:flex-row max-w-xl w-full"
         onClick={e => e.stopPropagation()}
       >
         {/* 閉じるボタン */}
@@ -101,10 +101,10 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
             <img
               src={card.art_url}
               alt={card.name}
-              className="w-full h-48 sm:h-full object-cover"
+              className="w-full h-48 object-cover"
             />
           ) : (
-            <div className="w-full h-48 sm:h-full min-h-[12rem] flex items-center justify-center text-6xl opacity-30">
+            <div className="w-full h-48 flex items-center justify-center text-6xl opacity-30">
               🃏
             </div>
           )}
