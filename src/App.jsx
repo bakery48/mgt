@@ -9,6 +9,7 @@ import DecksPage from './pages/DecksPage'
 import DeckEditPage from './pages/DeckEditPage'
 import GameLobbyPage from './pages/GameLobbyPage'
 import GameRoomPage from './pages/GameRoomPage'
+import GamePlayPage from './pages/GamePlayPage'
 
 function PlayerRoute({ children }) {
   const { player, loading } = usePlayer()
@@ -46,6 +47,7 @@ function AppRoutes() {
       <Route path="/decks/:id" element={<PlayerRoute><DeckEditPage /></PlayerRoute>} />
       <Route path="/game" element={<PlayerRoute><GameLobbyPage /></PlayerRoute>} />
       <Route path="/game/:id" element={<PlayerRoute><GameRoomPage /></PlayerRoute>} />
+      <Route path="/game/:id/play" element={<PlayerRoute><GamePlayPage /></PlayerRoute>} />
       <Route path="*" element={<Navigate to={player ? '/cards' : '/setup'} replace />} />
     </Routes>
   )

@@ -1,0 +1,570 @@
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+import { usePlayer } from '../contexts/PlayerContext'
+import {
+  PHASES, PHASE_LABELS,
+  initGameState, tapForMana, playLand, castSpell, passPriority,
+  advancePhase, declareAttackers, declareBlockers, resolveCombatDamage,
+  canPlaySorcerySpeed, hasMana, getOpponent,
+} from '../lib/gameEngine'
+
+// ─── カードコンポーネント ───────────────────────────────────────
+const COLOR_BG = {
+  white: 'bg-yellow-50 text-gray-900', blue: 'bg-blue-700 text-white',
+  black: 'bg-gray-900 text-white border-gray-600', red: 'bg-red-700 text-white',
+  green: 'bg-green-800 text-white', colorless: 'bg-gray-600 text-white',
+  multicolor: 'bg-gradient-to-br from-yellow-600 to-purple-700 text-white',
+}
+
+function MiniCard({ card, perm, selected, onClick, disabled, dimmed }) {
+  const kws = (card?.keywords || []).map(k => k.type)
+  const isTapped = perm?.tapped
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        relative border-2 rounded-lg transition-all select-none
+        ${isTapped ? 'rotate-90 origin-center' : ''}
+        ${selected ? 'border-yellow-400 ring-2 ring-yellow-300' : 'border-transparent'}
+        ${dimmed ? 'opacity-40' : ''}
+        ${disabled ? 'cursor-default' : 'cursor-pointer hover:border-white'}
+        ${COLOR_BG[card?.color] || 'bg-gray-700 text-white'}
+        w-20 h-28 flex flex-col p-1.5 text-left shrink-0
+      `}
+      style={isTapped ? { marginInline: '14px' } : {}}
+    >
+      {card?.art_url && (
+        <img src={card.art_url} alt="" className="w-full h-12 object-cover rounded mb-1" />
+      )}
+      <p className="text-xs font-bold leading-tight line-clamp-2">{card?.name || '?'}</p>
+      {card?.card_type === 'creature' && (
+        <p className="text-xs font-mono mt-auto">
+          {(perm?.power ?? card?.power ?? '?')}/{(perm?.toughness ?? card?.toughness ?? '?')}
+          {perm?.damage > 0 && <span className="text-red-300"> 🩸{perm.damage}</span>}
+        </p>
+      )}
+      {perm?.summoning_sick && <span className="absolute top-0.5 right-0.5 text-xs">😴</span>}
+      {perm?.attacking && <span className="absolute bottom-0.5 right-0.5 text-xs">⚔</span>}
+      {perm?.blocking && <span className="absolute bottom-0.5 right-0.5 text-xs">🛡</span>}
+      {kws.includes('flying') && <span className="absolute top-0.5 left-0.5 text-xs">✈</span>}
+    </button>
+  )
+}
+
+function HandCard({ card, onClick, disabled, highlight }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        border-2 rounded-lg p-2 transition-all shrink-0 w-20 h-28 flex flex-col text-left
+        ${highlight ? 'border-purple-400 ring-2 ring-purple-300 -translate-y-2' : 'border-transparent hover:-translate-y-1'}
+        ${disabled ? 'opacity-50 cursor-default' : 'cursor-pointer'}
+        ${COLOR_BG[card?.color] || 'bg-gray-700 text-white'}
+      `}
+    >
+      {card?.art_url && (
+        <img src={card.art_url} alt="" className="w-full h-11 object-cover rounded mb-1" />
+      )}
+      <p className="text-xs font-bold leading-tight line-clamp-2">{card?.name}</p>
+      {card?.mana_cost && <p className="text-xs font-mono mt-auto opacity-80">{card.mana_cost}</p>}
+    </button>
+  )
+}
+
+// ─── フェーズバー ───────────────────────────────────────────────
+function PhaseBar({ phase, isActive }) {
+  const mainPhases = ['main1', 'declare_attackers', 'declare_blockers', 'combat_damage', 'main2', 'end_step']
+  return (
+    <div className="flex items-center gap-1 overflow-x-auto">
+      {PHASES.map(p => (
+        <div
+          key={p}
+          className={`px-2 py-1 rounded text-xs shrink-0 transition-colors ${
+            p === phase
+              ? isActive ? 'bg-purple-600 text-white font-bold' : 'bg-blue-700 text-white font-bold'
+              : mainPhases.includes(p) ? 'bg-gray-700 text-gray-400' : 'bg-gray-800 text-gray-600'
+          }`}
+        >
+          {PHASE_LABELS[p]}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── マナプール表示 ─────────────────────────────────────────────
+const MANA_COLORS = { W: 'bg-yellow-100 text-yellow-900', U: 'bg-blue-600 text-white', B: 'bg-gray-800 text-white border border-gray-500', R: 'bg-red-600 text-white', G: 'bg-green-700 text-white', C: 'bg-gray-500 text-white' }
+function ManaPool({ pool }) {
+  const entries = Object.entries(pool).filter(([, v]) => v > 0)
+  if (entries.length === 0) return <span className="text-gray-600 text-xs">マナなし</span>
+  return (
+    <div className="flex gap-1 flex-wrap">
+      {entries.map(([col, val]) => (
+        <span key={col} className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${MANA_COLORS[col]}`}>
+          {val > 1 ? val : col}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ─── メインページ ───────────────────────────────────────────────
+export default function GamePlayPage() {
+  const { id: gameId } = useParams()
+  const navigate = useNavigate()
+  const { player } = usePlayer()
+  const chanRef = useRef(null)
+
+  const [gs, setGs] = useState(null)          // game state
+  const [cardData, setCardData] = useState({}) // card_id → card object
+  const [game, setGame] = useState(null)
+  const [participants, setParticipants] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedHandCard, setSelectedHandCard] = useState(null)
+  const [selectedAttackers, setSelectedAttackers] = useState([])
+  const [selectedBlockers, setSelectedBlockers] = useState({}) // {attIid: blkIid}
+  const [savingGs, setSavingGs] = useState(false)
+
+  const myId = player?.id
+  const isActive = gs?.active_player === myId
+  const hasPrio = gs?.priority === myId
+  const oppId = gs ? getOpponent(gs, myId) : null
+
+  // ─── ゲーム状態をDBに保存 ──────────────────────────────────
+  const saveGs = useCallback(async (newGs) => {
+    if (savingGs) return
+    setSavingGs(true)
+    setGs(newGs)
+    await supabase.from('games').update({ game_state: newGs }).eq('id', gameId)
+    setSavingGs(false)
+  }, [gameId, savingGs])
+
+  // ─── カードデータをまとめてロード ──────────────────────────
+  const loadCardData = useCallback(async (cardIds) => {
+    const unique = [...new Set(cardIds)].filter(Boolean)
+    if (unique.length === 0) return {}
+    const { data } = await supabase.from('cards').select('*').in('id', unique)
+    const map = {}
+    for (const c of (data || [])) map[c.id] = c
+    return map
+  }, [])
+
+  // ─── 初期化 ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!player) return
+    const init = async () => {
+      setLoading(true)
+      const [{ data: gameData }, { data: gpData }] = await Promise.all([
+        supabase.from('games').select('*').eq('id', gameId).single(),
+        supabase.from('game_players').select('*, players(username)').eq('game_id', gameId).order('turn_order'),
+      ])
+      setGame(gameData)
+      setParticipants(gpData || [])
+
+      let currentGs = gameData?.game_state
+      // ゲーム状態が未初期化ならホスト（turn_order=1）が初期化
+      if (!currentGs || Object.keys(currentGs).length === 0) {
+        const isHost = gpData?.[0]?.player_id === player.id
+        if (isHost) {
+          const playerOrder = gpData.map(gp => gp.player_id)
+          // 各プレイヤーのデッキをロード
+          const deckMap = {}
+          for (const gp of gpData) {
+            const { data: dcData } = await supabase
+              .from('deck_cards')
+              .select('card_id, quantity')
+              .eq('deck_id', gp.deck_id)
+            const expanded = []
+            for (const dc of (dcData || [])) {
+              for (let i = 0; i < dc.quantity; i++) expanded.push(dc.card_id)
+            }
+            deckMap[gp.player_id] = expanded
+          }
+          currentGs = initGameState(playerOrder, deckMap)
+          await supabase.from('games').update({ game_state: currentGs }).eq('id', gameId)
+        } else {
+          // 非ホストは少し待って再取得
+          await new Promise(r => setTimeout(r, 2000))
+          const { data: g2 } = await supabase.from('games').select('game_state').eq('id', gameId).single()
+          currentGs = g2?.game_state
+        }
+      }
+
+      // カードデータロード
+      const allCardIds = []
+      if (currentGs?.players) {
+        for (const ps of Object.values(currentGs.players)) {
+          allCardIds.push(...(ps.hand || []), ...(ps.library || []),
+            ...(ps.graveyard || []),
+            ...(ps.battlefield || []).map(p => p.card_id))
+        }
+      }
+      const cMap = await loadCardData(allCardIds)
+      setCardData(cMap)
+      setGs(currentGs)
+      setLoading(false)
+    }
+    init()
+
+    // Realtime
+    chanRef.current = supabase.channel(`game_play_${gameId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'games',
+        filter: `id=eq.${gameId}`,
+      }, async ({ new: newGame }) => {
+        if (!newGame.game_state || Object.keys(newGame.game_state).length === 0) return
+        // カード追加ロード
+        const ids = []
+        if (newGame.game_state?.players) {
+          for (const ps of Object.values(newGame.game_state.players)) {
+            ids.push(...(ps.hand || []), ...(ps.battlefield || []).map(p => p.card_id))
+          }
+        }
+        setCardData(prev => {
+          const missing = [...new Set(ids)].filter(id => !prev[id])
+          if (missing.length > 0) {
+            loadCardData(missing).then(m => setCardData(p => ({ ...p, ...m })))
+          }
+          return prev
+        })
+        setGs(newGame.game_state)
+      })
+      .subscribe()
+
+    return () => chanRef.current?.unsubscribe()
+  }, [gameId, player])
+
+  // ─── アクション処理 ────────────────────────────────────────
+  const dispatch = useCallback((newGs) => {
+    saveGs(newGs)
+    setSelectedHandCard(null)
+    setSelectedAttackers([])
+    setSelectedBlockers({})
+  }, [saveGs])
+
+  const handleHandCardClick = (cardId) => {
+    const card = cardData[cardId]
+    if (!card || !gs) return
+
+    if (card.card_type === 'land') {
+      const newGs = playLand(gs, myId, cardId, card)
+      if (newGs !== gs) dispatch(newGs)
+      return
+    }
+    // 呪文: 選択してからプレイ確定
+    setSelectedHandCard(prev => prev === cardId ? null : cardId)
+  }
+
+  const handleCastSpell = () => {
+    if (!selectedHandCard) return
+    const card = cardData[selectedHandCard]
+    const newGs = castSpell(gs, myId, selectedHandCard, card)
+    if (newGs !== gs) dispatch(newGs)
+  }
+
+  const handleTapLand = (instanceId) => {
+    const perm = gs.players[myId]?.battlefield.find(p => p.instance_id === instanceId)
+    if (!perm) return
+    const card = cardData[perm.card_id]
+    if (!card || card.card_type !== 'land') return
+    const newGs = tapForMana(gs, myId, instanceId, card)
+    if (newGs !== gs) dispatch(newGs)
+  }
+
+  const handleToggleAttacker = (instanceId) => {
+    if (gs.phase !== 'declare_attackers' || !isActive) return
+    const perm = gs.players[myId]?.battlefield.find(p => p.instance_id === instanceId)
+    if (!perm) return
+    const card = cardData[perm.card_id]
+    if (!card || card.card_type !== 'creature') return
+    if (perm.summoning_sick || perm.tapped) return
+    setSelectedAttackers(prev =>
+      prev.includes(instanceId) ? prev.filter(id => id !== instanceId) : [...prev, instanceId]
+    )
+  }
+
+  const handleConfirmAttackers = () => {
+    const newGs = declareAttackers(gs, myId, selectedAttackers, cardData)
+    dispatch(newGs)
+  }
+
+  const handleToggleBlocker = (blockerIid, attackerIid) => {
+    setSelectedBlockers(prev => ({
+      ...prev,
+      [attackerIid]: prev[attackerIid] === blockerIid ? undefined : blockerIid,
+    }))
+  }
+
+  const handleConfirmBlockers = () => {
+    const blockerMap = {}
+    for (const [attIid, blkIid] of Object.entries(selectedBlockers)) {
+      if (blkIid) blockerMap[attIid] = [blkIid]
+    }
+    const newGs = declareBlockers(gs, myId, blockerMap)
+    dispatch(newGs)
+  }
+
+  const handleResolveCombat = () => {
+    const newGs = resolveCombatDamage(gs, cardData)
+    dispatch(advancePhase(newGs))
+  }
+
+  const handlePassPriority = () => {
+    const newGs = passPriority(gs, myId, cardData)
+    if (newGs !== gs) dispatch(newGs)
+  }
+
+  const handlePassPhase = () => {
+    if (!isActive) return
+    dispatch(advancePhase(gs))
+  }
+
+  // ─── ゲーム終了チェック ────────────────────────────────────
+  const myLife = gs?.players?.[myId]?.life ?? 20
+  const oppLife = gs?.players?.[oppId]?.life ?? 20
+
+  // ─── レンダリング ──────────────────────────────────────────
+  if (loading || !gs) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="text-gray-400">ゲームを読み込み中...</div>
+      </div>
+    )
+  }
+
+  const myPs = gs.players[myId] || {}
+  const oppPs = gs.players[oppId] || {}
+  const oppInfo = participants.find(p => p.player_id === oppId)
+  const myInfo = participants.find(p => p.player_id === myId)
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex flex-col select-none overflow-hidden">
+      {/* ─── フェーズバー + ステータス ─── */}
+      <div className="bg-gray-900 border-b border-gray-700 px-3 py-2 flex items-center gap-3 flex-wrap">
+        <div className="shrink-0">
+          <PhaseBar phase={gs.phase} isActive={isActive} />
+        </div>
+        <div className="ml-auto flex items-center gap-3 text-xs text-gray-400 shrink-0">
+          <span>T{gs.turn_number}</span>
+          <span className={hasPrio ? 'text-yellow-400 font-bold' : ''}>
+            {hasPrio ? '⚡ あなたの優先権' : '相手の優先権'}
+          </span>
+          {savingGs && <span className="text-gray-500">保存中...</span>}
+        </div>
+      </div>
+
+      {/* ─── スタック ─── */}
+      {gs.stack.length > 0 && (
+        <div className="bg-indigo-950 border-b border-indigo-700 px-3 py-2">
+          <p className="text-indigo-300 text-xs mb-1">スタック（{gs.stack.length}）</p>
+          <div className="flex gap-2 overflow-x-auto">
+            {[...gs.stack].reverse().map((entry, i) => {
+              const card = entry.card || cardData[entry.card_id]
+              return (
+                <div key={entry.id} className={`shrink-0 bg-indigo-900 border rounded px-2 py-1 text-xs ${i === 0 ? 'border-yellow-400 text-yellow-300' : 'border-indigo-700 text-indigo-300'}`}>
+                  {i === 0 && '⬆ '}{card?.name || '?'}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-1 overflow-hidden">
+        {/* ─── 盤面 ─── */}
+        <div className="flex-1 flex flex-col overflow-hidden">
+
+          {/* 相手ゾーン */}
+          <div className="flex-1 bg-gray-900 border-b border-gray-700 p-3">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="text-red-400 font-bold text-xl">❤ {oppLife}</div>
+              <div className="text-gray-400 text-sm">{oppInfo?.players?.username}</div>
+              <div className="ml-2"><ManaPool pool={oppPs.mana_pool || {}} /></div>
+              <div className="ml-auto text-gray-500 text-xs">
+                手札{oppPs.hand?.length} / ライブラリ{oppPs.library?.length} / 墓地{oppPs.graveyard?.length}
+              </div>
+            </div>
+            {/* 相手の手札（伏せ） */}
+            <div className="flex gap-1 mb-2 overflow-x-auto pb-1">
+              {(oppPs.hand || []).map((_, i) => (
+                <div key={i} className="w-16 h-22 bg-blue-900 border-2 border-blue-700 rounded flex items-center justify-center shrink-0 text-blue-600 text-xl" style={{height:'5.5rem'}}>
+                  🂠
+                </div>
+              ))}
+            </div>
+            {/* 相手の戦場 */}
+            <div className="flex gap-2 overflow-x-auto pb-1 min-h-[7rem]">
+              {(oppPs.battlefield || []).map(perm => {
+                const card = cardData[perm.card_id]
+                const isAttacking = perm.attacking
+                const isBlockable = gs.phase === 'declare_blockers' && isAttacking && !perm.blocking
+                return (
+                  <MiniCard
+                    key={perm.instance_id}
+                    card={card}
+                    perm={perm}
+                    selected={isBlockable}
+                    onClick={() => {
+                      if (gs.phase === 'declare_blockers' && !isActive) {
+                        // ブロック選択: 攻撃クリーチャーをクリック
+                      }
+                    }}
+                    dimmed={false}
+                  />
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 自分ゾーン */}
+          <div className="flex-1 bg-gray-800 p-3">
+            {/* 自分の戦場 */}
+            <div className="flex gap-2 overflow-x-auto pb-2 min-h-[7rem]">
+              {(myPs.battlefield || []).map(perm => {
+                const card = cardData[perm.card_id]
+                const isLand = card?.card_type === 'land'
+                const isCrea = card?.card_type === 'creature'
+                const canAtt = gs.phase === 'declare_attackers' && isActive && isCrea && !perm.summoning_sick && !perm.tapped
+                const isSelAtt = selectedAttackers.includes(perm.instance_id)
+                return (
+                  <MiniCard
+                    key={perm.instance_id}
+                    card={card}
+                    perm={{ ...perm, attacking: isSelAtt || perm.attacking }}
+                    selected={isSelAtt}
+                    onClick={() => {
+                      if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
+                      else if (canAtt) handleToggleAttacker(perm.instance_id)
+                    }}
+                    disabled={!isLand && !canAtt}
+                  />
+                )
+              })}
+            </div>
+
+            {/* 自分のステータス */}
+            <div className="flex items-center gap-3 mb-2">
+              <div className="text-green-400 font-bold text-xl">❤ {myLife}</div>
+              <div className="text-gray-300 text-sm">{myInfo?.players?.username}</div>
+              <div className="ml-2"><ManaPool pool={myPs.mana_pool || {}} /></div>
+              <div className="ml-auto text-gray-500 text-xs">
+                ライブラリ{myPs.library?.length} / 墓地{myPs.graveyard?.length}
+              </div>
+            </div>
+
+            {/* 手札 */}
+            <div className="flex gap-1 overflow-x-auto pb-1">
+              {(myPs.hand || []).map(cardId => {
+                const card = cardData[cardId]
+                const canPlay = card?.card_type === 'land'
+                  ? !myPs.land_played && canPlaySorcerySpeed(gs, myId)
+                  : hasPrio && (card?.mana_cost
+                    ? hasMana(myPs.mana_pool, card.mana_cost)
+                    : true)
+                return (
+                  <HandCard
+                    key={cardId}
+                    card={card}
+                    highlight={selectedHandCard === cardId}
+                    disabled={!canPlay}
+                    onClick={() => handleHandCardClick(cardId)}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ─── サイドパネル ─── */}
+        <div className="w-48 bg-gray-900 border-l border-gray-700 flex flex-col p-3 gap-3 overflow-y-auto">
+          {/* 選択中の手札 */}
+          {selectedHandCard && (
+            <div className="bg-gray-800 border border-purple-600 rounded-lg p-3">
+              <p className="text-purple-300 text-xs font-bold mb-2">{cardData[selectedHandCard]?.name}</p>
+              <p className="text-gray-400 text-xs mb-3 leading-relaxed line-clamp-4">
+                {cardData[selectedHandCard]?.effect_text || '効果なし'}
+              </p>
+              <button
+                onClick={handleCastSpell}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded"
+              >
+                詠唱する
+              </button>
+              <button
+                onClick={() => setSelectedHandCard(null)}
+                className="w-full mt-1 text-gray-500 hover:text-gray-300 text-xs py-1"
+              >
+                キャンセル
+              </button>
+            </div>
+          )}
+
+          {/* 攻撃宣言 */}
+          {gs.phase === 'declare_attackers' && isActive && (
+            <button
+              onClick={handleConfirmAttackers}
+              className="w-full bg-red-700 hover:bg-red-600 text-white text-sm py-2.5 rounded-lg font-medium"
+            >
+              ⚔ 攻撃宣言 ({selectedAttackers.length})
+            </button>
+          )}
+
+          {/* 戦闘ダメージ解決 */}
+          {gs.phase === 'combat_damage' && isActive && hasPrio && (
+            <button
+              onClick={handleResolveCombat}
+              className="w-full bg-orange-700 hover:bg-orange-600 text-white text-sm py-2.5 rounded-lg font-medium"
+            >
+              💥 ダメージ解決
+            </button>
+          )}
+
+          {/* 優先権パス */}
+          {hasPrio && gs.phase !== 'declare_attackers' && gs.phase !== 'combat_damage' && (
+            <button
+              onClick={handlePassPriority}
+              className="w-full bg-gray-700 hover:bg-gray-600 text-white text-sm py-2.5 rounded-lg"
+            >
+              優先権パス
+            </button>
+          )}
+
+          {/* フェーズスキップ */}
+          {isActive && ['main1', 'main2', 'end_step'].includes(gs.phase) && (
+            <button
+              onClick={handlePassPhase}
+              className="w-full bg-gray-700 hover:bg-gray-600 text-blue-300 text-sm py-2 rounded-lg"
+            >
+              次のフェーズ →
+            </button>
+          )}
+
+          {/* ログ */}
+          <div className="flex-1 bg-gray-950 rounded-lg p-2 overflow-y-auto max-h-64">
+            <p className="text-gray-600 text-xs mb-1">ログ</p>
+            {[...(gs.log || [])].reverse().map((entry, i) => (
+              <p key={i} className="text-gray-400 text-xs leading-relaxed border-b border-gray-800 py-0.5">
+                {entry.msg}
+              </p>
+            ))}
+          </div>
+
+          {/* 墓地 */}
+          {myPs.graveyard?.length > 0 && (
+            <div>
+              <p className="text-gray-500 text-xs mb-1">墓地 ({myPs.graveyard.length})</p>
+              <div className="text-gray-400 text-xs space-y-0.5 max-h-24 overflow-y-auto">
+                {myPs.graveyard.map((cid, i) => (
+                  <p key={i}>{cardData[cid]?.name || '?'}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
