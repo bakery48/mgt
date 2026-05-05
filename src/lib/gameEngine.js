@@ -108,6 +108,7 @@ export function initGameState(playerOrder, deckMap) {
       library: shuffled.slice(7),
       battlefield: [],
       graveyard: [],
+      exile: [],
       land_played: false,
     }
   }
@@ -182,16 +183,33 @@ export function playLand(state, pid, cardId, card) {
   }, `${card.name} をプレイ（土地）`)
 }
 
-// 呪文をスタックに積む（kicker対応）
-export function castSpell(state, pid, cardId, card, kicker = false) {
+// 呪文をスタックに積む（kicker / delve 対応）
+export function castSpell(state, pid, cardId, card, kicker = false, delveCount = 0) {
   const ps = state.players[pid]
   if (!ps.hand.includes(cardId)) return state
   const isFlash = (card.keywords || []).some(k => k.type === 'flash')
+  const hasDelve = (card.keywords || []).some(k => k.type === 'delve')
   const instant = card.card_type === 'instant' || isFlash
   if (instant ? !canPlayInstantSpeed(state, pid) : !canPlaySorcerySpeed(state, pid)) return state
-  if (card.mana_cost && !hasMana(ps.mana_pool, card.mana_cost)) return state
 
-  let newPool = card.mana_cost ? spendMana(ps.mana_pool, card.mana_cost) : { ...ps.mana_pool }
+  // 探査（delve）: 墓地のカードを追放してジェネリックコストを軽減
+  let graveyard = [...ps.graveyard]
+  let exile = [...(ps.exile || [])]
+  let actualDelve = 0
+  if (hasDelve && delveCount > 0) {
+    actualDelve = Math.min(delveCount, graveyard.length)
+    exile = [...exile, ...graveyard.slice(-actualDelve)]
+    graveyard = graveyard.slice(0, -actualDelve)
+  }
+
+  // マナコスト計算（delve分だけジェネリック軽減）
+  let newPool = { ...ps.mana_pool }
+  if (card.mana_cost) {
+    const cost = parseMana(card.mana_cost)
+    cost.C = Math.max(0, (cost.C || 0) - actualDelve)
+    if (!hasMana(newPool, cost)) return state
+    newPool = spendMana(newPool, cost)
+  }
 
   // キッカーコスト
   if (kicker) {
@@ -211,9 +229,15 @@ export function castSpell(state, pid, cardId, card, kicker = false) {
     stack: [...state.stack, entry],
     players: {
       ...state.players,
-      [pid]: { ...ps, hand: ps.hand.filter(id => id !== cardId), mana_pool: newPool },
+      [pid]: {
+        ...ps,
+        hand: ps.hand.filter(id => id !== cardId),
+        graveyard,
+        exile,
+        mana_pool: newPool,
+      },
     },
-  }, `${card.name} をスタックに積んだ${kicker ? '（キッカー）' : ''}`)
+  }, `${card.name} をスタックに積んだ${kicker ? '（キッカー）' : ''}${actualDelve > 0 ? `（探査×${actualDelve}）` : ''}`)
 }
 
 // スタック最上位を解決
@@ -236,12 +260,20 @@ function resolveStack(state, cardData) {
     }
     newState = log(newState, `${card?.name} が戦場に出た${top.kicked ? '（キッカー済）' : ''}`)
   } else {
-    // instant/sorcery → 墓地
-    newState.players = {
-      ...newState.players,
-      [top.controller]: { ...ps, graveyard: [...ps.graveyard, top.card_id] },
+    // instant/sorcery → フラッシュバックなら追放、それ以外は墓地
+    if (top.flashback) {
+      newState.players = {
+        ...newState.players,
+        [top.controller]: { ...ps, exile: [...(ps.exile || []), top.card_id] },
+      }
+      newState = log(newState, `${card?.name} 解決 → 追放`)
+    } else {
+      newState.players = {
+        ...newState.players,
+        [top.controller]: { ...ps, graveyard: [...ps.graveyard, top.card_id] },
+      }
+      newState = log(newState, `${card?.name} 解決 → 墓地へ`)
     }
-    newState = log(newState, `${card?.name} 解決 → 墓地へ`)
   }
   newState.priority = newState.active_player
   return newState
@@ -302,6 +334,21 @@ export function advancePhase(state) {
     s.priority = ap
   } else if (next === 'cleanup') {
     const ap = state.active_player
+    // アンアース済みクリーチャーを全プレイヤーで追放
+    for (const pid of order) {
+      const ps = s.players[pid]
+      const unearthed = ps.battlefield.filter(p => p.unearthed)
+      if (unearthed.length > 0) {
+        s.players = {
+          ...s.players,
+          [pid]: {
+            ...ps,
+            battlefield: ps.battlefield.filter(p => !p.unearthed),
+            exile: [...(ps.exile || []), ...unearthed.map(p => p.card_id)],
+          },
+        }
+      }
+    }
     const ps = s.players[ap]
     s.players = {
       ...s.players,
@@ -372,10 +419,9 @@ export function resolveCombatDamage(state, cardData) {
     const attKw = attKws.map(k => k.type)
     // protectionカラー: このクリーチャーはそのカラーからダメージを受けない
     const attProtection = attKws.find(k => k.type === 'protection')?.value ?? null
-    const power = attPerm.power ?? attCard.power ?? 0
     const blockerIids = state.combat.blockers[attIid] || []
     const blockers = blockerIids.map(biid => dpBf.find(p => p.instance_id === biid)).filter(Boolean)
-
+    const { power } = getEffectivePT(attPerm, attCard, apBf, cardData)
     if (blockers.length === 0) {
       defLife -= power
       if (attKw.includes('lifelink')) apLife += power
@@ -386,8 +432,7 @@ export function resolveCombatDamage(state, cardData) {
         const blkKws = blkCard.keywords || []
         const blkKw = blkKws.map(k => k.type)
         const blkProtection = blkKws.find(k => k.type === 'protection')?.value ?? null
-        const blkPower = blk.power ?? blkCard.power ?? 0
-        const blkTough = blk.toughness ?? blkCard.toughness ?? 1
+        const { power: blkPower, toughness: blkTough } = getEffectivePT(blk, blkCard, dpBf, cardData)
 
         // ブロッカーがprotection持ちなら攻撃クリーチャーのカラーからダメージ無効
         const blkImmuneToAtt = blkProtection && attCard.color === blkProtection
@@ -417,24 +462,35 @@ export function resolveCombatDamage(state, cardData) {
     }
   }
 
-  // 致死ダメージ処理
-  const filterLethal = (bf, pid, isAP) => {
+  // 致死ダメージ処理（装備込みタフネス + 装備デタッチ）
+  const filterLethal = (bf) => {
+    const deadIids = []
     const graveyard = []
     const alive = bf.filter(p => {
       const card = cardData[p.card_id] || {}
+      if (card.card_type !== 'creature') return true  // 装備品などは死なない
       const kw = (card.keywords || []).map(k => k.type)
-      const tough = p.toughness ?? card.toughness ?? 1
-      if (!kw.includes('indestructible') && p.damage >= tough) {
+      const { toughness: effTough } = getEffectivePT(p, card, bf, cardData)
+      if (!kw.includes('indestructible') && p.damage >= effTough) {
+        deadIids.push(p.instance_id)
         graveyard.push(p.card_id)
         return false
       }
       return true
     })
-    return { alive, graveyard }
+    // 死んだクリーチャーから装備をデタッチ
+    return {
+      alive: alive.map(p =>
+        p.attached_to && deadIids.includes(p.attached_to)
+          ? { ...p, attached_to: null }
+          : p
+      ),
+      graveyard,
+    }
   }
 
-  const { alive: apAlive, graveyard: apDead } = filterLethal(apBf, ap, true)
-  const { alive: dpAlive, graveyard: dpDead } = filterLethal(dpBf, def, false)
+  const { alive: apAlive, graveyard: apDead } = filterLethal(apBf)
+  const { alive: dpAlive, graveyard: dpDead } = filterLethal(dpBf)
 
   let s = {
     ...state,
@@ -461,6 +517,105 @@ export function resolveCombatDamage(state, cardData) {
 // 状況起因処理（ライフ0チェック等）
 export function checkStateBasedActions(state) {
   return state
+}
+
+// 装備品の有効P/T計算（同一プレイヤーの戦場の装備を参照）
+export function getEffectivePT(perm, card, battlefield, cardData) {
+  let power = perm.power ?? card?.power ?? 0
+  let toughness = perm.toughness ?? card?.toughness ?? 1
+  for (const eq of battlefield) {
+    if (eq.attached_to !== perm.instance_id) continue
+    const eqCard = cardData[eq.card_id] || {}
+    const eqKw = (eqCard.keywords || []).find(k => k.type === 'equip')
+    if (eqKw) {
+      power += eqKw.power_bonus ?? 0
+      toughness += eqKw.toughness_bonus ?? 0
+    }
+  }
+  return { power, toughness }
+}
+
+// 装備（アーティファクトをクリーチャーに付ける）
+export function equipArtifact(state, pid, equipIid, targetIid, cardData) {
+  if (!canPlaySorcerySpeed(state, pid)) return state
+  const ps = state.players[pid]
+  const equipPerm = ps.battlefield.find(p => p.instance_id === equipIid)
+  if (!equipPerm) return state
+  const equipCard = cardData[equipPerm.card_id] || {}
+  const equipKw = (equipCard.keywords || []).find(k => k.type === 'equip')
+  if (!equipKw) return state
+  const costStr = `{${equipKw.value ?? 1}}`
+  if (!hasMana(ps.mana_pool, costStr)) return state
+  const target = ps.battlefield.find(p => p.instance_id === targetIid)
+  if (!target) return state
+  const targetCard = cardData[target.card_id] || {}
+  if (targetCard.card_type !== 'creature') return state
+  const newPool = spendMana(ps.mana_pool, costStr)
+  return log({
+    ...state,
+    players: {
+      ...state.players,
+      [pid]: {
+        ...ps,
+        mana_pool: newPool,
+        battlefield: ps.battlefield.map(p =>
+          p.instance_id === equipIid ? { ...p, attached_to: targetIid } : p
+        ),
+      },
+    },
+  }, `${equipCard.name} を装備（${targetCard.name}）`)
+}
+
+// フラッシュバック（墓地から詠唱→追放）
+export function castFlashback(state, pid, cardId, card) {
+  const ps = state.players[pid]
+  if (!(ps.graveyard || []).includes(cardId)) return state
+  const fbKw = (card?.keywords || []).find(k => k.type === 'flashback')
+  if (!fbKw?.value) return state
+  const isInstant = card.card_type === 'instant'
+  if (isInstant ? !canPlayInstantSpeed(state, pid) : !canPlaySorcerySpeed(state, pid)) return state
+  if (!hasMana(ps.mana_pool, fbKw.value)) return state
+  const newPool = spendMana(ps.mana_pool, fbKw.value)
+  const entry = { id: uuidv4(), type: 'spell', card_id: cardId, card, controller: pid, flashback: true }
+  return log({
+    ...state,
+    stack: [...state.stack, entry],
+    priority_passed: [],
+    players: {
+      ...state.players,
+      [pid]: {
+        ...ps,
+        graveyard: ps.graveyard.filter(id => id !== cardId),
+        mana_pool: newPool,
+      },
+    },
+  }, `${card.name} をフラッシュバックで詠唱`)
+}
+
+// アンアース（墓地からクリーチャーを戦場へ、クリーンアップ時に追放）
+export function unearthCreature(state, pid, cardId, card) {
+  const ps = state.players[pid]
+  if (!(ps.graveyard || []).includes(cardId)) return state
+  const unearthKw = (card?.keywords || []).find(k => k.type === 'unearth')
+  if (!unearthKw?.value) return state
+  if (!canPlaySorcerySpeed(state, pid)) return state
+  if (!hasMana(ps.mana_pool, unearthKw.value)) return state
+  const newPool = spendMana(ps.mana_pool, unearthKw.value)
+  const perm = mkPermanent(cardId, card)
+  perm.summoning_sick = false  // 速攻を持つ扱い
+  perm.unearthed = true
+  return log({
+    ...state,
+    players: {
+      ...state.players,
+      [pid]: {
+        ...ps,
+        graveyard: ps.graveyard.filter(id => id !== cardId),
+        battlefield: [...ps.battlefield, perm],
+        mana_pool: newPool,
+      },
+    },
+  }, `${card.name} をアンアースで戦場へ`)
 }
 
 // サイクリング（手札から捨てて1ドロー）

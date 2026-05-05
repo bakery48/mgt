@@ -7,6 +7,7 @@ import {
   initGameState, tapForMana, playLand, castSpell, cycleCard, passPriority,
   advancePhase, declareAttackers, declareBlockers, resolveCombatDamage,
   canPlaySorcerySpeed, hasMana, getOpponent, getValidBlockers,
+  castFlashback, unearthCreature, equipArtifact, getEffectivePT,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -136,6 +137,8 @@ export default function GamePlayPage() {
   const [loading, setLoading] = useState(true)
   const [selectedHandCard, setSelectedHandCard] = useState(null)
   const [kickerPaid, setKickerPaid] = useState(false)
+  const [delveCount, setDelveCount] = useState(0)
+  const [pendingEquip, setPendingEquip] = useState(null)   // equipment instance_id
   const [selectedAttackers, setSelectedAttackers] = useState([])
   const [pendingBlocker, setPendingBlocker] = useState(null)
   const [blockingAssignments, setBlockingAssignments] = useState({})
@@ -256,6 +259,8 @@ export default function GamePlayPage() {
     saveGs(newGs)
     setSelectedHandCard(null)
     setKickerPaid(false)
+    setDelveCount(0)
+    setPendingEquip(null)
     setSelectedAttackers([])
     setPendingBlocker(null)
     setBlockingAssignments({})
@@ -282,7 +287,7 @@ export default function GamePlayPage() {
   const handleCastSpell = () => {
     if (!selectedHandCard) return
     const card = cardData[selectedHandCard]
-    const newGs = castSpell(gs, myId, selectedHandCard, card, kickerPaid)
+    const newGs = castSpell(gs, myId, selectedHandCard, card, kickerPaid, delveCount)
     if (newGs !== gs) dispatch(newGs)
   }
 
@@ -291,6 +296,36 @@ export default function GamePlayPage() {
     if (!card || !gs) return
     const newGs = cycleCard(gs, myId, cardId, card)
     if (newGs !== gs) dispatch(newGs)
+  }
+
+  const handleFlashback = (cardId) => {
+    const card = cardData[cardId]
+    if (!card || !gs) return
+    const newGs = castFlashback(gs, myId, cardId, card)
+    if (newGs !== gs) dispatch(newGs)
+  }
+
+  const handleUnearth = (cardId) => {
+    const card = cardData[cardId]
+    if (!card || !gs) return
+    const newGs = unearthCreature(gs, myId, cardId, card)
+    if (newGs !== gs) dispatch(newGs)
+  }
+
+  const handleEquipClick = (instanceId) => {
+    // 装備品をクリック → 装備モード開始/解除
+    if (pendingEquip === instanceId) {
+      setPendingEquip(null)
+    } else {
+      setPendingEquip(instanceId)
+    }
+  }
+
+  const handleEquipTarget = (targetIid) => {
+    if (!pendingEquip) return
+    const newGs = equipArtifact(gs, myId, pendingEquip, targetIid, cardData)
+    if (newGs !== gs) dispatch(newGs)
+    else setPendingEquip(null)
   }
 
   const handleTapLand = (instanceId) => {
@@ -538,24 +573,38 @@ export default function GamePlayPage() {
                 const card = cardData[perm.card_id]
                 const isLand = card?.card_type === 'land'
                 const isCrea = card?.card_type === 'creature'
+                const isEquip = card?.card_type === 'artifact' &&
+                  (card?.keywords || []).some(k => k.type === 'equip')
                 const canAtt = gs.phase === 'declare_attackers' && isActive && isCrea && !perm.summoning_sick && !perm.tapped
                 const isSelAtt = selectedAttackers.includes(perm.instance_id)
                 const isBlockPhase = gs.phase === 'declare_blockers' && !isActive
                 const canBlk = isBlockPhase && isCrea && !perm.tapped && !perm.summoning_sick
                 const isSelBlk = pendingBlocker === perm.instance_id
                 const isAssignedBlk = Object.values(blockingAssignments).includes(perm.instance_id)
+                const canEquipThis = isEquip && isActive && canPlaySorcerySpeed(gs, myId)
+                const isSelEquip = pendingEquip === perm.instance_id
+                const isEquipTarget = pendingEquip && isCrea
+                // 装備込みP/T表示
+                const effPT = isCrea ? getEffectivePT(perm, card, myPs.battlefield, cardData) : null
                 return (
                   <MiniCard
                     key={perm.instance_id}
                     card={card}
-                    perm={{ ...perm, attacking: isSelAtt || perm.attacking }}
-                    selected={isSelAtt || isSelBlk || isAssignedBlk}
+                    perm={{
+                      ...perm,
+                      attacking: isSelAtt || perm.attacking,
+                      power: effPT?.power ?? perm.power,
+                      toughness: effPT?.toughness ?? perm.toughness,
+                    }}
+                    selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip)}
                     onClick={() => {
                       if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
                       else if (canAtt) handleToggleAttacker(perm.instance_id)
                       else if (canBlk) handleSelectBlocker(perm.instance_id)
+                      else if (isEquipTarget && !isEquip) handleEquipTarget(perm.instance_id)
+                      else if (canEquipThis) handleEquipClick(perm.instance_id)
                     }}
-                    disabled={!isLand && !canAtt && !canBlk}
+                    disabled={!isLand && !canAtt && !canBlk && !canEquipThis && !(isEquipTarget && !isEquip)}
                   />
                 )
               })}
@@ -568,6 +617,7 @@ export default function GamePlayPage() {
               <div className="ml-2"><ManaPool pool={myPs.mana_pool || {}} /></div>
               <div className="ml-auto text-gray-500 text-xs">
                 ライブラリ{myPs.library?.length} / 墓地{myPs.graveyard?.length}
+                {(myPs.exile?.length ?? 0) > 0 && ` / 追放${myPs.exile.length}`}
               </div>
             </div>
 
@@ -614,23 +664,35 @@ export default function GamePlayPage() {
                 {/* キッカートグル */}
                 {kickerKw && (
                   <label className="flex items-center gap-2 mb-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={kickerPaid}
+                    <input type="checkbox" checked={kickerPaid}
                       onChange={e => setKickerPaid(e.target.checked)}
-                      className="accent-yellow-400"
-                    />
+                      className="accent-yellow-400" />
                     <span className="text-yellow-400 text-xs">
-                      キッカー ({`{${kickerKw.value ?? 1}}`}) を支払う
+                      キッカー ({`{${kickerKw.value ?? 1}}`})
                     </span>
                   </label>
+                )}
+
+                {/* 探査スライダー */}
+                {(selCard?.keywords || []).some(k => k.type === 'delve') && (
+                  <div className="mb-2">
+                    <p className="text-teal-400 text-xs mb-1">
+                      探査: 墓地から {delveCount} 枚追放
+                    </p>
+                    <input type="range" min={0}
+                      max={myPs.graveyard?.length ?? 0}
+                      value={delveCount}
+                      onChange={e => setDelveCount(+e.target.value)}
+                      className="w-full accent-teal-400"
+                    />
+                  </div>
                 )}
 
                 <button
                   onClick={handleCastSpell}
                   className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded mb-1"
                 >
-                  詠唱する{kickerPaid ? '（キッカー）' : ''}
+                  詠唱する{kickerPaid ? '（K）' : ''}{delveCount > 0 ? `（探査×${delveCount}）` : ''}
                 </button>
 
                 {/* サイクリング */}
@@ -644,7 +706,7 @@ export default function GamePlayPage() {
                 )}
 
                 <button
-                  onClick={() => { setSelectedHandCard(null); setKickerPaid(false) }}
+                  onClick={() => { setSelectedHandCard(null); setKickerPaid(false); setDelveCount(0) }}
                   className="w-full text-gray-500 hover:text-gray-300 text-xs py-1"
                 >
                   キャンセル
@@ -711,8 +773,18 @@ export default function GamePlayPage() {
             </button>
           )}
 
+          {/* 装備モードヒント */}
+          {pendingEquip && (
+            <div className="bg-amber-900/40 border border-amber-600 rounded-lg px-2 py-1.5 text-amber-300 text-xs text-center">
+              装備先のクリーチャーを選択
+              <button onClick={() => setPendingEquip(null)} className="block w-full text-amber-500 hover:text-amber-300 mt-1">
+                キャンセル
+              </button>
+            </div>
+          )}
+
           {/* ログ */}
-          <div className="flex-1 bg-gray-950 rounded-lg p-2 overflow-y-auto max-h-64">
+          <div className="flex-1 bg-gray-950 rounded-lg p-2 overflow-y-auto max-h-48">
             <p className="text-gray-600 text-xs mb-1">ログ</p>
             {[...(gs.log || [])].reverse().map((entry, i) => (
               <p key={i} className="text-gray-400 text-xs leading-relaxed border-b border-gray-800 py-0.5">
@@ -721,14 +793,35 @@ export default function GamePlayPage() {
             ))}
           </div>
 
-          {/* 墓地 */}
+          {/* 墓地（フラッシュバック/アンアース対応） */}
           {myPs.graveyard?.length > 0 && (
             <div>
               <p className="text-gray-500 text-xs mb-1">墓地 ({myPs.graveyard.length})</p>
-              <div className="text-gray-400 text-xs space-y-0.5 max-h-24 overflow-y-auto">
-                {myPs.graveyard.map((cid, i) => (
-                  <p key={i}>{cardData[cid]?.name || '?'}</p>
-                ))}
+              <div className="space-y-0.5 max-h-28 overflow-y-auto">
+                {myPs.graveyard.map((cid, i) => {
+                  const card = cardData[cid]
+                  const fbKw = (card?.keywords || []).find(k => k.type === 'flashback')
+                  const unKw = (card?.keywords || []).find(k => k.type === 'unearth')
+                  const canFb = fbKw && hasPrio && hasMana(myPs.mana_pool, fbKw.value || '{0}')
+                  const canUn = unKw && canPlaySorcerySpeed(gs, myId) && hasMana(myPs.mana_pool, unKw.value || '{0}')
+                  return (
+                    <div key={i} className="flex items-center gap-1">
+                      <span className="text-gray-400 text-xs flex-1 truncate">{card?.name || '?'}</span>
+                      {canFb && (
+                        <button onClick={() => handleFlashback(cid)}
+                          className="text-xs bg-indigo-700 hover:bg-indigo-600 text-white px-1 py-0.5 rounded shrink-0">
+                          FB
+                        </button>
+                      )}
+                      {canUn && (
+                        <button onClick={() => handleUnearth(cid)}
+                          className="text-xs bg-emerald-700 hover:bg-emerald-600 text-white px-1 py-0.5 rounded shrink-0">
+                          UN
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}

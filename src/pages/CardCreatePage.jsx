@@ -44,6 +44,18 @@ const MTG_KEYWORD_LABELS = {
   equip: '装備', morph: '変異', unearth: '発掘', delve: '探査',
 }
 
+// 値が必要な上級キーワード
+const HARD_KEYWORDS = ['flashback', 'equip', 'unearth', 'ward', 'protection']
+const HARD_KW_DEFAULTS = {
+  flashback:  { value: '{2}' },
+  equip:      { value: 2, power_bonus: 1, toughness_bonus: 1 },
+  unearth:    { value: '{1}{B}' },
+  ward:       { value: 2 },
+  protection: { value: 'red' },
+}
+const PROTECTION_COLORS = ['white','blue','black','red','green']
+const PROTECTION_COLOR_LABELS = { white:'白', blue:'青', black:'黒', red:'赤', green:'緑' }
+
 const ORIGINAL_KEYWORDS = ['拝金', '徴収', '栄光', '簒奪']
 const TRIGGERS = ['etb', 'upkeep', 'attack', 'damage']
 const TRIGGER_LABELS = { etb: '戦場に出た時', upkeep: 'アップキープ', attack: '攻撃時', damage: 'ダメージ時' }
@@ -56,6 +68,9 @@ export default function CardCreatePage() {
   })
 
   const [selectedMtgKeywords, setSelectedMtgKeywords] = useState([])
+  const [hardKwConfigs, setHardKwConfigs] = useState(
+    Object.fromEntries(Object.entries(HARD_KW_DEFAULTS).map(([k, v]) => [k, { ...v }]))
+  )
   const [originalKeywords, setOriginalKeywords] = useState(
     ORIGINAL_KEYWORDS.reduce((acc, k) => ({ ...acc, [k]: { enabled: false, value: '', trigger: 'etb' } }), {})
   )
@@ -93,8 +108,17 @@ export default function CardCreatePage() {
     setImagePreview(URL.createObjectURL(file))
   }
 
+  const updateHardKw = (kw, field, value) =>
+    setHardKwConfigs(prev => ({ ...prev, [kw]: { ...prev[kw], [field]: value } }))
+
   const buildKeywords = () => {
-    const mtg = selectedMtgKeywords.map(type => ({ type }))
+    const mtg = selectedMtgKeywords.map(type => {
+      if (HARD_KEYWORDS.includes(type)) {
+        const cfg = hardKwConfigs[type] || {}
+        return { type, ...cfg }
+      }
+      return { type }
+    })
     const original = ORIGINAL_KEYWORDS
       .filter(k => originalKeywords[k].enabled)
       .map(k => ({
@@ -306,6 +330,86 @@ export default function CardCreatePage() {
             ))}
           </div>
         </section>
+
+        {/* 上級キーワード設定（選択時のみ表示） */}
+        {HARD_KEYWORDS.some(k => selectedMtgKeywords.includes(k)) && (
+          <section className="bg-gray-800 rounded-xl p-6 border border-amber-700/50">
+            <h2 className="text-lg font-semibold text-amber-400 mb-4">上級キーワード設定</h2>
+            <div className="space-y-4">
+              {HARD_KEYWORDS.filter(k => selectedMtgKeywords.includes(k)).map(kw => (
+                <div key={kw} className="border border-gray-700 rounded-lg p-4">
+                  <p className="text-white text-sm font-medium mb-3">{MTG_KEYWORD_LABELS[kw]}</p>
+                  {kw === 'flashback' && (
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">フラッシュバックコスト（例: {'{2}{U}'}）</label>
+                      <input value={hardKwConfigs.flashback.value}
+                        onChange={e => updateHardKw('flashback', 'value', e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm"
+                        placeholder="{2}{U}" />
+                    </div>
+                  )}
+                  {kw === 'equip' && (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">装備コスト</label>
+                        <input type="number" min={0} value={hardKwConfigs.equip.value}
+                          onChange={e => updateHardKw('equip', 'value', +e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">+パワー</label>
+                        <input type="number" min={0} value={hardKwConfigs.equip.power_bonus}
+                          onChange={e => updateHardKw('equip', 'power_bonus', +e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 mb-1">+タフネス</label>
+                        <input type="number" min={0} value={hardKwConfigs.equip.toughness_bonus}
+                          onChange={e => updateHardKw('equip', 'toughness_bonus', +e.target.value)}
+                          className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm" />
+                      </div>
+                    </div>
+                  )}
+                  {kw === 'unearth' && (
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">アンアースコスト（例: {'{1}{B}'}）</label>
+                      <input value={hardKwConfigs.unearth.value}
+                        onChange={e => updateHardKw('unearth', 'value', e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm"
+                        placeholder="{1}{B}" />
+                    </div>
+                  )}
+                  {kw === 'ward' && (
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-1">護法コスト（マナ数）</label>
+                      <input type="number" min={0} value={hardKwConfigs.ward.value}
+                        onChange={e => updateHardKw('ward', 'value', +e.target.value)}
+                        className="w-32 bg-gray-900 border border-gray-600 rounded px-3 py-2 text-white text-sm" />
+                    </div>
+                  )}
+                  {kw === 'protection' && (
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-2">プロテクション対象</label>
+                      <div className="flex gap-2">
+                        {PROTECTION_COLORS.map(c => (
+                          <button key={c} type="button"
+                            onClick={() => updateHardKw('protection', 'value', c)}
+                            className={`px-3 py-1.5 rounded text-xs border transition-colors ${
+                              hardKwConfigs.protection.value === c
+                                ? 'bg-purple-600 border-purple-500 text-white'
+                                : 'bg-gray-900 border-gray-600 text-gray-300'
+                            }`}>
+                            {PROTECTION_COLOR_LABELS[c]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* 独自キーワード */}
         <section className="bg-gray-800 rounded-xl p-6 border border-gray-700">
