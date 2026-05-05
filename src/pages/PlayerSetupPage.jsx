@@ -62,7 +62,7 @@ export default function PlayerSetupPage() {
           </form>
 
           <p className="text-gray-500 text-xs text-center mt-4">
-            初期所持金: 10,000G ＋ スターターカード30枚
+            初期所持金: 10,000G ＋ ランダムスターターデッキ（40枚）
           </p>
         </div>
       </div>
