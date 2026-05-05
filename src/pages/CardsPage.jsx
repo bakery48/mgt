@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { usePlayer } from '../contexts/PlayerContext'
 
 const TYPE_LABELS = {
   creature: 'クリーチャー',
@@ -126,6 +127,7 @@ function CardItem({ card }) {
 
 export default function CardsPage() {
   const navigate = useNavigate()
+  const { player, clearPlayer } = usePlayer()
   const [cards, setCards] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -152,14 +154,27 @@ export default function CardsPage() {
   return (
     <div className="min-h-screen">
       <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-xl font-bold text-purple-400">MTG Board Game</h1>
-          <button
-            onClick={() => navigate('/cards/create')}
-            className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-          >
-            + カード作成
-          </button>
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          <h1 className="text-xl font-bold text-purple-400 shrink-0">MTG Board Game</h1>
+          <div className="flex items-center gap-3 ml-auto">
+            <div className="text-right hidden sm:block">
+              <div className="text-white text-sm font-medium">{player?.username}</div>
+              <div className="text-yellow-400 text-xs font-mono">{player?.balance?.toLocaleString()}G</div>
+            </div>
+            <button
+              onClick={() => navigate('/cards/create')}
+              className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4 py-2 rounded-lg transition-colors shrink-0"
+            >
+              + カード作成
+            </button>
+            <button
+              onClick={clearPlayer}
+              className="text-gray-500 hover:text-gray-300 text-xs px-2 py-2 rounded transition-colors shrink-0"
+              title="プレイヤー変更"
+            >
+              退出
+            </button>
+          </div>
         </div>
       </header>
 

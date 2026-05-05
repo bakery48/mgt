@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
+import { usePlayer } from '../contexts/PlayerContext'
 
 const CARD_TYPES = ['creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'land']
 const CARD_TYPE_LABELS = {
@@ -48,6 +49,7 @@ const TRIGGER_LABELS = { etb: '戦場に出た時', upkeep: 'アップキープ'
 
 export default function CardCreatePage() {
   const navigate = useNavigate()
+  const { player } = usePlayer()
   const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: { card_type: 'creature', color: 'colorless' },
   })
@@ -133,6 +135,7 @@ export default function CardCreatePage() {
         effect_text: data.effect_text || null,
         keywords: buildKeywords(),
         art_url: artUrl,
+        creator_id: player?.id ?? null,
       }
 
       const { error: insertError } = await supabase.from('cards').insert(cardData)
