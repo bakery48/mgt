@@ -7,7 +7,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/cards" element={<CardsPage />} />
-        <Route path="/cards/new" element={<CardCreatePage />} />
+        <Route path="/cards/create" element={<CardCreatePage />} />
         <Route path="*" element={<Navigate to="/cards" replace />} />
       </Routes>
     </BrowserRouter>

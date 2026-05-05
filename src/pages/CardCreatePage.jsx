@@ -15,18 +15,12 @@ const CARD_TYPE_LABELS = {
 
 const COLORS = ['white', 'blue', 'black', 'red', 'green', 'colorless', 'multicolor']
 const COLOR_LABELS = {
-  white: '白',
-  blue: '青',
-  black: '黒',
-  red: '赤',
-  green: '緑',
-  colorless: '無色',
-  multicolor: '多色',
+  white: '白', blue: '青', black: '黒', red: '赤', green: '緑', colorless: '無色', multicolor: '多色',
 }
 const COLOR_STYLES = {
-  white: 'bg-yellow-50 border-yellow-200 text-yellow-900',
+  white: 'bg-yellow-50 border-yellow-300 text-yellow-900',
   blue: 'bg-blue-600 border-blue-400 text-white',
-  black: 'bg-gray-900 border-gray-600 text-white',
+  black: 'bg-gray-900 border-gray-500 text-white',
   red: 'bg-red-600 border-red-400 text-white',
   green: 'bg-green-700 border-green-500 text-white',
   colorless: 'bg-gray-500 border-gray-400 text-white',
@@ -55,7 +49,7 @@ const TRIGGER_LABELS = { etb: '戦場に出た時', upkeep: 'アップキープ'
 export default function CardCreatePage() {
   const navigate = useNavigate()
   const { register, handleSubmit, watch, formState: { errors } } = useForm({
-    defaultValues: { type: 'creature', color: 'colorless' },
+    defaultValues: { card_type: 'creature', color: 'colorless' },
   })
 
   const [selectedMtgKeywords, setSelectedMtgKeywords] = useState([])
@@ -67,7 +61,7 @@ export default function CardCreatePage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const cardType = watch('type')
+  const cardType = watch('card_type')
 
   const toggleMtgKeyword = (kw) => {
     setSelectedMtgKeywords(prev =>
@@ -113,7 +107,7 @@ export default function CardCreatePage() {
     setError('')
 
     try {
-      let imageUrl = null
+      let artUrl = null
 
       if (imageFile) {
         const ext = imageFile.name.split('.').pop()
@@ -121,27 +115,24 @@ export default function CardCreatePage() {
         const { error: uploadError } = await supabase.storage
           .from('card-images')
           .upload(fileName, imageFile)
-
         if (uploadError) throw uploadError
 
         const { data: urlData } = supabase.storage
           .from('card-images')
           .getPublicUrl(fileName)
-        imageUrl = urlData.publicUrl
+        artUrl = urlData.publicUrl
       }
-
-      const keywords = buildKeywords()
 
       const cardData = {
         name: data.name,
-        type: data.type,
+        card_type: data.card_type,
         color: data.color,
         mana_cost: data.mana_cost || null,
-        power: cardType === 'creature' ? (parseInt(data.power, 10) ?? null) : null,
-        toughness: cardType === 'creature' ? (parseInt(data.toughness, 10) ?? null) : null,
+        power: data.card_type === 'creature' ? (parseInt(data.power, 10) || null) : null,
+        toughness: data.card_type === 'creature' ? (parseInt(data.toughness, 10) || null) : null,
         effect_text: data.effect_text || null,
-        keywords,
-        image_url: imageUrl,
+        keywords: buildKeywords(),
+        art_url: artUrl,
       }
 
       const { error: insertError } = await supabase.from('cards').insert(cardData)
@@ -171,7 +162,6 @@ export default function CardCreatePage() {
         {/* 基本情報 */}
         <section className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <h2 className="text-lg font-semibold text-purple-400 mb-4">基本情報</h2>
-
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-1">カード名 *</label>
@@ -187,8 +177,8 @@ export default function CardCreatePage() {
               <label className="block text-sm font-medium text-gray-300 mb-2">タイプ *</label>
               <div className="flex flex-wrap gap-2">
                 {CARD_TYPES.map(t => (
-                  <label key={t} className="flex items-center gap-1.5 cursor-pointer">
-                    <input type="radio" value={t} {...register('type')} className="hidden" />
+                  <label key={t} className="cursor-pointer">
+                    <input type="radio" value={t} {...register('card_type')} className="hidden" />
                     <span className={`px-3 py-1.5 rounded-lg text-sm border cursor-pointer transition-colors ${
                       cardType === t
                         ? 'bg-purple-600 border-purple-500 text-white'
@@ -267,7 +257,7 @@ export default function CardCreatePage() {
           </div>
         </section>
 
-        {/* キーワード能力 - MTG既存 */}
+        {/* MTGキーワード */}
         <section className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <h2 className="text-lg font-semibold text-purple-400 mb-4">MTGキーワード能力</h2>
           <div className="flex flex-wrap gap-2">
@@ -288,7 +278,7 @@ export default function CardCreatePage() {
           </div>
         </section>
 
-        {/* キーワード能力 - 独自 */}
+        {/* 独自キーワード */}
         <section className="bg-gray-800 rounded-xl p-6 border border-gray-700">
           <h2 className="text-lg font-semibold text-purple-400 mb-4">独自キーワード能力</h2>
           <div className="space-y-4">
@@ -298,28 +288,24 @@ export default function CardCreatePage() {
                   ? 'border-purple-500 bg-purple-900/20'
                   : 'border-gray-700 bg-gray-900/40'
               }`}>
-                <div className="flex items-center justify-between mb-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleOriginalKeyword(kw)}
-                    className="flex items-center gap-2"
-                  >
-                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                      originalKeywords[kw].enabled
-                        ? 'bg-purple-600 border-purple-500'
-                        : 'border-gray-500'
-                    }`}>
-                      {originalKeywords[kw].enabled && (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                    <span className={`font-medium ${originalKeywords[kw].enabled ? 'text-white' : 'text-gray-400'}`}>
-                      {kw}
-                    </span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleOriginalKeyword(kw)}
+                  className="flex items-center gap-2 mb-3"
+                >
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                    originalKeywords[kw].enabled ? 'bg-purple-600 border-purple-500' : 'border-gray-500'
+                  }`}>
+                    {originalKeywords[kw].enabled && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className={`font-medium ${originalKeywords[kw].enabled ? 'text-white' : 'text-gray-400'}`}>
+                    {kw}
+                  </span>
+                </button>
 
                 {originalKeywords[kw].enabled && (
                   <div className="grid grid-cols-2 gap-3">
@@ -372,7 +358,7 @@ export default function CardCreatePage() {
                 </button>
               </div>
             ) : (
-              <div className="w-32 h-44 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center text-gray-500 text-xs text-center">
+              <div className="w-32 h-44 border-2 border-dashed border-gray-600 rounded-lg flex items-center justify-center text-gray-500 text-xs">
                 プレビュー
               </div>
             )}
@@ -381,14 +367,9 @@ export default function CardCreatePage() {
                 <div className="bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-gray-300 text-sm hover:border-gray-400 transition-colors text-center">
                   画像を選択
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
+                <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
               </label>
-              <p className="text-gray-500 text-xs mt-2">PNG, JPG, GIF (最大 5MB)</p>
+              <p className="text-gray-500 text-xs mt-2">PNG, JPG, GIF（最大 5MB）</p>
             </div>
           </div>
         </section>

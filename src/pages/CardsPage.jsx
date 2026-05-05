@@ -42,9 +42,11 @@ const MTG_KEYWORD_LABELS = {
   equip: '装備', morph: '変異', unearth: '発掘', delve: '探査',
 }
 
+const ORIGINAL_KW = new Set(['拝金', '徴収', '栄光', '簒奪'])
+
 function KeywordTag({ kw }) {
   const label = MTG_KEYWORD_LABELS[kw.type] || kw.type
-  const isOriginal = ['拝金', '徴収', '栄光', '簒奪'].includes(kw.type)
+  const isOriginal = ORIGINAL_KW.has(kw.type)
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
       isOriginal
@@ -64,10 +66,10 @@ function CardItem({ card }) {
 
   return (
     <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:border-purple-600 transition-colors group">
-      {card.image_url ? (
+      {card.art_url ? (
         <div className="aspect-[5/7] overflow-hidden bg-gray-900">
           <img
-            src={card.image_url}
+            src={card.art_url}
             alt={card.name}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           />
@@ -81,17 +83,20 @@ function CardItem({ card }) {
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
           <h3 className="font-semibold text-white text-sm leading-tight">{card.name}</h3>
-          <div className={`w-4 h-4 rounded-full shrink-0 mt-0.5 ${COLOR_DOT[card.color] || 'bg-gray-500'}`} title={COLOR_LABELS[card.color]} />
+          <div
+            className={`w-4 h-4 rounded-full shrink-0 mt-0.5 ${COLOR_DOT[card.color] || 'bg-gray-500'}`}
+            title={COLOR_LABELS[card.color]}
+          />
         </div>
 
         <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className={`text-xs px-2 py-0.5 rounded border ${TYPE_BADGE[card.type] || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
-            {TYPE_LABELS[card.type] || card.type}
+          <span className={`text-xs px-2 py-0.5 rounded border ${TYPE_BADGE[card.card_type] || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
+            {TYPE_LABELS[card.card_type] || card.card_type}
           </span>
           {card.mana_cost && (
             <span className="text-xs text-gray-400 font-mono">{card.mana_cost}</span>
           )}
-          {card.type === 'creature' && card.power != null && card.toughness != null && (
+          {card.card_type === 'creature' && card.power != null && card.toughness != null && (
             <span className="text-xs text-gray-300 font-mono bg-gray-700 px-2 py-0.5 rounded">
               {card.power}/{card.toughness}
             </span>
@@ -124,48 +129,41 @@ export default function CardsPage() {
   const [cards, setCards] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filter, setFilter] = useState({ type: '', color: '', search: '' })
+  const [filter, setFilter] = useState({ card_type: '', color: '', search: '' })
 
-  const fetchCards = async () => {
-    setLoading(true)
-    let query = supabase.from('cards').select('*').order('created_at', { ascending: false })
-
-    if (filter.type) query = query.eq('type', filter.type)
-    if (filter.color) query = query.eq('color', filter.color)
-    if (filter.search) query = query.ilike('name', `%${filter.search}%`)
-
-    const { data, error } = await query
-    if (error) setError(error.message)
-    else setCards(data || [])
-    setLoading(false)
-  }
-
-  useEffect(() => { fetchCards() }, [filter])
+  useEffect(() => {
+    const fetchCards = async () => {
+      setLoading(true)
+      let query = supabase.from('cards').select('*').order('created_at', { ascending: false })
+      if (filter.card_type) query = query.eq('card_type', filter.card_type)
+      if (filter.color) query = query.eq('color', filter.color)
+      if (filter.search) query = query.ilike('name', `%${filter.search}%`)
+      const { data, error } = await query
+      if (error) setError(error.message)
+      else setCards(data || [])
+      setLoading(false)
+    }
+    fetchCards()
+  }, [filter])
 
   const TYPES = ['', 'creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'land']
-  const TYPE_LABELS_ALL = { '': 'すべてのタイプ', ...TYPE_LABELS }
   const COLORS = ['', 'white', 'blue', 'black', 'red', 'green', 'colorless', 'multicolor']
-  const COLOR_LABELS_ALL = { '': 'すべての色', ...COLOR_LABELS }
 
   return (
     <div className="min-h-screen">
-      {/* ヘッダー */}
       <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <h1 className="text-xl font-bold text-purple-400">MTG Board Game</h1>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/cards/new')}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-            >
-              + カード作成
-            </button>
-          </div>
+          <button
+            onClick={() => navigate('/cards/create')}
+            className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4 py-2 rounded-lg transition-colors"
+          >
+            + カード作成
+          </button>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* フィルター */}
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-6">
           <div className="flex flex-wrap gap-3">
             <input
@@ -176,12 +174,13 @@ export default function CardsPage() {
               className="bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500 flex-1 min-w-40"
             />
             <select
-              value={filter.type}
-              onChange={(e) => setFilter(f => ({ ...f, type: e.target.value }))}
+              value={filter.card_type}
+              onChange={(e) => setFilter(f => ({ ...f, card_type: e.target.value }))}
               className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
             >
-              {TYPES.map(t => (
-                <option key={t} value={t}>{TYPE_LABELS_ALL[t]}</option>
+              <option value="">すべてのタイプ</option>
+              {TYPES.filter(Boolean).map(t => (
+                <option key={t} value={t}>{TYPE_LABELS[t]}</option>
               ))}
             </select>
             <select
@@ -189,14 +188,14 @@ export default function CardsPage() {
               onChange={(e) => setFilter(f => ({ ...f, color: e.target.value }))}
               className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
             >
-              {COLORS.map(c => (
-                <option key={c} value={c}>{COLOR_LABELS_ALL[c]}</option>
+              <option value="">すべての色</option>
+              {COLORS.filter(Boolean).map(c => (
+                <option key={c} value={c}>{COLOR_LABELS[c]}</option>
               ))}
             </select>
           </div>
         </div>
 
-        {/* カード一覧 */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-gray-400">読み込み中...</div>
@@ -210,7 +209,7 @@ export default function CardsPage() {
             <div className="text-6xl mb-4">🃏</div>
             <p className="text-gray-400 mb-4">カードがまだありません</p>
             <button
-              onClick={() => navigate('/cards/new')}
+              onClick={() => navigate('/cards/create')}
               className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-lg transition-colors"
             >
               最初のカードを作成
