@@ -46,15 +46,48 @@ const MTG_KEYWORD_LABELS = {
 
 const ORIGINAL_KW = new Set(['拝金', '徴収', '栄光', '簒奪'])
 
+const KW_TOOLTIPS = {
+  flying:        '飛行持ちかリーチ持ちのクリーチャーにしかブロックされない',
+  haste:         '召喚酔いなし。出たターンから攻撃・能力使用が可能',
+  vigilance:     '攻撃してもタップしない',
+  trample:       'ブロッカーへの超過ダメージがプレイヤーに通る',
+  reach:         '飛行クリーチャーをブロックできる',
+  first_strike:  '通常クリーチャーより先にダメージを与える',
+  double_strike: '先制攻撃と通常攻撃の両方を行う',
+  lifelink:      '与えたダメージ分だけライフを得る',
+  deathtouch:    '与えたダメージは致死ダメージとして扱われる',
+  menace:        '2体以上でしかブロックできない',
+  defender:      '攻撃できない',
+  indestructible:'破壊されない',
+  hexproof:      '対戦相手の呪文・能力の対象にならない',
+  shroud:        '呪文・能力の対象にならない',
+  flash:         'インスタントのタイミングで唱えられる',
+  ward:          '対戦相手が対象にするには追加コストが必要',
+  cycling:       'コストを払ってこのカードを捨て、1枚引く',
+  kicker:        '追加コストを払うことで強化効果を得る',
+  flashback:     '墓地からコストを払って唱えられる（その後追放）',
+  equip:         'コストを払ってクリーチャーに装備する',
+  unearth:       '墓地からコストを払って戦場に戻す（次の終了ステップに追放）',
+  delve:         '墓地のカードを除外してマナコストを軽減できる',
+  '拝金':        '指定タイミングにGを獲得する',
+  '徴収':        '攻撃するたびに対戦相手からGを奪う',
+  '栄光':        'ダメージを与えるたびVPを獲得する',
+  '簒奪':        'ダメージを与えるたびに対戦相手からVPを奪う',
+}
+
 function KeywordTag({ kw }) {
   const label = MTG_KEYWORD_LABELS[kw.type] || kw.type
   const isOriginal = ORIGINAL_KW.has(kw.type)
+  const tip = KW_TOOLTIPS[kw.type]
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${
-      isOriginal
-        ? 'bg-amber-900/50 text-amber-300 border-amber-700'
-        : 'bg-gray-700 text-gray-300 border-gray-600'
-    }`}>
+    <span
+      title={tip || ''}
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border cursor-help ${
+        isOriginal
+          ? 'bg-amber-900/50 text-amber-300 border-amber-700'
+          : 'bg-gray-700 text-gray-300 border-gray-600'
+      }`}
+    >
       {label}
       {isOriginal && kw.value != null && (
         <span className="text-amber-400 font-mono">{kw.value}</span>
