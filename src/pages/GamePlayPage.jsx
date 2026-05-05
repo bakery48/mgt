@@ -6,8 +6,11 @@ import {
   PHASES, PHASE_LABELS,
   initGameState, tapForMana, playLand, castSpell, passPriority,
   advancePhase, declareAttackers, declareBlockers, resolveCombatDamage,
-  canPlaySorcerySpeed, hasMana, getOpponent,
+  canPlaySorcerySpeed, hasMana, getOpponent, getValidBlockers,
 } from '../lib/gameEngine'
+import {
+  processETB, processUpkeep, processAttack, processDamage,
+} from '../lib/keywordEffects'
 
 // ─── カードコンポーネント ───────────────────────────────────────
 const COLOR_BG = {
@@ -125,8 +128,10 @@ export default function GamePlayPage() {
   const [loading, setLoading] = useState(true)
   const [selectedHandCard, setSelectedHandCard] = useState(null)
   const [selectedAttackers, setSelectedAttackers] = useState([])
-  const [selectedBlockers, setSelectedBlockers] = useState({}) // {attIid: blkIid}
+  const [pendingBlocker, setPendingBlocker] = useState(null)       // my creature iid selected to block
+  const [blockingAssignments, setBlockingAssignments] = useState({}) // {attackerIid: blockerIid}
   const [savingGs, setSavingGs] = useState(false)
+  const [roundResult, setRoundResult] = useState(null)
 
   const myId = player?.id
   const isActive = gs?.active_player === myId
@@ -242,7 +247,8 @@ export default function GamePlayPage() {
     saveGs(newGs)
     setSelectedHandCard(null)
     setSelectedAttackers([])
-    setSelectedBlockers({})
+    setPendingBlocker(null)
+    setBlockingAssignments({})
   }, [saveGs])
 
   const handleHandCardClick = (cardId) => {
@@ -286,43 +292,122 @@ export default function GamePlayPage() {
     )
   }
 
-  const handleConfirmAttackers = () => {
-    const newGs = declareAttackers(gs, myId, selectedAttackers, cardData)
-    dispatch(newGs)
+  const handleSelectBlocker = (myCreatureIid) => {
+    if (gs.phase !== 'declare_blockers' || isActive) return
+    setPendingBlocker(prev => prev === myCreatureIid ? null : myCreatureIid)
   }
 
-  const handleToggleBlocker = (blockerIid, attackerIid) => {
-    setSelectedBlockers(prev => ({
+  const handleAssignBlocker = (attackerIid) => {
+    if (!pendingBlocker) return
+    const validMap = getValidBlockers(gs, myId, cardData)
+    if (!(validMap[attackerIid] || []).includes(pendingBlocker)) return
+    setBlockingAssignments(prev => ({
       ...prev,
-      [attackerIid]: prev[attackerIid] === blockerIid ? undefined : blockerIid,
+      [attackerIid]: prev[attackerIid] === pendingBlocker ? undefined : pendingBlocker,
     }))
+    setPendingBlocker(null)
   }
 
   const handleConfirmBlockers = () => {
     const blockerMap = {}
-    for (const [attIid, blkIid] of Object.entries(selectedBlockers)) {
+    for (const [attIid, blkIid] of Object.entries(blockingAssignments)) {
       if (blkIid) blockerMap[attIid] = [blkIid]
     }
     const newGs = declareBlockers(gs, myId, blockerMap)
     dispatch(newGs)
   }
 
-  const handleResolveCombat = () => {
+  const handleConfirmAttackers = async () => {
+    const newGs = declareAttackers(gs, myId, selectedAttackers, cardData)
+    dispatch(newGs)
+    if (selectedAttackers.length > 0) {
+      const attackerPerms = selectedAttackers
+        .map(iid => gs.players[myId]?.battlefield.find(p => p.instance_id === iid))
+        .filter(Boolean)
+      const msgs = await processAttack(attackerPerms, cardData, myId, oppId, gameId)
+      if (msgs.length > 0) console.log('[attack triggers]', msgs)
+    }
+  }
+
+  const handleResolveCombat = async () => {
+    const prevGS = gs
     const newGs = resolveCombatDamage(gs, cardData)
-    dispatch(advancePhase(newGs))
+    const didDamage = (newGs.players[oppId]?.life ?? 0) < (prevGS.players[oppId]?.life ?? 0)
+    const attackerPerms = gs.combat.attackers
+      .map(iid => gs.players[myId]?.battlefield.find(p => p.instance_id === iid))
+      .filter(Boolean)
+    const advanced = advancePhase(newGs)
+    dispatch(advanced)
+    const msgs = await processDamage(attackerPerms, cardData, myId, oppId, gameId, didDamage)
+    if (msgs.length > 0) console.log('[damage triggers]', msgs)
+    checkForRoundEnd(advanced)
   }
 
-  const handlePassPriority = () => {
+  const handlePassPriority = async () => {
+    const prevStack = [...(gs.stack || [])]
+    const prevPhase = gs.phase
     const newGs = passPriority(gs, myId, cardData)
-    if (newGs !== gs) dispatch(newGs)
+    if (newGs === gs) return
+    // Detect ETB: stack top resolved to battlefield
+    if (prevStack.length > 0 && newGs.stack.length < prevStack.length) {
+      const resolved = prevStack[prevStack.length - 1]
+      const card = resolved.card || cardData[resolved.card_id]
+      if (['creature', 'enchantment', 'artifact'].includes(card?.card_type)) {
+        const etbOpp = getOpponent(newGs, resolved.controller)
+        const msgs = await processETB(card, resolved.controller, etbOpp, gameId)
+        if (msgs.length > 0) console.log('[ETB triggers]', msgs)
+      }
+    }
+    // Detect upkeep entry
+    if (newGs.phase === 'upkeep' && prevPhase !== 'upkeep') {
+      const ap = newGs.active_player
+      const apOpp = getOpponent(newGs, ap)
+      const msgs = await processUpkeep(
+        newGs.players[ap]?.battlefield || [], cardData, ap, apOpp, gameId
+      )
+      if (msgs.length > 0) console.log('[upkeep triggers]', msgs)
+    }
+    dispatch(newGs)
+    checkForRoundEnd(newGs)
   }
 
-  const handlePassPhase = () => {
+  const handlePassPhase = async () => {
     if (!isActive) return
-    dispatch(advancePhase(gs))
+    const prevPhase = gs.phase
+    const newGs = advancePhase(gs)
+    if (newGs.phase === 'upkeep' && prevPhase !== 'upkeep') {
+      const ap = newGs.active_player
+      const apOpp = getOpponent(newGs, ap)
+      const msgs = await processUpkeep(
+        newGs.players[ap]?.battlefield || [], cardData, ap, apOpp, gameId
+      )
+      if (msgs.length > 0) console.log('[upkeep triggers]', msgs)
+    }
+    dispatch(newGs)
   }
 
-  // ─── ゲーム終了チェック ────────────────────────────────────
+  // ─── ラウンド終了チェック ──────────────────────────────────
+  function checkForRoundEnd(state) {
+    if (!state?.players || !myId || !oppId) return
+    const myL = state.players[myId]?.life ?? 20
+    const oppL = state.players[oppId]?.life ?? 20
+    if (myL <= 0 || oppL <= 0) {
+      setRoundResult({
+        winner: myL > 0 ? myId : oppId,
+        loser: myL <= 0 ? myId : oppId,
+      })
+    }
+  }
+
+  const handleRoundEnd = async () => {
+    await supabase.rpc('process_round_end', {
+      p_game_id: gameId,
+      p_winner_id: roundResult.winner,
+      p_loser_id: roundResult.loser,
+    })
+    navigate(`/game/${gameId}`)
+  }
+
   const myLife = gs?.players?.[myId]?.life ?? 20
   const oppLife = gs?.players?.[oppId]?.life ?? 20
 
@@ -399,18 +484,22 @@ export default function GamePlayPage() {
             <div className="flex gap-2 overflow-x-auto pb-1 min-h-[7rem]">
               {(oppPs.battlefield || []).map(perm => {
                 const card = cardData[perm.card_id]
+                const isBlockPhase = gs.phase === 'declare_blockers' && !isActive
                 const isAttacking = perm.attacking
-                const isBlockable = gs.phase === 'declare_blockers' && isAttacking && !perm.blocking
+                const assignedBlocker = blockingAssignments[perm.instance_id]
+                const canAssign = isBlockPhase && isAttacking && pendingBlocker
+                const isAssigned = isBlockPhase && isAttacking && !!assignedBlocker
                 return (
                   <MiniCard
                     key={perm.instance_id}
                     card={card}
-                    perm={perm}
-                    selected={isBlockable}
+                    perm={{
+                      ...perm,
+                      blocking: isAssigned ? assignedBlocker : perm.blocking,
+                    }}
+                    selected={canAssign || isAssigned}
                     onClick={() => {
-                      if (gs.phase === 'declare_blockers' && !isActive) {
-                        // ブロック選択: 攻撃クリーチャーをクリック
-                      }
+                      if (canAssign) handleAssignBlocker(perm.instance_id)
                     }}
                     dimmed={false}
                   />
@@ -429,17 +518,22 @@ export default function GamePlayPage() {
                 const isCrea = card?.card_type === 'creature'
                 const canAtt = gs.phase === 'declare_attackers' && isActive && isCrea && !perm.summoning_sick && !perm.tapped
                 const isSelAtt = selectedAttackers.includes(perm.instance_id)
+                const isBlockPhase = gs.phase === 'declare_blockers' && !isActive
+                const canBlk = isBlockPhase && isCrea && !perm.tapped && !perm.summoning_sick
+                const isSelBlk = pendingBlocker === perm.instance_id
+                const isAssignedBlk = Object.values(blockingAssignments).includes(perm.instance_id)
                 return (
                   <MiniCard
                     key={perm.instance_id}
                     card={card}
                     perm={{ ...perm, attacking: isSelAtt || perm.attacking }}
-                    selected={isSelAtt}
+                    selected={isSelAtt || isSelBlk || isAssignedBlk}
                     onClick={() => {
                       if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
                       else if (canAtt) handleToggleAttacker(perm.instance_id)
+                      else if (canBlk) handleSelectBlocker(perm.instance_id)
                     }}
-                    disabled={!isLand && !canAtt}
+                    disabled={!isLand && !canAtt && !canBlk}
                   />
                 )
               })}
@@ -512,6 +606,24 @@ export default function GamePlayPage() {
             </button>
           )}
 
+          {/* ブロック宣言 */}
+          {gs.phase === 'declare_blockers' && !isActive && (
+            <div className="space-y-1">
+              {pendingBlocker && (
+                <p className="text-yellow-400 text-xs text-center">攻撃クリーチャーを選択</p>
+              )}
+              {!pendingBlocker && (
+                <p className="text-gray-400 text-xs text-center">ブロッカーを選択</p>
+              )}
+              <button
+                onClick={handleConfirmBlockers}
+                className="w-full bg-blue-700 hover:bg-blue-600 text-white text-sm py-2.5 rounded-lg font-medium"
+              >
+                🛡 ブロック確定 ({Object.values(blockingAssignments).filter(Boolean).length})
+              </button>
+            </div>
+          )}
+
           {/* 戦闘ダメージ解決 */}
           {gs.phase === 'combat_damage' && isActive && hasPrio && (
             <button
@@ -565,6 +677,29 @@ export default function GamePlayPage() {
           )}
         </div>
       </div>
+
+      {/* ─── ラウンド終了モーダル ─── */}
+      {roundResult && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-gray-800 border border-gray-600 rounded-xl p-8 text-center max-w-sm w-full mx-4 shadow-2xl">
+            <div className="text-5xl mb-4">
+              {roundResult.winner === myId ? '🏆' : '💀'}
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">
+              {roundResult.winner === myId ? 'ラウンド勝利！' : 'ラウンド敗北...'}
+            </h2>
+            <p className="text-gray-400 mb-6">
+              {participants.find(p => p.player_id === roundResult.winner)?.players?.username} の勝利
+            </p>
+            <button
+              onClick={handleRoundEnd}
+              className="w-full bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+            >
+              結果を確定する
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

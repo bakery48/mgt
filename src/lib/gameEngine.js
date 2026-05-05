@@ -436,3 +436,50 @@ export function resolveCombatDamage(state, cardData) {
 export function checkStateBasedActions(state) {
   return state
 }
+
+// 飛行/到達/威迫ルールを考慮した有効ブロッカーマップを返す
+// 戻り値: { [attackerIid]: blockerIid[] } — 各攻撃クリーチャーをブロックできる防御側のinstance_id一覧
+export function getValidBlockers(state, defId, cardData) {
+  const ap = state.active_player
+  const attackerPerms = state.combat.attackers
+    .map(iid => state.players[ap].battlefield.find(p => p.instance_id === iid))
+    .filter(Boolean)
+
+  const defenderPerms = (state.players[defId]?.battlefield || []).filter(p => {
+    const card = cardData[p.card_id] || {}
+    return card.card_type === 'creature' && !p.tapped && !p.summoning_sick
+  })
+
+  const result = {}
+  for (const att of attackerPerms) {
+    const attCard = cardData[att.card_id] || {}
+    const attKw = (attCard.keywords || []).map(k => k.type)
+    const attFlying = attKw.includes('flying')
+
+    result[att.instance_id] = defenderPerms
+      .filter(blk => {
+        const blkCard = cardData[blk.card_id] || {}
+        const blkKw = (blkCard.keywords || []).map(k => k.type)
+        if (attFlying && !blkKw.includes('flying') && !blkKw.includes('reach')) return false
+        return true
+      })
+      .map(p => p.instance_id)
+  }
+  return result
+}
+
+// 威迫（menace）チェック: 威迫クリーチャーは2体未満でブロックできない
+// blockerMap: { [attackerIid]: blockerIid[] }
+// 戻り値: 無効なブロック割り当てがあれば false
+export function validateBlockers(state, blockerMap, cardData) {
+  const ap = state.active_player
+  for (const [attIid, blkIids] of Object.entries(blockerMap)) {
+    if (!blkIids || blkIids.length === 0) continue
+    const attPerm = state.players[ap].battlefield.find(p => p.instance_id === attIid)
+    if (!attPerm) continue
+    const attCard = cardData[attPerm.card_id] || {}
+    const attKw = (attCard.keywords || []).map(k => k.type)
+    if (attKw.includes('menace') && blkIids.length < 2) return false
+  }
+  return true
+}
