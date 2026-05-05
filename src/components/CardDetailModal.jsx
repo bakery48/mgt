@@ -20,6 +20,34 @@ const MTG_KW_LABELS = {
   ward: '護法', protection: 'プロテクション', cycling: 'サイクリング', kicker: 'キッカー',
   flashback: 'フラッシュバック', equip: '装備', morph: '変異', unearth: '発掘', delve: '探査',
 }
+const KW_TOOLTIPS = {
+  flying:        '飛行持ちかリーチ持ちのクリーチャーにしかブロックされない',
+  haste:         '召喚酔いなし。出たターンから攻撃・能力使用が可能',
+  vigilance:     '攻撃してもタップしない',
+  trample:       'ブロッカーへの超過ダメージがプレイヤーに通る',
+  reach:         '飛行クリーチャーをブロックできる',
+  first_strike:  '通常クリーチャーより先にダメージを与える',
+  double_strike: '先制攻撃と通常攻撃の両方を行う',
+  lifelink:      '与えたダメージ分だけライフを得る',
+  deathtouch:    '与えたダメージは致死ダメージとして扱われる',
+  menace:        '2体以上でしかブロックできない',
+  defender:      '攻撃できない',
+  indestructible:'破壊されない',
+  hexproof:      '対戦相手の呪文・能力の対象にならない',
+  shroud:        '呪文・能力の対象にならない',
+  flash:         'インスタントのタイミングで唱えられる',
+  ward:          '対戦相手が対象にするには追加コストが必要',
+  cycling:       'コストを払ってこのカードを捨て、1枚引く',
+  kicker:        '追加コストを払うことで強化効果を得る',
+  flashback:     '墓地からコストを払って唱えられる（その後追放）',
+  equip:         'コストを払ってクリーチャーに装備する',
+  unearth:       '墓地からコストを払って戦場に戻す（次の終了ステップに追放）',
+  delve:         '墓地のカードを除外してマナコストを軽減できる',
+  拝金:          '指定タイミングにGを獲得する',
+  徴収:          '攻撃するたびに対戦相手からGを奪う',
+  栄光:          'ダメージを与えるたびVPを獲得する',
+  簒奪:          'ダメージを与えるたびに対戦相手からVPを奪う',
+}
 const ORIG_KW = new Set(['拝金', '徴収', '栄光', '簒奪'])
 const TRIGGER_LABELS = { etb: '戦場に出た時', upkeep: 'アップキープ', attack: '攻撃時', damage: 'ダメージ時' }
 
@@ -128,12 +156,19 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
           {keywords.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
               {keywords.map((kw, i) => (
-                <span key={i} className={`text-xs px-2 py-0.5 rounded border ${
-                  ORIG_KW.has(kw.type)
-                    ? 'bg-amber-900/40 text-amber-300 border-amber-700'
-                    : 'bg-gray-800 text-gray-300 border-gray-600'
-                }`}>
-                  {kwLabel(kw)}
+                <span key={i} className="relative group">
+                  <span className={`text-xs px-2 py-0.5 rounded border cursor-help ${
+                    ORIG_KW.has(kw.type)
+                      ? 'bg-amber-900/40 text-amber-300 border-amber-700'
+                      : 'bg-gray-800 text-gray-300 border-gray-600'
+                  }`}>
+                    {kwLabel(kw)}
+                  </span>
+                  {KW_TOOLTIPS[kw.type] && (
+                    <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-gray-950 text-gray-100 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 border border-gray-600 shadow-lg">
+                      {KW_TOOLTIPS[kw.type]}
+                    </span>
+                  )}
                 </span>
               ))}
             </div>
