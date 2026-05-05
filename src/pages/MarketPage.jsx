@@ -209,7 +209,16 @@ export default function MarketPage() {
     if (error) {
       showMessage(`開封失敗: ${error.message}`)
     } else {
-      setPackResult(data)
+      // RPCがUUID配列を返す場合はカード情報を取得
+      if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'string') {
+        const { data: cardData } = await supabase
+          .from('cards')
+          .select('id, name, card_type, color')
+          .in('id', data)
+        setPackResult(cardData || data)
+      } else {
+        setPackResult(data)
+      }
       await refreshPlayer()
     }
     setOpening(null)
