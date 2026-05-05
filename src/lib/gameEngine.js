@@ -182,8 +182,8 @@ export function playLand(state, pid, cardId, card) {
   }, `${card.name} をプレイ（土地）`)
 }
 
-// 呪文をスタックに積む
-export function castSpell(state, pid, cardId, card) {
+// 呪文をスタックに積む（kicker対応）
+export function castSpell(state, pid, cardId, card, kicker = false) {
   const ps = state.players[pid]
   if (!ps.hand.includes(cardId)) return state
   const isFlash = (card.keywords || []).some(k => k.type === 'flash')
@@ -191,8 +191,19 @@ export function castSpell(state, pid, cardId, card) {
   if (instant ? !canPlayInstantSpeed(state, pid) : !canPlaySorcerySpeed(state, pid)) return state
   if (card.mana_cost && !hasMana(ps.mana_pool, card.mana_cost)) return state
 
-  const newPool = card.mana_cost ? spendMana(ps.mana_pool, card.mana_cost) : ps.mana_pool
-  const entry = { id: uuidv4(), type: 'spell', card_id: cardId, card, controller: pid }
+  let newPool = card.mana_cost ? spendMana(ps.mana_pool, card.mana_cost) : { ...ps.mana_pool }
+
+  // キッカーコスト
+  if (kicker) {
+    const kickerKw = (card.keywords || []).find(k => k.type === 'kicker')
+    if (kickerKw) {
+      const kickerCostStr = `{${kickerKw.value || 1}}`
+      if (!hasMana(newPool, kickerCostStr)) return state
+      newPool = spendMana(newPool, kickerCostStr)
+    }
+  }
+
+  const entry = { id: uuidv4(), type: 'spell', card_id: cardId, card, controller: pid, kicked: kicker }
 
   return log({
     ...state,
@@ -202,7 +213,7 @@ export function castSpell(state, pid, cardId, card) {
       ...state.players,
       [pid]: { ...ps, hand: ps.hand.filter(id => id !== cardId), mana_pool: newPool },
     },
-  }, `${card.name} をスタックに積んだ`)
+  }, `${card.name} をスタックに積んだ${kicker ? '（キッカー）' : ''}`)
 }
 
 // スタック最上位を解決
@@ -215,6 +226,7 @@ function resolveStack(state, cardData) {
 
   if (['creature', 'enchantment', 'artifact'].includes(card?.card_type)) {
     const perm = mkPermanent(top.card_id, card)
+    if (top.kicked) perm.kicked = true
     newState.players = {
       ...newState.players,
       [top.controller]: {
@@ -222,7 +234,7 @@ function resolveStack(state, cardData) {
         battlefield: [...ps.battlefield, perm],
       },
     }
-    newState = log(newState, `${card?.name} が戦場に出た`)
+    newState = log(newState, `${card?.name} が戦場に出た${top.kicked ? '（キッカー済）' : ''}`)
   } else {
     // instant/sorcery → 墓地
     newState.players = {
@@ -356,7 +368,10 @@ export function resolveCombatDamage(state, cardData) {
     const attPerm = apBf.find(p => p.instance_id === attIid)
     if (!attPerm) continue
     const attCard = cardData[attPerm.card_id] || {}
-    const attKw = (attCard.keywords || []).map(k => k.type)
+    const attKws = attCard.keywords || []
+    const attKw = attKws.map(k => k.type)
+    // protectionカラー: このクリーチャーはそのカラーからダメージを受けない
+    const attProtection = attKws.find(k => k.type === 'protection')?.value ?? null
     const power = attPerm.power ?? attCard.power ?? 0
     const blockerIids = state.combat.blockers[attIid] || []
     const blockers = blockerIids.map(biid => dpBf.find(p => p.instance_id === biid)).filter(Boolean)
@@ -368,17 +383,28 @@ export function resolveCombatDamage(state, cardData) {
       let rem = power
       for (const blk of blockers) {
         const blkCard = cardData[blk.card_id] || {}
-        const blkKw = (blkCard.keywords || []).map(k => k.type)
+        const blkKws = blkCard.keywords || []
+        const blkKw = blkKws.map(k => k.type)
+        const blkProtection = blkKws.find(k => k.type === 'protection')?.value ?? null
         const blkPower = blk.power ?? blkCard.power ?? 0
         const blkTough = blk.toughness ?? blkCard.toughness ?? 1
-        const dmgToBlk = blkKw.includes('indestructible') ? 0 : Math.min(rem, blkTough - blk.damage)
-        rem -= dmgToBlk
+
+        // ブロッカーがprotection持ちなら攻撃クリーチャーのカラーからダメージ無効
+        const blkImmuneToAtt = blkProtection && attCard.color === blkProtection
+        const dmgToBlk = (blkKw.includes('indestructible') || blkImmuneToAtt)
+          ? 0
+          : Math.min(rem, blkTough - blk.damage)
+        rem -= Math.min(rem, blkTough - blk.damage) // trample計算用に実際の割り当て量を減算
         if (attKw.includes('deathtouch') && dmgToBlk > 0) {
           dpBf = dpBf.map(p => p.instance_id === blk.instance_id ? { ...p, damage: 9999 } : p)
         } else {
           dpBf = dpBf.map(p => p.instance_id === blk.instance_id ? { ...p, damage: p.damage + dmgToBlk } : p)
         }
-        const dmgToAtt = blkKw.includes('deathtouch') && blkPower > 0 ? 9999 : blkPower
+
+        // 攻撃クリーチャーがprotection持ちならブロッカーのカラーからダメージ無効
+        const attImmuneToBlk = attProtection && blkCard.color === attProtection
+        const dmgToAtt = attImmuneToBlk ? 0
+          : (blkKw.includes('deathtouch') && blkPower > 0 ? 9999 : blkPower)
         if (!attKw.includes('indestructible')) {
           apBf = apBf.map(p => p.instance_id === attIid ? { ...p, damage: p.damage + dmgToAtt } : p)
         }
@@ -437,6 +463,32 @@ export function checkStateBasedActions(state) {
   return state
 }
 
+// サイクリング（手札から捨てて1ドロー）
+export function cycleCard(state, pid, cardId, card) {
+  const ps = state.players[pid]
+  if (!ps.hand.includes(cardId)) return state
+  const cycleKw = (card?.keywords || []).find(k => k.type === 'cycling')
+  if (!cycleKw) return state
+  const costStr = `{${cycleKw.value ?? 1}}`
+  if (!hasMana(ps.mana_pool, costStr)) return state
+  const newPool = spendMana(ps.mana_pool, costStr)
+  const newHand = ps.hand.filter(id => id !== cardId)
+  const drawn = ps.library[0] ?? null
+  return log({
+    ...state,
+    players: {
+      ...state.players,
+      [pid]: {
+        ...ps,
+        hand: drawn ? [...newHand, drawn] : newHand,
+        library: ps.library.slice(1),
+        graveyard: [...ps.graveyard, cardId],
+        mana_pool: newPool,
+      },
+    },
+  }, `${card.name} をサイクリング → 1枚ドロー`)
+}
+
 // 飛行/到達/威迫ルールを考慮した有効ブロッカーマップを返す
 // 戻り値: { [attackerIid]: blockerIid[] } — 各攻撃クリーチャーをブロックできる防御側のinstance_id一覧
 export function getValidBlockers(state, defId, cardData) {
@@ -453,14 +505,18 @@ export function getValidBlockers(state, defId, cardData) {
   const result = {}
   for (const att of attackerPerms) {
     const attCard = cardData[att.card_id] || {}
-    const attKw = (attCard.keywords || []).map(k => k.type)
-    const attFlying = attKw.includes('flying')
+    const attKws = attCard.keywords || []
+    const attKwTypes = attKws.map(k => k.type)
+    const attFlying = attKwTypes.includes('flying')
+    // protection from X: attacker cannot be blocked by X-colored creatures
+    const attProtection = attKws.find(k => k.type === 'protection')?.value ?? null
 
     result[att.instance_id] = defenderPerms
       .filter(blk => {
         const blkCard = cardData[blk.card_id] || {}
-        const blkKw = (blkCard.keywords || []).map(k => k.type)
-        if (attFlying && !blkKw.includes('flying') && !blkKw.includes('reach')) return false
+        const blkKwTypes = (blkCard.keywords || []).map(k => k.type)
+        if (attFlying && !blkKwTypes.includes('flying') && !blkKwTypes.includes('reach')) return false
+        if (attProtection && blkCard.color === attProtection) return false
         return true
       })
       .map(p => p.instance_id)

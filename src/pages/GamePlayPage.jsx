@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
 import {
   PHASES, PHASE_LABELS,
-  initGameState, tapForMana, playLand, castSpell, passPriority,
+  initGameState, tapForMana, playLand, castSpell, cycleCard, passPriority,
   advancePhase, declareAttackers, declareBlockers, resolveCombatDamage,
   canPlaySorcerySpeed, hasMana, getOpponent, getValidBlockers,
 } from '../lib/gameEngine'
@@ -72,7 +72,15 @@ function HandCard({ card, onClick, disabled, highlight }) {
         <img src={card.art_url} alt="" className="w-full h-11 object-cover rounded mb-1" />
       )}
       <p className="text-xs font-bold leading-tight line-clamp-2">{card?.name}</p>
-      {card?.mana_cost && <p className="text-xs font-mono mt-auto opacity-80">{card.mana_cost}</p>}
+      <div className="mt-auto flex items-center gap-1">
+        {card?.mana_cost && <p className="text-xs font-mono opacity-80">{card.mana_cost}</p>}
+        {(card?.keywords || []).some(k => k.type === 'cycling') && (
+          <span className="text-xs opacity-70" title="サイクリング">♻</span>
+        )}
+        {(card?.keywords || []).some(k => k.type === 'kicker') && (
+          <span className="text-xs opacity-70" title="キッカー">⚡</span>
+        )}
+      </div>
     </button>
   )
 }
@@ -127,9 +135,10 @@ export default function GamePlayPage() {
   const [participants, setParticipants] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedHandCard, setSelectedHandCard] = useState(null)
+  const [kickerPaid, setKickerPaid] = useState(false)
   const [selectedAttackers, setSelectedAttackers] = useState([])
-  const [pendingBlocker, setPendingBlocker] = useState(null)       // my creature iid selected to block
-  const [blockingAssignments, setBlockingAssignments] = useState({}) // {attackerIid: blockerIid}
+  const [pendingBlocker, setPendingBlocker] = useState(null)
+  const [blockingAssignments, setBlockingAssignments] = useState({})
   const [savingGs, setSavingGs] = useState(false)
   const [roundResult, setRoundResult] = useState(null)
 
@@ -246,6 +255,7 @@ export default function GamePlayPage() {
   const dispatch = useCallback((newGs) => {
     saveGs(newGs)
     setSelectedHandCard(null)
+    setKickerPaid(false)
     setSelectedAttackers([])
     setPendingBlocker(null)
     setBlockingAssignments({})
@@ -260,14 +270,26 @@ export default function GamePlayPage() {
       if (newGs !== gs) dispatch(newGs)
       return
     }
-    // 呪文: 選択してからプレイ確定
-    setSelectedHandCard(prev => prev === cardId ? null : cardId)
+    if (selectedHandCard === cardId) {
+      setSelectedHandCard(null)
+      setKickerPaid(false)
+    } else {
+      setSelectedHandCard(cardId)
+      setKickerPaid(false)
+    }
   }
 
   const handleCastSpell = () => {
     if (!selectedHandCard) return
     const card = cardData[selectedHandCard]
-    const newGs = castSpell(gs, myId, selectedHandCard, card)
+    const newGs = castSpell(gs, myId, selectedHandCard, card, kickerPaid)
+    if (newGs !== gs) dispatch(newGs)
+  }
+
+  const handleCycleCard = (cardId) => {
+    const card = cardData[cardId]
+    if (!card || !gs) return
+    const newGs = cycleCard(gs, myId, cardId, card)
     if (newGs !== gs) dispatch(newGs)
   }
 
@@ -575,26 +597,61 @@ export default function GamePlayPage() {
         {/* ─── サイドパネル ─── */}
         <div className="w-48 bg-gray-900 border-l border-gray-700 flex flex-col p-3 gap-3 overflow-y-auto">
           {/* 選択中の手札 */}
-          {selectedHandCard && (
-            <div className="bg-gray-800 border border-purple-600 rounded-lg p-3">
-              <p className="text-purple-300 text-xs font-bold mb-2">{cardData[selectedHandCard]?.name}</p>
-              <p className="text-gray-400 text-xs mb-3 leading-relaxed line-clamp-4">
-                {cardData[selectedHandCard]?.effect_text || '効果なし'}
-              </p>
-              <button
-                onClick={handleCastSpell}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded"
-              >
-                詠唱する
-              </button>
-              <button
-                onClick={() => setSelectedHandCard(null)}
-                className="w-full mt-1 text-gray-500 hover:text-gray-300 text-xs py-1"
-              >
-                キャンセル
-              </button>
-            </div>
-          )}
+          {selectedHandCard && (() => {
+            const selCard = cardData[selectedHandCard]
+            const kickerKw = (selCard?.keywords || []).find(k => k.type === 'kicker')
+            const cycleKw = (selCard?.keywords || []).find(k => k.type === 'cycling')
+            return (
+              <div className="bg-gray-800 border border-purple-600 rounded-lg p-3">
+                <p className="text-purple-300 text-xs font-bold mb-1">{selCard?.name}</p>
+                {selCard?.mana_cost && (
+                  <p className="text-gray-500 text-xs font-mono mb-1">{selCard.mana_cost}</p>
+                )}
+                <p className="text-gray-400 text-xs mb-3 leading-relaxed line-clamp-3">
+                  {selCard?.effect_text || '効果なし'}
+                </p>
+
+                {/* キッカートグル */}
+                {kickerKw && (
+                  <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={kickerPaid}
+                      onChange={e => setKickerPaid(e.target.checked)}
+                      className="accent-yellow-400"
+                    />
+                    <span className="text-yellow-400 text-xs">
+                      キッカー ({`{${kickerKw.value ?? 1}}`}) を支払う
+                    </span>
+                  </label>
+                )}
+
+                <button
+                  onClick={handleCastSpell}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white text-xs py-2 rounded mb-1"
+                >
+                  詠唱する{kickerPaid ? '（キッカー）' : ''}
+                </button>
+
+                {/* サイクリング */}
+                {cycleKw && hasPrio && (
+                  <button
+                    onClick={() => handleCycleCard(selectedHandCard)}
+                    className="w-full bg-teal-700 hover:bg-teal-600 text-white text-xs py-1.5 rounded mb-1"
+                  >
+                    サイクリング ({`{${cycleKw.value ?? 1}}`})
+                  </button>
+                )}
+
+                <button
+                  onClick={() => { setSelectedHandCard(null); setKickerPaid(false) }}
+                  className="w-full text-gray-500 hover:text-gray-300 text-xs py-1"
+                >
+                  キャンセル
+                </button>
+              </div>
+            )
+          })()}
 
           {/* 攻撃宣言 */}
           {gs.phase === 'declare_attackers' && isActive && (
