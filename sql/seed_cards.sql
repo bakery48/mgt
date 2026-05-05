@@ -10,7 +10,7 @@ ALTER TABLE cards ALTER COLUMN power DROP NOT NULL;
 ALTER TABLE cards ALTER COLUMN toughness DROP NOT NULL;
 
 -- creator_id=null のシステムカード挿入中はトリガーを無効化
-ALTER TABLE cards DISABLE TRIGGER ALL;
+ALTER TABLE cards DISABLE TRIGGER USER;
 
 INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price) VALUES
 
@@ -208,4 +208,4 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"簒奪","value":1,"trigger":"damage"}]', 3000);
 
 -- トリガーを再有効化
-ALTER TABLE cards ENABLE TRIGGER ALL;
+ALTER TABLE cards ENABLE TRIGGER USER;
