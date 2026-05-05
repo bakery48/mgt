@@ -4,7 +4,10 @@
 -- カラム型修正・追加
 ALTER TABLE cards ADD COLUMN IF NOT EXISTS price integer NOT NULL DEFAULT 500;
 ALTER TABLE cards ALTER COLUMN mana_cost TYPE text USING mana_cost::text;
+ALTER TABLE cards ALTER COLUMN mana_cost DROP NOT NULL;
 ALTER TABLE cards ALTER COLUMN creator_id DROP NOT NULL;
+ALTER TABLE cards ALTER COLUMN power DROP NOT NULL;
+ALTER TABLE cards ALTER COLUMN toughness DROP NOT NULL;
 
 INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price) VALUES
 
