@@ -155,22 +155,27 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
           {/* キーワード */}
           {keywords.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
-              {keywords.map((kw, i) => (
-                <span key={i} className="relative group">
-                  <span className={`text-xs px-2 py-0.5 rounded border cursor-help ${
-                    ORIG_KW.has(kw.type)
-                      ? 'bg-amber-900/40 text-amber-300 border-amber-700'
-                      : 'bg-gray-800 text-gray-300 border-gray-600'
-                  }`}>
+              {keywords.map((kw, i) => {
+                const tip = KW_TOOLTIPS[kw.type]
+                return (
+                  <span
+                    key={i}
+                    title={tip || ''}
+                    className={`relative inline-block group text-xs px-2 py-0.5 rounded border cursor-help ${
+                      ORIG_KW.has(kw.type)
+                        ? 'bg-amber-900/40 text-amber-300 border-amber-700'
+                        : 'bg-gray-800 text-gray-300 border-gray-600'
+                    }`}
+                  >
                     {kwLabel(kw)}
+                    {tip && (
+                      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 bg-gray-950 text-gray-100 rounded normal-case opacity-0 group-hover:opacity-100 transition-opacity z-50 border border-gray-600 shadow-lg max-w-xs whitespace-normal text-center">
+                        {tip}
+                      </span>
+                    )}
                   </span>
-                  {KW_TOOLTIPS[kw.type] && (
-                    <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 bg-gray-950 text-gray-100 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 border border-gray-600 shadow-lg">
-                      {KW_TOOLTIPS[kw.type]}
-                    </span>
-                  )}
-                </span>
-              ))}
+                )
+              })}
             </div>
           )}
 
