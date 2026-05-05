@@ -84,7 +84,7 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
       onClick={onClose}
     >
       <div
-        className="relative bg-gray-900 border border-gray-600 rounded-2xl overflow-hidden shadow-2xl max-w-xl w-full"
+        className="relative bg-gray-900 border border-gray-600 rounded-2xl overflow-y-auto shadow-2xl flex flex-col sm:flex-row max-w-xl w-full max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* 閉じるボタン */}
@@ -95,11 +95,8 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
           ×
         </button>
 
-        {/* スクロール対象: アート + 詳細 */}
-        <div className="flex flex-col sm:flex-row max-h-[90vh] overflow-y-auto">
-
         {/* 左: アート */}
-        <div className={`sm:w-48 shrink-0 sm:sticky sm:top-0 sm:self-start ${COLOR_BG[card.color] || 'bg-gray-800'}`}>
+        <div className={`sm:w-48 shrink-0 ${COLOR_BG[card.color] || 'bg-gray-800'}`}>
           {card.art_url ? (
             <img
               src={card.art_url}
@@ -192,7 +189,6 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
             <p className="text-gray-600 text-sm italic">効果なし</p>
           )}
         </div>
-        </div>{/* end スクロール */}
       </div>
     </div>
   )
