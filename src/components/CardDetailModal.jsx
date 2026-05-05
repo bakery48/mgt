@@ -43,10 +43,10 @@ const KW_TOOLTIPS = {
   equip:         'コストを払ってクリーチャーに装備する',
   unearth:       '墓地からコストを払って戦場に戻す（次の終了ステップに追放）',
   delve:         '墓地のカードを除外してマナコストを軽減できる',
-  拝金:          '指定タイミングにGを獲得する',
-  徴収:          '攻撃するたびに対戦相手からGを奪う',
-  栄光:          'ダメージを与えるたびVPを獲得する',
-  簒奪:          'ダメージを与えるたびに対戦相手からVPを奪う',
+  '拝金':        '指定タイミングにGを獲得する',
+  '徴収':        '攻撃するたびに対戦相手からGを奪う',
+  '栄光':        'ダメージを与えるたびVPを獲得する',
+  '簒奪':        'ダメージを与えるたびに対戦相手からVPを奪う',
 }
 const ORIG_KW = new Set(['拝金', '徴収', '栄光', '簒奪'])
 const TRIGGER_LABELS = { etb: '戦場に出た時', upkeep: 'アップキープ', attack: '攻撃時', damage: 'ダメージ時' }
@@ -165,7 +165,7 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
                     {kwLabel(kw)}
                   </span>
                   {KW_TOOLTIPS[kw.type] && (
-                    <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2 py-1 bg-gray-950 text-gray-100 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 border border-gray-600 shadow-lg">
+                    <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 bg-gray-950 text-gray-100 text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-20 border border-gray-600 shadow-lg">
                       {KW_TOOLTIPS[kw.type]}
                     </span>
                   )}
