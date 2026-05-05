@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+
 const TYPE_LABELS = {
   creature: 'クリーチャー', instant: 'インスタント', sorcery: 'ソーサリー',
   enchantment: 'エンチャント', artifact: 'アーティファクト', land: '土地',
@@ -36,6 +38,12 @@ function kwLabel(kw) {
 // perm: ゲーム中のpermanentオブジェクト（任意）
 // effectivePower / effectiveToughness: 装備込みP/T（任意）
 export default function CardDetailModal({ card, perm, effectivePower, effectiveToughness, onClose }) {
+  useEffect(() => {
+    if (!card) return
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [card, onClose])
   if (!card) return null
   const keywords = Array.isArray(card.keywords) ? card.keywords : []
   const isCrea = card.card_type === 'creature'

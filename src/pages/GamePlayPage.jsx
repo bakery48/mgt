@@ -24,7 +24,7 @@ const COLOR_BG = {
   multicolor: 'bg-gradient-to-br from-yellow-600 to-purple-700 text-white',
 }
 
-function MiniCard({ card, perm, selected, onClick, onDetail, disabled, dimmed }) {
+function MiniCard({ card, perm, selected, onClick, onDetail, disabled, dimmed, equipped }) {
   const kws = (card?.keywords || []).map(k => k.type)
   const isTapped = perm?.tapped
   return (
@@ -57,6 +57,7 @@ function MiniCard({ card, perm, selected, onClick, onDetail, disabled, dimmed })
       {perm?.attacking && <span className="absolute bottom-0.5 right-0.5 text-xs">⚔</span>}
       {perm?.blocking && <span className="absolute bottom-0.5 right-0.5 text-xs">🛡</span>}
       {kws.includes('flying') && <span className="absolute top-0.5 left-0.5 text-xs">✈</span>}
+      {equipped && <span className="absolute bottom-0.5 left-0.5 text-xs bg-yellow-700/80 rounded px-0.5">⚙</span>}
     </button>
   )
 }
@@ -521,7 +522,13 @@ export default function GamePlayPage() {
           <span className={hasPrio ? 'text-yellow-400 font-bold' : ''}>
             {hasPrio ? '⚡ あなたの優先権' : '相手の優先権'}
           </span>
-          {savingGs && <span className="text-gray-500">保存中...</span>}
+          {savingGs && (
+            <span className="flex items-center gap-1 text-gray-500 animate-pulse">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{animationDelay:'0ms'}} />
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{animationDelay:'150ms'}} />
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce" style={{animationDelay:'300ms'}} />
+            </span>
+          )}
         </div>
       </div>
 
@@ -596,53 +603,60 @@ export default function GamePlayPage() {
           {/* 自分ゾーン */}
           <div className="flex-1 bg-gray-800 p-3">
             {/* 自分の戦場 */}
-            <div className="flex gap-2 overflow-x-auto pb-2 min-h-[7rem]">
-              {(myPs.battlefield || []).map(perm => {
-                const card = cardData[perm.card_id]
-                const isLand = card?.card_type === 'land'
-                const isCrea = card?.card_type === 'creature'
-                const isEquip = card?.card_type === 'artifact' &&
-                  (card?.keywords || []).some(k => k.type === 'equip')
-                const hasDefender = (card?.keywords || []).some(k => k.type === 'defender')
-                const canAtt = gs.phase === 'declare_attackers' && isActive && isCrea && !perm.summoning_sick && !perm.tapped && !hasDefender
-                const isSelAtt = selectedAttackers.includes(perm.instance_id)
-                const isBlockPhase = gs.phase === 'declare_blockers' && !isActive
-                const canBlk = isBlockPhase && isCrea && !perm.tapped && !perm.summoning_sick
-                const isSelBlk = pendingBlocker === perm.instance_id
-                const isAssignedBlk = Object.values(blockingAssignments).includes(perm.instance_id)
-                const canEquipThis = isEquip && isActive && canPlaySorcerySpeed(gs, myId)
-                const isSelEquip = pendingEquip === perm.instance_id
-                const isEquipTarget = pendingEquip && isCrea
-                // 装備込みP/T表示
-                const effPT = isCrea ? getEffectivePT(perm, card, myPs.battlefield, cardData) : null
-                return (
-                  <MiniCard
-                    key={perm.instance_id}
-                    card={card}
-                    perm={{
-                      ...perm,
-                      attacking: isSelAtt || perm.attacking,
-                      power: effPT?.power ?? perm.power,
-                      toughness: effPT?.toughness ?? perm.toughness,
-                    }}
-                    selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip)}
-                    onClick={() => {
-                      if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
-                      else if (canAtt) handleToggleAttacker(perm.instance_id)
-                      else if (canBlk) handleSelectBlocker(perm.instance_id)
-                      else if (isEquipTarget && !isEquip) handleEquipTarget(perm.instance_id)
-                      else if (canEquipThis) handleEquipClick(perm.instance_id)
-                    }}
-                    onDetail={() => {
-                      const ep = isCrea ? getEffectivePT(perm, card, myPs.battlefield, cardData) : null
-                      setDetailCard(card)
-                      setDetailPerm({ ...perm, power: ep?.power ?? perm.power, toughness: ep?.toughness ?? perm.toughness })
-                    }}
-                    disabled={!isLand && !canAtt && !canBlk && !canEquipThis && !(isEquipTarget && !isEquip)}
-                  />
-                )
-              })}
-            </div>
+            {(() => {
+              const equippedSet = new Set(
+                (myPs.battlefield || []).filter(p => p.attached_to).map(p => p.attached_to)
+              )
+              return (
+                <div className="flex gap-2 overflow-x-auto pb-2 min-h-[7rem]">
+                  {(myPs.battlefield || []).map(perm => {
+                    const card = cardData[perm.card_id]
+                    const isLand = card?.card_type === 'land'
+                    const isCrea = card?.card_type === 'creature'
+                    const isEquip = card?.card_type === 'artifact' &&
+                      (card?.keywords || []).some(k => k.type === 'equip')
+                    const hasDefender = (card?.keywords || []).some(k => k.type === 'defender')
+                    const canAtt = gs.phase === 'declare_attackers' && isActive && isCrea && !perm.summoning_sick && !perm.tapped && !hasDefender
+                    const isSelAtt = selectedAttackers.includes(perm.instance_id)
+                    const isBlockPhase = gs.phase === 'declare_blockers' && !isActive
+                    const canBlk = isBlockPhase && isCrea && !perm.tapped && !perm.summoning_sick
+                    const isSelBlk = pendingBlocker === perm.instance_id
+                    const isAssignedBlk = Object.values(blockingAssignments).includes(perm.instance_id)
+                    const canEquipThis = isEquip && isActive && canPlaySorcerySpeed(gs, myId)
+                    const isSelEquip = pendingEquip === perm.instance_id
+                    const isEquipTarget = pendingEquip && isCrea
+                    const effPT = isCrea ? getEffectivePT(perm, card, myPs.battlefield, cardData) : null
+                    return (
+                      <MiniCard
+                        key={perm.instance_id}
+                        card={card}
+                        perm={{
+                          ...perm,
+                          attacking: isSelAtt || perm.attacking,
+                          power: effPT?.power ?? perm.power,
+                          toughness: effPT?.toughness ?? perm.toughness,
+                        }}
+                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip)}
+                        onClick={() => {
+                          if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
+                          else if (canAtt) handleToggleAttacker(perm.instance_id)
+                          else if (canBlk) handleSelectBlocker(perm.instance_id)
+                          else if (isEquipTarget && !isEquip) handleEquipTarget(perm.instance_id)
+                          else if (canEquipThis) handleEquipClick(perm.instance_id)
+                        }}
+                        onDetail={() => {
+                          const ep = isCrea ? getEffectivePT(perm, card, myPs.battlefield, cardData) : null
+                          setDetailCard(card)
+                          setDetailPerm({ ...perm, power: ep?.power ?? perm.power, toughness: ep?.toughness ?? perm.toughness })
+                        }}
+                        equipped={equippedSet.has(perm.instance_id)}
+                        disabled={!isLand && !canAtt && !canBlk && !canEquipThis && !(isEquipTarget && !isEquip)}
+                      />
+                    )
+                  })}
+                </div>
+              )
+            })()}
 
             {/* 自分のステータス */}
             <div className="flex items-center gap-3 mb-2">
