@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
+import Layout from '../components/Layout'
 
 const CARD_TYPES = ['creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'land']
 const CARD_TYPE_LABELS = {
@@ -138,8 +139,28 @@ export default function CardCreatePage() {
         creator_id: player?.id ?? null,
       }
 
-      const { error: insertError } = await supabase.from('cards').insert(cardData)
+      const { data: newCard, error: insertError } = await supabase
+        .from('cards').insert(cardData).select().single()
       if (insertError) throw insertError
+
+      // マーケット登録
+      const basePrice = parseInt(data.base_price, 10) || 100
+      await supabase.from('card_market').insert({
+        card_id: newCard.id,
+        base_price: basePrice,
+        current_price: basePrice,
+        total_copies: 1,
+        purchases_7d: 0,
+      })
+
+      // 作成者のコレクションに追加
+      if (player?.id) {
+        await supabase.from('player_collection').insert({
+          player_id: player.id,
+          card_id: newCard.id,
+          quantity: 1,
+        })
+      }
 
       navigate('/cards')
     } catch (err) {
@@ -150,15 +171,10 @@ export default function CardCreatePage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <Layout>
+    <div className="max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-bold text-white">カード作成</h1>
-        <button
-          onClick={() => navigate('/cards')}
-          className="text-gray-400 hover:text-white text-sm transition-colors"
-        >
-          ← カード一覧へ
-        </button>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -222,6 +238,16 @@ export default function CardCreatePage() {
                   {...register('mana_cost')}
                   className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500"
                   placeholder="{2}{W}{U}"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">基本価格（G）</label>
+                <input
+                  type="number"
+                  {...register('base_price')}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500"
+                  placeholder="100"
+                  min="1"
                 />
               </div>
               {cardType === 'creature' && (
@@ -401,5 +427,6 @@ export default function CardCreatePage() {
         </div>
       </form>
     </div>
+    </Layout>
   )
 }

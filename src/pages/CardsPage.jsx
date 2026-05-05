@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { usePlayer } from '../contexts/PlayerContext'
+import Layout from '../components/Layout'
 
 const TYPE_LABELS = {
   creature: 'クリーチャー',
@@ -127,7 +127,6 @@ function CardItem({ card }) {
 
 export default function CardsPage() {
   const navigate = useNavigate()
-  const { player, clearPlayer } = usePlayer()
   const [cards, setCards] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -148,99 +147,64 @@ export default function CardsPage() {
     fetchCards()
   }, [filter])
 
-  const TYPES = ['', 'creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'land']
-  const COLORS = ['', 'white', 'blue', 'black', 'red', 'green', 'colorless', 'multicolor']
+  const TYPES = ['creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'land']
+  const COLORS = ['white', 'blue', 'black', 'red', 'green', 'colorless', 'multicolor']
 
   return (
-    <div className="min-h-screen">
-      <header className="bg-gray-800 border-b border-gray-700 px-4 py-3 sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <h1 className="text-xl font-bold text-purple-400 shrink-0">MTG Board Game</h1>
-          <div className="flex items-center gap-3 ml-auto">
-            <div className="text-right hidden sm:block">
-              <div className="text-white text-sm font-medium">{player?.username}</div>
-              <div className="text-yellow-400 text-xs font-mono">{player?.balance?.toLocaleString()}G</div>
-            </div>
-            <button
-              onClick={() => navigate('/cards/create')}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4 py-2 rounded-lg transition-colors shrink-0"
-            >
-              + カード作成
-            </button>
-            <button
-              onClick={clearPlayer}
-              className="text-gray-500 hover:text-gray-300 text-xs px-2 py-2 rounded transition-colors shrink-0"
-              title="プレイヤー変更"
-            >
-              退出
-            </button>
-          </div>
+    <Layout>
+      <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-6">
+        <div className="flex flex-wrap gap-3">
+          <input
+            type="text"
+            placeholder="カード名で検索..."
+            value={filter.search}
+            onChange={(e) => setFilter(f => ({ ...f, search: e.target.value }))}
+            className="bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500 flex-1 min-w-40"
+          />
+          <select
+            value={filter.card_type}
+            onChange={(e) => setFilter(f => ({ ...f, card_type: e.target.value }))}
+            className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+          >
+            <option value="">すべてのタイプ</option>
+            {TYPES.map(t => <option key={t} value={t}>{TYPE_LABELS[t]}</option>)}
+          </select>
+          <select
+            value={filter.color}
+            onChange={(e) => setFilter(f => ({ ...f, color: e.target.value }))}
+            className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
+          >
+            <option value="">すべての色</option>
+            {COLORS.map(c => <option key={c} value={c}>{COLOR_LABELS[c]}</option>)}
+          </select>
         </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-6">
-          <div className="flex flex-wrap gap-3">
-            <input
-              type="text"
-              placeholder="カード名で検索..."
-              value={filter.search}
-              onChange={(e) => setFilter(f => ({ ...f, search: e.target.value }))}
-              className="bg-gray-900 border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-purple-500 flex-1 min-w-40"
-            />
-            <select
-              value={filter.card_type}
-              onChange={(e) => setFilter(f => ({ ...f, card_type: e.target.value }))}
-              className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-            >
-              <option value="">すべてのタイプ</option>
-              {TYPES.filter(Boolean).map(t => (
-                <option key={t} value={t}>{TYPE_LABELS[t]}</option>
-              ))}
-            </select>
-            <select
-              value={filter.color}
-              onChange={(e) => setFilter(f => ({ ...f, color: e.target.value }))}
-              className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-            >
-              <option value="">すべての色</option>
-              {COLORS.filter(Boolean).map(c => (
-                <option key={c} value={c}>{COLOR_LABELS[c]}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-gray-400">読み込み中...</div>
-          </div>
-        ) : error ? (
-          <div className="bg-red-900/50 border border-red-700 rounded-lg px-4 py-3 text-red-300 text-sm">
-            {error}
-          </div>
-        ) : cards.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-4">🃏</div>
-            <p className="text-gray-400 mb-4">カードがまだありません</p>
-            <button
-              onClick={() => navigate('/cards/create')}
-              className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-lg transition-colors"
-            >
-              最初のカードを作成
-            </button>
-          </div>
-        ) : (
-          <>
-            <p className="text-gray-400 text-sm mb-4">{cards.length} 枚のカード</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {cards.map(card => (
-                <CardItem key={card.id} card={card} />
-              ))}
-            </div>
-          </>
-        )}
       </div>
-    </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-gray-400">読み込み中...</div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-900/50 border border-red-700 rounded-lg px-4 py-3 text-red-300 text-sm">{error}</div>
+      ) : cards.length === 0 ? (
+        <div className="text-center py-20">
+          <div className="text-6xl mb-4">🃏</div>
+          <p className="text-gray-400 mb-4">カードがまだありません</p>
+          <button
+            onClick={() => navigate('/cards/create')}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-lg transition-colors"
+          >
+            最初のカードを作成
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="text-gray-400 text-sm mb-4">{cards.length} 枚のカード</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {cards.map(card => <CardItem key={card.id} card={card} />)}
+          </div>
+        </>
+      )}
+    </Layout>
   )
 }
