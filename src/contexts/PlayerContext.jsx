@@ -34,12 +34,32 @@ export function PlayerProvider({ children }) {
   const createPlayer = async (username) => {
     const { data, error } = await supabase
       .from('players')
-      .insert({ username, balance: 1000 })
+      .insert({ username, balance: 10000 })
       .select()
       .single()
     if (error) throw error
     localStorage.setItem(STORAGE_KEY, data.id)
     setPlayer(data)
+
+    // スターターカードを付与（基本土地×各4枚 + 安価クリーチャー×各2枚）
+    const STARTER_CARDS = [
+      { name: '平野', qty: 4 }, { name: '島', qty: 4 }, { name: '沼', qty: 4 },
+      { name: '山', qty: 4 },  { name: '森', qty: 4 },
+      { name: '守護の衛兵', qty: 2 }, { name: '炎の精霊', qty: 2 },
+      { name: 'ゴブリンの突撃者', qty: 2 }, { name: '骸骨の戦士', qty: 2 },
+      { name: '回復の妖精', qty: 2 },
+    ]
+    const names = STARTER_CARDS.map(c => c.name)
+    const { data: cardRows } = await supabase.from('cards').select('id, name').in('name', names)
+    if (cardRows?.length) {
+      const inserts = []
+      for (const { name, qty } of STARTER_CARDS) {
+        const card = cardRows.find(c => c.name === name)
+        if (card) inserts.push({ player_id: data.id, card_id: card.id, quantity: qty })
+      }
+      if (inserts.length) await supabase.from('player_collection').insert(inserts)
+    }
+
     return data
   }
 
