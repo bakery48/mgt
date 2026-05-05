@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
 
 const CARD_TYPES = ['creature', 'instant', 'sorcery', 'enchantment', 'artifact', 'land']
 const CARD_TYPE_LABELS = {
@@ -54,7 +53,6 @@ const TRIGGERS = ['etb', 'upkeep', 'attack', 'damage']
 const TRIGGER_LABELS = { etb: '戦場に出た時', upkeep: 'アップキープ', attack: '攻撃時', damage: 'ダメージ時' }
 
 export default function CardCreatePage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
   const { register, handleSubmit, watch, formState: { errors } } = useForm({
     defaultValues: { type: 'creature', color: 'colorless' },
@@ -119,7 +117,7 @@ export default function CardCreatePage() {
 
       if (imageFile) {
         const ext = imageFile.name.split('.').pop()
-        const fileName = `${user.id}/${Date.now()}.${ext}`
+        const fileName = `shared/${Date.now()}.${ext}`
         const { error: uploadError } = await supabase.storage
           .from('card-images')
           .upload(fileName, imageFile)
@@ -144,7 +142,6 @@ export default function CardCreatePage() {
         effect_text: data.effect_text || null,
         keywords,
         image_url: imageUrl,
-        created_by: user.id,
       }
 
       const { error: insertError } = await supabase.from('cards').insert(cardData)

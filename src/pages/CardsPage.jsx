@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { useAuth } from '../contexts/AuthContext'
 
 const TYPE_LABELS = {
   creature: 'クリーチャー',
@@ -121,7 +120,6 @@ function CardItem({ card }) {
 }
 
 export default function CardsPage() {
-  const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const [cards, setCards] = useState([])
   const [loading, setLoading] = useState(true)
@@ -156,18 +154,11 @@ export default function CardsPage() {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <h1 className="text-xl font-bold text-purple-400">MTG Board Game</h1>
           <div className="flex items-center gap-3">
-            <span className="text-gray-400 text-sm hidden sm:block">{user?.email}</span>
             <button
               onClick={() => navigate('/cards/new')}
               className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4 py-2 rounded-lg transition-colors"
             >
               + カード作成
-            </button>
-            <button
-              onClick={signOut}
-              className="text-gray-400 hover:text-white text-sm px-3 py-2 rounded-lg hover:bg-gray-700 transition-colors"
-            >
-              ログアウト
             </button>
           </div>
         </div>
