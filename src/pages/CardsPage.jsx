@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import Layout from '../components/Layout'
+import CardDetailModal from '../components/CardDetailModal'
 
 const TYPE_LABELS = {
   creature: 'クリーチャー',
@@ -62,11 +63,14 @@ function KeywordTag({ kw }) {
   )
 }
 
-function CardItem({ card }) {
+function CardItem({ card, onClick }) {
   const keywords = Array.isArray(card.keywords) ? card.keywords : []
 
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:border-purple-600 transition-colors group">
+    <div
+      className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:border-purple-600 transition-colors group cursor-pointer"
+      onClick={onClick}
+    >
       {card.art_url ? (
         <div className="aspect-[5/7] overflow-hidden bg-gray-900">
           <img
@@ -131,6 +135,7 @@ export default function CardsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [filter, setFilter] = useState({ card_type: '', color: '', search: '' })
+  const [detailCard, setDetailCard] = useState(null)
 
   useEffect(() => {
     const fetchCards = async () => {
@@ -201,10 +206,11 @@ export default function CardsPage() {
         <>
           <p className="text-gray-400 text-sm mb-4">{cards.length} 枚のカード</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {cards.map(card => <CardItem key={card.id} card={card} />)}
+            {cards.map(card => <CardItem key={card.id} card={card} onClick={() => setDetailCard(card)} />)}
           </div>
         </>
       )}
+      <CardDetailModal card={detailCard} onClose={() => setDetailCard(null)} />
     </Layout>
   )
 }

@@ -14,6 +14,7 @@ import {
 import {
   processETB, processUpkeep, processAttack, processDamage,
 } from '../lib/keywordEffects'
+import CardDetailModal from '../components/CardDetailModal'
 
 // ─── カードコンポーネント ───────────────────────────────────────
 const COLOR_BG = {
@@ -23,12 +24,13 @@ const COLOR_BG = {
   multicolor: 'bg-gradient-to-br from-yellow-600 to-purple-700 text-white',
 }
 
-function MiniCard({ card, perm, selected, onClick, disabled, dimmed }) {
+function MiniCard({ card, perm, selected, onClick, onDetail, disabled, dimmed }) {
   const kws = (card?.keywords || []).map(k => k.type)
   const isTapped = perm?.tapped
   return (
     <button
       onClick={onClick}
+      onContextMenu={onDetail ? (e) => { e.preventDefault(); onDetail() } : undefined}
       disabled={disabled}
       className={`
         relative border-2 rounded-lg transition-all select-none
@@ -59,10 +61,11 @@ function MiniCard({ card, perm, selected, onClick, disabled, dimmed }) {
   )
 }
 
-function HandCard({ card, onClick, disabled, highlight }) {
+function HandCard({ card, onClick, onDetail, disabled, highlight }) {
   return (
     <button
       onClick={onClick}
+      onContextMenu={onDetail ? (e) => { e.preventDefault(); onDetail() } : undefined}
       disabled={disabled}
       className={`
         border-2 rounded-lg p-2 transition-all shrink-0 w-20 h-28 flex flex-col text-left
@@ -146,6 +149,8 @@ export default function GamePlayPage() {
   const [blockingAssignments, setBlockingAssignments] = useState({})
   const [savingGs, setSavingGs] = useState(false)
   const [roundResult, setRoundResult] = useState(null)
+  const [detailCard, setDetailCard] = useState(null)
+  const [detailPerm, setDetailPerm] = useState(null)
 
   const myId = player?.id
   const isActive = gs?.active_player === myId
@@ -580,6 +585,7 @@ export default function GamePlayPage() {
                     onClick={() => {
                       if (canAssign) handleAssignBlocker(perm.instance_id)
                     }}
+                    onDetail={() => { setDetailCard(card); setDetailPerm(perm) }}
                     dimmed={false}
                   />
                 )
@@ -627,6 +633,11 @@ export default function GamePlayPage() {
                       else if (isEquipTarget && !isEquip) handleEquipTarget(perm.instance_id)
                       else if (canEquipThis) handleEquipClick(perm.instance_id)
                     }}
+                    onDetail={() => {
+                      const ep = isCrea ? getEffectivePT(perm, card, myPs.battlefield, cardData) : null
+                      setDetailCard(card)
+                      setDetailPerm({ ...perm, power: ep?.power ?? perm.power, toughness: ep?.toughness ?? perm.toughness })
+                    }}
                     disabled={!isLand && !canAtt && !canBlk && !canEquipThis && !(isEquipTarget && !isEquip)}
                   />
                 )
@@ -660,6 +671,7 @@ export default function GamePlayPage() {
                     highlight={selectedHandCard === cardId}
                     disabled={!canPlay}
                     onClick={() => handleHandCardClick(cardId)}
+                    onDetail={() => { setDetailCard(card); setDetailPerm(null) }}
                   />
                 )
               })}
@@ -839,7 +851,10 @@ export default function GamePlayPage() {
                   const canUn = unKw && canPlaySorcerySpeed(gs, myId) && hasMana(myPs.mana_pool, unKw.value || '{0}')
                   return (
                     <div key={i} className="flex items-center gap-1">
-                      <span className="text-gray-400 text-xs flex-1 truncate">{card?.name || '?'}</span>
+                      <span
+                        className="text-gray-400 text-xs flex-1 truncate cursor-pointer hover:text-gray-200"
+                        onClick={() => { setDetailCard(card); setDetailPerm(null) }}
+                      >{card?.name || '?'}</span>
                       {canFb && (
                         <button onClick={() => handleFlashback(cid)}
                           className="text-xs bg-indigo-700 hover:bg-indigo-600 text-white px-1 py-0.5 rounded shrink-0">
@@ -886,6 +901,13 @@ export default function GamePlayPage() {
           </div>
         </div>
       )}
+
+      {/* ─── カード詳細モーダル ─── */}
+      <CardDetailModal
+        card={detailCard}
+        perm={detailPerm}
+        onClose={() => { setDetailCard(null); setDetailPerm(null) }}
+      />
 
       {/* ─── ラウンド終了モーダル ─── */}
       {roundResult && (
