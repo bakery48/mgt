@@ -5,9 +5,11 @@ import { usePlayer } from '../contexts/PlayerContext'
 import {
   PHASES, PHASE_LABELS,
   initGameState, tapForMana, playLand, castSpell, cycleCard, passPriority,
-  advancePhase, declareAttackers, declareBlockers, resolveCombatDamage,
+  advancePhase, declareAttackers, declareBlockers,
+  resolveFirstStrikeDamage, resolveCombatDamage,
   canPlaySorcerySpeed, hasMana, getOpponent, getValidBlockers,
   castFlashback, unearthCreature, equipArtifact, getEffectivePT,
+  discardCard, finishCleanup,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -386,6 +388,11 @@ export default function GamePlayPage() {
     }
   }
 
+  const handleResolveFirstStrike = () => {
+    const newGs = resolveFirstStrikeDamage(gs, cardData)
+    dispatch(advancePhase(newGs))
+  }
+
   const handleResolveCombat = async () => {
     const prevGS = gs
     const newGs = resolveCombatDamage(gs, cardData)
@@ -398,6 +405,16 @@ export default function GamePlayPage() {
     const msgs = await processDamage(attackerPerms, cardData, myId, oppId, gameId, didDamage)
     if (msgs.length > 0) console.log('[damage triggers]', msgs)
     checkForRoundEnd(advanced)
+  }
+
+  const handleDiscard = (cardId) => {
+    if (!gs || (gs.cleanup_discard ?? 0) <= 0) return
+    const newGs = discardCard(gs, myId, cardId)
+    if ((newGs.cleanup_discard ?? 0) === 0) {
+      dispatch(finishCleanup(newGs))
+    } else {
+      dispatch(newGs)
+    }
   }
 
   const handlePassPriority = async () => {
@@ -448,11 +465,16 @@ export default function GamePlayPage() {
     if (!state?.players || !myId || !oppId) return
     const myL = state.players[myId]?.life ?? 20
     const oppL = state.players[oppId]?.life ?? 20
+    // ライフ0
     if (myL <= 0 || oppL <= 0) {
-      setRoundResult({
-        winner: myL > 0 ? myId : oppId,
-        loser: myL <= 0 ? myId : oppId,
-      })
+      setRoundResult({ winner: myL > 0 ? myId : oppId, loser: myL <= 0 ? myId : oppId })
+      return
+    }
+    // ライブラリアウト
+    if (state.library_out_player) {
+      const loser = state.library_out_player
+      const winner = loser === myId ? oppId : myId
+      setRoundResult({ winner, loser })
     }
   }
 
@@ -575,7 +597,8 @@ export default function GamePlayPage() {
                 const isCrea = card?.card_type === 'creature'
                 const isEquip = card?.card_type === 'artifact' &&
                   (card?.keywords || []).some(k => k.type === 'equip')
-                const canAtt = gs.phase === 'declare_attackers' && isActive && isCrea && !perm.summoning_sick && !perm.tapped
+                const hasDefender = (card?.keywords || []).some(k => k.type === 'defender')
+                const canAtt = gs.phase === 'declare_attackers' && isActive && isCrea && !perm.summoning_sick && !perm.tapped && !hasDefender
                 const isSelAtt = selectedAttackers.includes(perm.instance_id)
                 const isBlockPhase = gs.phase === 'declare_blockers' && !isActive
                 const canBlk = isBlockPhase && isCrea && !perm.tapped && !perm.summoning_sick
@@ -743,6 +766,16 @@ export default function GamePlayPage() {
             </div>
           )}
 
+          {/* 先制ダメージ解決 */}
+          {gs.phase === 'first_strike_damage' && isActive && hasPrio && (
+            <button
+              onClick={handleResolveFirstStrike}
+              className="w-full bg-yellow-700 hover:bg-yellow-600 text-white text-sm py-2.5 rounded-lg font-medium"
+            >
+              ⚡ 先制ダメージ解決
+            </button>
+          )}
+
           {/* 戦闘ダメージ解決 */}
           {gs.phase === 'combat_damage' && isActive && hasPrio && (
             <button
@@ -754,7 +787,7 @@ export default function GamePlayPage() {
           )}
 
           {/* 優先権パス */}
-          {hasPrio && gs.phase !== 'declare_attackers' && gs.phase !== 'combat_damage' && (
+          {hasPrio && !['declare_attackers','first_strike_damage','combat_damage'].includes(gs.phase) && (
             <button
               onClick={handlePassPriority}
               className="w-full bg-gray-700 hover:bg-gray-600 text-white text-sm py-2.5 rounded-lg"
@@ -827,6 +860,32 @@ export default function GamePlayPage() {
           )}
         </div>
       </div>
+
+      {/* ─── 手札整理モーダル（クリーンアップ時 手札>7枚）─── */}
+      {(gs.cleanup_discard ?? 0) > 0 && isActive && (
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-40 pb-4">
+          <div className="bg-gray-800 border border-yellow-600 rounded-xl p-4 w-full max-w-2xl mx-4">
+            <p className="text-yellow-400 font-bold text-center mb-3">
+              手札を {gs.cleanup_discard} 枚捨ててください
+            </p>
+            <div className="flex gap-2 overflow-x-auto justify-center pb-1">
+              {(myPs.hand || []).map(cardId => {
+                const card = cardData[cardId]
+                return (
+                  <button
+                    key={cardId}
+                    onClick={() => handleDiscard(cardId)}
+                    className={`shrink-0 w-20 h-28 rounded-lg p-1.5 border-2 border-red-500 hover:border-red-300 text-left text-xs flex flex-col ${COLOR_BG[card?.color] || 'bg-gray-700 text-white'}`}
+                  >
+                    {card?.art_url && <img src={card.art_url} alt="" className="w-full h-12 object-cover rounded mb-1" />}
+                    <p className="font-bold leading-tight line-clamp-2">{card?.name || '?'}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── ラウンド終了モーダル ─── */}
       {roundResult && (

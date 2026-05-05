@@ -330,6 +330,10 @@ export function advancePhase(state) {
         ...state.players,
         [ap]: { ...ps, hand: [...ps.hand, ps.library[0]], library: ps.library.slice(1) },
       }
+    } else {
+      // ライブラリアウト
+      s.library_out_player = ap
+      s = log(s, `${ap} のライブラリが空になった！`)
     }
     s.priority = ap
   } else if (next === 'cleanup') {
@@ -349,6 +353,15 @@ export function advancePhase(state) {
         }
       }
     }
+    // 手札上限チェック（7枚）
+    const ap2 = s.active_player
+    const ps2 = s.players[ap2]
+    const excess = (ps2.hand || []).length - 7
+    if (excess > 0) {
+      s.cleanup_discard = excess
+      s.priority = ap2
+      return s  // 手札整理待ち（クリーンアップ本体は後で）
+    }
     const ps = s.players[ap]
     s.players = {
       ...s.players,
@@ -364,23 +377,48 @@ export function advancePhase(state) {
   return s
 }
 
-// 攻撃宣言
+// 手札整理後にクリーンアップ本体を実行（GamePlayPage から呼ぶ）
+export function finishCleanup(state) {
+  const ap = state.active_player
+  const ps = state.players[ap]
+  return {
+    ...state,
+    cleanup_discard: 0,
+    players: {
+      ...state.players,
+      [ap]: {
+        ...ps,
+        mana_pool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
+        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0 })),
+      },
+    },
+  }
+}
+
+// 攻撃宣言（防衛クリーチャーを除外）
 export function declareAttackers(state, pid, attackerIids, cardData) {
   if (state.phase !== 'declare_attackers' || state.active_player !== pid) return state
   const ps = state.players[pid]
+  // defender 持ちは攻撃不可
+  const validIids = attackerIids.filter(iid => {
+    const perm = ps.battlefield.find(p => p.instance_id === iid)
+    if (!perm) return false
+    const card = cardData[perm.card_id] || {}
+    return !(card.keywords || []).some(k => k.type === 'defender')
+  })
   const newBf = ps.battlefield.map(p => {
-    if (!attackerIids.includes(p.instance_id)) return p
+    if (!validIids.includes(p.instance_id)) return p
     const card = cardData[p.card_id] || {}
     const hasVigilance = (card.keywords || []).some(k => k.type === 'vigilance')
     return { ...p, attacking: true, tapped: !hasVigilance }
   })
   return log({
     ...state,
-    combat: { ...state.combat, attackers: attackerIids },
+    combat: { ...state.combat, attackers: validIids },
     players: { ...state.players, [pid]: { ...ps, battlefield: newBf } },
     priority_passed: [],
     priority: pid,
-  }, `${attackerIids.length} 体で攻撃`)
+  }, `${validIids.length} 体で攻撃`)
 }
 
 // ブロック宣言
@@ -400,28 +438,37 @@ export function declareBlockers(state, pid, blockerMap) {
   }, 'ブロック宣言')
 }
 
-// 戦闘ダメージ解決
-export function resolveCombatDamage(state, cardData) {
-  const ap = state.active_player
+// ─── 戦闘ダメージ共通ヘルパー ─────────────────────────────────────
+// firstStrikePhase=true  → 先制攻撃フェーズ（先制/二段のみ）
+// firstStrikePhase=false → 通常ダメージフェーズ（先制のみはスキップ、二段は含む）
+function _resolveStrike(state, cardData, firstStrikePhase) {
+  const ap  = state.active_player
   const def = getOpponent(state, ap)
   let aps = { ...state.players[ap] }
   let dps = { ...state.players[def] }
   let apBf = [...aps.battlefield]
   let dpBf = [...dps.battlefield]
   let defLife = dps.life
-  let apLife = aps.life
+  let apLife  = aps.life
 
   for (const attIid of state.combat.attackers) {
     const attPerm = apBf.find(p => p.instance_id === attIid)
     if (!attPerm) continue
     const attCard = cardData[attPerm.card_id] || {}
-    const attKws = attCard.keywords || []
-    const attKw = attKws.map(k => k.type)
-    // protectionカラー: このクリーチャーはそのカラーからダメージを受けない
+    const attKws  = attCard.keywords || []
+    const attKw   = attKws.map(k => k.type)
+    const hasFS   = attKw.includes('first_strike')
+    const hasDS   = attKw.includes('double_strike')
+
+    // フェーズ別スキップ判定
+    if (firstStrikePhase  && !hasFS && !hasDS) continue  // 先制/二段でない → 先制フェーズはスキップ
+    if (!firstStrikePhase && hasFS  && !hasDS) continue  // 先制のみ → 通常フェーズはスキップ
+
     const attProtection = attKws.find(k => k.type === 'protection')?.value ?? null
-    const blockerIids = state.combat.blockers[attIid] || []
-    const blockers = blockerIids.map(biid => dpBf.find(p => p.instance_id === biid)).filter(Boolean)
-    const { power } = getEffectivePT(attPerm, attCard, apBf, cardData)
+    const blockerIids   = state.combat.blockers[attIid] || []
+    const blockers      = blockerIids.map(biid => dpBf.find(p => p.instance_id === biid)).filter(Boolean)
+    const { power }     = getEffectivePT(attPerm, attCard, apBf, cardData)
+
     if (blockers.length === 0) {
       defLife -= power
       if (attKw.includes('lifelink')) apLife += power
@@ -429,29 +476,34 @@ export function resolveCombatDamage(state, cardData) {
       let rem = power
       for (const blk of blockers) {
         const blkCard = cardData[blk.card_id] || {}
-        const blkKws = blkCard.keywords || []
-        const blkKw = blkKws.map(k => k.type)
-        const blkProtection = blkKws.find(k => k.type === 'protection')?.value ?? null
+        const blkKws  = blkCard.keywords || []
+        const blkKw   = blkKws.map(k => k.type)
+        const blkFS   = blkKw.includes('first_strike') || blkKw.includes('double_strike')
+        const blkProt = blkKws.find(k => k.type === 'protection')?.value ?? null
+        const blkImmuneToAtt = blkProt && attCard.color === blkProt
         const { power: blkPower, toughness: blkTough } = getEffectivePT(blk, blkCard, dpBf, cardData)
 
-        // ブロッカーがprotection持ちなら攻撃クリーチャーのカラーからダメージ無効
-        const blkImmuneToAtt = blkProtection && attCard.color === blkProtection
         const dmgToBlk = (blkKw.includes('indestructible') || blkImmuneToAtt)
-          ? 0
-          : Math.min(rem, blkTough - blk.damage)
-        rem -= Math.min(rem, blkTough - blk.damage) // trample計算用に実際の割り当て量を減算
+          ? 0 : Math.min(rem, blkTough - blk.damage)
+        rem -= Math.min(rem, blkTough - blk.damage)
+
         if (attKw.includes('deathtouch') && dmgToBlk > 0) {
           dpBf = dpBf.map(p => p.instance_id === blk.instance_id ? { ...p, damage: 9999 } : p)
         } else {
           dpBf = dpBf.map(p => p.instance_id === blk.instance_id ? { ...p, damage: p.damage + dmgToBlk } : p)
         }
 
-        // 攻撃クリーチャーがprotection持ちならブロッカーのカラーからダメージ無効
-        const attImmuneToBlk = attProtection && blkCard.color === attProtection
-        const dmgToAtt = attImmuneToBlk ? 0
-          : (blkKw.includes('deathtouch') && blkPower > 0 ? 9999 : blkPower)
-        if (!attKw.includes('indestructible')) {
-          apBf = apBf.map(p => p.instance_id === attIid ? { ...p, damage: p.damage + dmgToAtt } : p)
+        // ブロッカーの反撃: 先制フェーズは先制/二段のみ、通常フェーズは先制なし/二段のみ
+        const blkDealsBack = firstStrikePhase
+          ? blkFS
+          : (!blkKw.includes('first_strike') || blkKw.includes('double_strike'))
+        if (blkDealsBack) {
+          const attImmuneToBlk = attProtection && blkCard.color === attProtection
+          const dmgToAtt = attImmuneToBlk ? 0
+            : (blkKw.includes('deathtouch') && blkPower > 0 ? 9999 : blkPower)
+          if (!attKw.includes('indestructible')) {
+            apBf = apBf.map(p => p.instance_id === attIid ? { ...p, damage: p.damage + dmgToAtt } : p)
+          }
         }
         if (attKw.includes('lifelink')) apLife += dmgToBlk
       }
@@ -468,7 +520,7 @@ export function resolveCombatDamage(state, cardData) {
     const graveyard = []
     const alive = bf.filter(p => {
       const card = cardData[p.card_id] || {}
-      if (card.card_type !== 'creature') return true  // 装備品などは死なない
+      if (card.card_type !== 'creature') return true
       const kw = (card.keywords || []).map(k => k.type)
       const { toughness: effTough } = getEffectivePT(p, card, bf, cardData)
       if (!kw.includes('indestructible') && p.damage >= effTough) {
@@ -478,12 +530,9 @@ export function resolveCombatDamage(state, cardData) {
       }
       return true
     })
-    // 死んだクリーチャーから装備をデタッチ
     return {
       alive: alive.map(p =>
-        p.attached_to && deadIids.includes(p.attached_to)
-          ? { ...p, attached_to: null }
-          : p
+        p.attached_to && deadIids.includes(p.attached_to) ? { ...p, attached_to: null } : p
       ),
       graveyard,
     }
@@ -492,26 +541,53 @@ export function resolveCombatDamage(state, cardData) {
   const { alive: apAlive, graveyard: apDead } = filterLethal(apBf)
   const { alive: dpAlive, graveyard: dpDead } = filterLethal(dpBf)
 
+  const clearCombat = !firstStrikePhase
   let s = {
     ...state,
-    combat: { attackers: [], blockers: {} },
+    ...(clearCombat ? { combat: { attackers: [], blockers: {} } } : {}),
     players: {
       ...state.players,
       [ap]: {
-        ...aps,
-        life: apLife,
-        battlefield: apAlive.map(p => ({ ...p, attacking: false })),
+        ...aps, life: apLife,
+        battlefield: apAlive.map(p => clearCombat ? { ...p, attacking: false } : p),
         graveyard: [...aps.graveyard, ...apDead],
       },
       [def]: {
-        ...dps,
-        life: defLife,
-        battlefield: dpAlive.map(p => ({ ...p, blocking: null })),
+        ...dps, life: defLife,
+        battlefield: dpAlive.map(p => clearCombat ? { ...p, blocking: null } : p),
         graveyard: [...dps.graveyard, ...dpDead],
       },
     },
   }
-  return log(s, `戦闘ダメージ: ${apDead.length + dpDead.length} 体が破壊された`)
+  const label = firstStrikePhase ? '先制ダメージ' : '戦闘ダメージ'
+  return log(s, `${label}: ${apDead.length + dpDead.length} 体が破壊された`)
+}
+
+// 先制攻撃フェーズのダメージ解決
+export function resolveFirstStrikeDamage(state, cardData) {
+  return _resolveStrike(state, cardData, true)
+}
+
+// 通常ダメージフェーズの解決
+export function resolveCombatDamage(state, cardData) {
+  return _resolveStrike(state, cardData, false)
+}
+
+// 手札を1枚捨てる（手札上限処理）
+export function discardCard(state, pid, cardId) {
+  const ps = state.players[pid]
+  if (!(ps.hand || []).includes(cardId)) return state
+  const newHand = ps.hand.filter(id => id !== cardId)
+  const remaining = Math.max(0, (state.cleanup_discard || 0) - 1)
+  let s = {
+    ...state,
+    cleanup_discard: remaining,
+    players: {
+      ...state.players,
+      [pid]: { ...ps, hand: newHand, graveyard: [...ps.graveyard, cardId] },
+    },
+  }
+  return log(s, `手札を1枚捨てた（残り捨て枚数: ${remaining}）`)
 }
 
 // 状況起因処理（ライフ0チェック等）
