@@ -1,6 +1,9 @@
 -- デフォルトカードプール（約50枚）
 -- Supabase SQL Editor（role: postgres）で実行
 
+-- price カラムが未存在の場合は追加
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS price integer NOT NULL DEFAULT 500;
+
 INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price) VALUES
 
 -- ── 土地 ──────────────────────────────────────────────────────
