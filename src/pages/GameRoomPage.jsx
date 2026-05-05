@@ -11,7 +11,7 @@ export default function GameRoomPage() {
   const channelRef = useRef(null)
 
   const [game, setGame] = useState(null)
-  const [participants, setParticipants] = useState([])  // game_players + player info
+  const [participants, setParticipants] = useState([])
   const [myDecks, setMyDecks] = useState([])
   const [selectedDeck, setSelectedDeck] = useState(null)
   const [joined, setJoined] = useState(false)
@@ -21,6 +21,7 @@ export default function GameRoomPage() {
   const [copied, setCopied] = useState(false)
 
   const isHost = participants.length > 0 && participants[0]?.player_id === player?.id
+  const status = game?.status
 
   const fetchRoom = async () => {
     const [{ data: gameData }, { data: gpData }, { data: deckData }] = await Promise.all([
@@ -40,7 +41,6 @@ export default function GameRoomPage() {
     if (me?.deck_id) setSelectedDeck(me.deck_id)
     setLoading(false)
 
-    // ゲームが開始済みなら対戦画面へ
     if (gameData?.status === 'in_progress') {
       navigate(`/game/${gameId}/play`)
     }
@@ -50,7 +50,6 @@ export default function GameRoomPage() {
     if (!player) return
     fetchRoom()
 
-    // Realtime購読
     channelRef.current = supabase
       .channel(`game_room_${gameId}`)
       .on('postgres_changes', {
@@ -68,9 +67,7 @@ export default function GameRoomPage() {
       })
       .subscribe()
 
-    return () => {
-      channelRef.current?.unsubscribe()
-    }
+    return () => channelRef.current?.unsubscribe()
   }, [gameId, player])
 
   const join = async () => {
@@ -109,6 +106,15 @@ export default function GameRoomPage() {
     if (error) { alert(error.message); setStarting(false) }
   }
 
+  const startNextRound = async () => {
+    setStarting(true)
+    const { error } = await supabase
+      .from('games')
+      .update({ status: 'in_progress', game_state: {} })
+      .eq('id', gameId)
+    if (error) { alert(error.message); setStarting(false) }
+  }
+
   const copyId = () => {
     navigator.clipboard.writeText(gameId)
     setCopied(true)
@@ -117,6 +123,8 @@ export default function GameRoomPage() {
 
   const getDeckCount = (deck) =>
     (deck.deck_cards || []).reduce((s, dc) => s + dc.quantity, 0)
+
+  const finalWinner = participants.find(p => p.player_id === game?.winner_id)
 
   if (loading) {
     return (
@@ -128,6 +136,113 @@ export default function GameRoomPage() {
     )
   }
 
+  // ─── ゲーム終了画面 ───────────────────────────────────────
+  if (status === 'finished') {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto text-center py-16">
+          <div className="text-7xl mb-6">🏆</div>
+          <h1 className="text-3xl font-bold text-white mb-2">ゲーム終了！</h1>
+          <p className="text-yellow-400 text-xl font-semibold mb-8">
+            {finalWinner?.players?.username || '不明'} の勝利
+          </p>
+
+          {/* 最終スコア */}
+          <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden mb-8">
+            <div className="px-4 py-3 border-b border-gray-700">
+              <p className="text-gray-400 text-sm font-semibold">最終スコア</p>
+            </div>
+            {[...participants]
+              .sort((a, b) => b.victory_points - a.victory_points)
+              .map((gp, i) => (
+                <div key={gp.player_id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-700 last:border-0">
+                  <span className="text-2xl w-8 text-center shrink-0">
+                    {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-white font-medium">{gp.players?.username}</p>
+                    <p className="text-gray-400 text-xs">{gp.players?.balance?.toLocaleString()}G</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-yellow-400 font-bold">{gp.victory_points} VP</p>
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          <button
+            onClick={() => navigate('/game')}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-medium transition-colors"
+          >
+            ロビーに戻る
+          </button>
+        </div>
+      </Layout>
+    )
+  }
+
+  // ─── ラウンド間画面 ───────────────────────────────────────
+  if (status === 'between_rounds') {
+    return (
+      <Layout>
+        <div className="max-w-lg mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-white mb-1">
+              ラウンド {(game?.current_round ?? 1) - 1} 終了
+            </h1>
+            <p className="text-gray-400 text-sm">
+              次のラウンド: {game?.current_round} / {game?.total_rounds}
+            </p>
+          </div>
+
+          {/* スコアボード */}
+          <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden mb-6">
+            <div className="px-4 py-3 border-b border-gray-700">
+              <p className="text-gray-400 text-sm font-semibold">現在のスコア</p>
+            </div>
+            {[...participants]
+              .sort((a, b) => b.victory_points - a.victory_points)
+              .map((gp, i) => (
+                <div key={gp.player_id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-700 last:border-0">
+                  <span className="text-xl w-8 text-center shrink-0">
+                    {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
+                  </span>
+                  <div className="flex-1">
+                    <p className="text-white font-medium">
+                      {gp.players?.username}
+                      {gp.player_id === player?.id && <span className="text-purple-400 text-xs ml-2">（あなた）</span>}
+                    </p>
+                    <p className="text-gray-400 text-xs">{gp.players?.balance?.toLocaleString()}G</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-yellow-400 font-bold text-lg">{gp.victory_points} VP</p>
+                    {game?.vp_threshold && (
+                      <p className="text-gray-500 text-xs">/ {game.vp_threshold}</p>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          {isHost ? (
+            <button
+              onClick={startNextRound}
+              disabled={starting}
+              className="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white font-bold py-4 rounded-xl transition-colors text-lg"
+            >
+              {starting ? '準備中...' : `🎮 ラウンド ${game?.current_round} 開始`}
+            </button>
+          ) : (
+            <div className="text-center text-gray-400 py-4">
+              ホストがラウンドを開始するまでお待ちください...
+            </div>
+          )}
+        </div>
+      </Layout>
+    )
+  }
+
+  // ─── 待合室（waiting / 初回） ─────────────────────────────
   return (
     <Layout>
       {/* ゲーム情報ヘッダー */}
@@ -257,7 +372,6 @@ export default function GameRoomPage() {
               )}
             </div>
 
-            {/* ホストのみ: ゲーム開始ボタン */}
             {isHost && (
               <div className="mt-4">
                 <button
