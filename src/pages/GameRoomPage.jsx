@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
 import Layout from '../components/Layout'
 import { initGameState } from '../lib/gameEngine'
+import { CPU_USERNAME } from '../lib/cpuPlayer'
 
 export default function GameRoomPage() {
   const { id: gameId } = useParams()
@@ -23,6 +24,9 @@ export default function GameRoomPage() {
 
   const isHost = participants.length > 0 && participants[0]?.player_id === player?.id
   const status = game?.status
+  const cpuParticipant = participants.find(p => p.players?.username === CPU_USERNAME)
+  const cpuId = cpuParticipant?.player_id ?? null
+  const isCpuGame = !!cpuId
 
   const fetchRoom = async () => {
     const [{ data: gameData }, { data: gpData }, { data: deckData }] = await Promise.all([
@@ -106,6 +110,85 @@ export default function GameRoomPage() {
       .eq('id', gameId)
     if (error) { alert(error.message); setStarting(false) }
   }
+
+  // ─── CPU自動プレイ（ラウンド間フェーズ） ────────────────────
+  const applyCpuActionEffect = async (card, cpuGp) => {
+    const ep = card.effect_params || {}
+    const t = card.effect_type
+    const humanGp = participants.find(p => p.player_id !== cpuId)
+    if (t === 'vp_self') {
+      await supabase.from('game_players')
+        .update({ victory_points: (cpuGp?.victory_points || 0) + ep.amount })
+        .eq('game_id', gameId).eq('player_id', cpuId)
+    } else if (t === 'gold_self') {
+      await supabase.from('players')
+        .update({ balance: Math.max(0, (cpuGp?.players?.balance || 0) + ep.amount) })
+        .eq('id', cpuId)
+    } else if ((t === 'vp_target' || t === 'vp_random') && humanGp) {
+      await supabase.from('game_players')
+        .update({ victory_points: Math.max(0, (humanGp.victory_points || 0) + ep.amount) })
+        .eq('game_id', gameId).eq('player_id', humanGp.player_id)
+    } else if (t === 'gold_steal' && humanGp) {
+      const steal = Math.min(ep.amount, humanGp.players?.balance || 0)
+      await Promise.all([
+        supabase.from('players').update({ balance: Math.max(0, (humanGp.players?.balance || 0) - steal) }).eq('id', humanGp.player_id),
+        supabase.from('players').update({ balance: (cpuGp?.players?.balance || 0) + steal }).eq('id', cpuId),
+      ])
+    } else if (t === 'mana_bonus') return { mana_bonus: ep.amount }
+    else if (t === 'life_bonus') return { life_bonus: ep.amount }
+    else if (t === 'go_first') return { go_first: true }
+    else if (t === 'draw_bonus') return { draw_bonus: ep.amount }
+    return {}
+  }
+
+  useEffect(() => {
+    if (!isCpuGame || !cpuId || status !== 'between_rounds' || !game?.game_state || starting) return
+    const meta = game.game_state
+    const roundPhase = meta.round_phase
+
+    // イベントフェーズ自動開始（CPU対戦のみ）
+    if (!roundPhase && isHost) {
+      const t = setTimeout(() => startEventPhase(), 1000)
+      return () => clearTimeout(t)
+    }
+
+    // CPU自動イベント確認
+    if (roundPhase === 'event' && !meta.event_confirmed?.[cpuId]) {
+      const isDiceEvent = meta.event_card?.effect_type === 'dice_random'
+      if (isDiceEvent && meta.dice_result == null) return
+      const t = setTimeout(async () => {
+        const confirmed = { ...(meta.event_confirmed || {}), [cpuId]: true }
+        const allConfirmed = participants.every(gp => confirmed[gp.player_id])
+        await supabase.from('games').update({
+          game_state: { ...meta, event_confirmed: confirmed, ...(allConfirmed ? { round_phase: 'action' } : {}) }
+        }).eq('id', gameId)
+      }, 700)
+      return () => clearTimeout(t)
+    }
+
+    // バトル自動開始（全員ready後、CPU対戦のみ）
+    if (roundPhase === 'ready' && isHost) {
+      const t = setTimeout(() => startBattle(), 1200)
+      return () => clearTimeout(t)
+    }
+
+    // CPUアクションカード自動プレイ
+    if (roundPhase === 'action' && meta.action_played?.[cpuId] == null) {
+      const t = setTimeout(async () => {
+        const cpuGp = participants.find(p => p.player_id === cpuId)
+        const cpuCard = meta.action_cards?.[cpuId]
+        const battleMods = cpuCard ? (await applyCpuActionEffect(cpuCard, cpuGp)) : {}
+        const modifiers = { ...(meta.modifiers || {}), [cpuId]: { ...(meta.modifiers?.[cpuId] || {}), ...battleMods } }
+        const actionPlayed = { ...(meta.action_played || {}), [cpuId]: true }
+        const allDone = participants.every(gp => actionPlayed[gp.player_id] != null)
+        await supabase.from('games').update({
+          game_state: { ...meta, modifiers, action_played: actionPlayed, ...(allDone ? { round_phase: 'ready' } : {}) }
+        }).eq('id', gameId)
+      }, 700)
+      return () => clearTimeout(t)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game?.game_state?.round_phase, game?.game_state?.dice_result, status, cpuId, isCpuGame, isHost, starting])
 
   // ─── イベント効果適用（ホストのみ実行） ──────────────────────
   const applyEventEffect = async (eventCard, diceResult, parts) => {
