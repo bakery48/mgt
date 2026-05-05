@@ -161,11 +161,7 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
                   <span
                     key={i}
                     title={tip || ''}
-                    className={`relative inline-block group text-xs px-2 py-0.5 rounded border cursor-help ${
-                      ORIG_KW.has(kw.type)
-                        ? 'bg-amber-900/40 text-amber-300 border-amber-700'
-                        : 'bg-gray-800 text-gray-300 border-gray-600'
-                    }`}
+                    className="relative inline-block group text-xs px-2 py-0.5 rounded border cursor-help bg-gray-800 text-gray-300 border-gray-600"
                   >
                     {kwLabel(kw)}
                     {tip && (

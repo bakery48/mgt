@@ -82,16 +82,9 @@ function KeywordTag({ kw }) {
   return (
     <span
       title={tip || ''}
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border cursor-help ${
-        isOriginal
-          ? 'bg-amber-900/50 text-amber-300 border-amber-700'
-          : 'bg-gray-700 text-gray-300 border-gray-600'
-      }`}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border cursor-help bg-gray-700 text-gray-300 border-gray-600"
     >
       {label}
-      {isOriginal && kw.value != null && (
-        <span className="text-amber-400 font-mono">{kw.value}</span>
-      )}
     </span>
   )
 }
