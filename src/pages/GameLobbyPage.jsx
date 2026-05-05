@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
 import Layout from '../components/Layout'
+import { initGameState } from '../lib/gameEngine'
+import { CPU_USERNAME } from '../lib/cpuPlayer'
 
 const STATUS_LABEL = { waiting: '待機中', in_progress: '進行中', finished: '終了' }
 const STATUS_COLOR = { waiting: 'text-green-400', in_progress: 'text-yellow-400', finished: 'text-gray-500' }
@@ -15,6 +17,7 @@ export default function GameLobbyPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [joinId, setJoinId] = useState('')
   const [creating, setCreating] = useState(false)
+  const [startingCpu, setStartingCpu] = useState(false)
   const [settings, setSettings] = useState({
     total_rounds: 5,
     vp_threshold: 15,
@@ -63,6 +66,99 @@ export default function GameLobbyPage() {
     navigate(`/game/${data.id}`)
   }
 
+  const startCpuGame = async () => {
+    if (!player) return
+    setStartingCpu(true)
+    try {
+      // Human's deck
+      const { data: humanDecks } = await supabase
+        .from('decks')
+        .select('id, deck_cards(card_id, quantity)')
+        .eq('player_id', player.id)
+        .limit(1)
+      const humanDeck = humanDecks?.[0]
+      if (!humanDeck?.deck_cards?.length) {
+        alert('デッキを先に作成してください')
+        return
+      }
+
+      // Get or create CPU player
+      let { data: cpuPlayer } = await supabase
+        .from('players')
+        .select('id')
+        .eq('username', CPU_USERNAME)
+        .maybeSingle()
+      if (!cpuPlayer) {
+        const { data: newCpu, error } = await supabase
+          .from('players')
+          .insert({ username: CPU_USERNAME, balance: 0 })
+          .select('id')
+          .single()
+        if (error) { alert('CPUプレイヤー作成失敗: ' + error.message); return }
+        cpuPlayer = newCpu
+      }
+
+      // Get or create CPU deck (copy of human deck)
+      let { data: cpuDecks } = await supabase
+        .from('decks')
+        .select('id, deck_cards(card_id, quantity)')
+        .eq('player_id', cpuPlayer.id)
+        .limit(1)
+      let cpuDeck = cpuDecks?.[0]
+      if (!cpuDeck) {
+        const { data: newDeck } = await supabase
+          .from('decks')
+          .insert({ player_id: cpuPlayer.id, name: 'CPU Deck' })
+          .select('id')
+          .single()
+        await supabase.from('deck_cards').insert(
+          humanDeck.deck_cards.map(dc => ({
+            deck_id: newDeck.id, card_id: dc.card_id, quantity: dc.quantity,
+          }))
+        )
+        cpuDeck = { id: newDeck.id, deck_cards: humanDeck.deck_cards }
+      }
+
+      // Build deck maps
+      const expandDeck = (cards) => {
+        const arr = []
+        for (const dc of (cards || [])) {
+          for (let i = 0; i < dc.quantity; i++) arr.push(dc.card_id)
+        }
+        return arr
+      }
+      const deckMap = {
+        [player.id]: expandDeck(humanDeck.deck_cards),
+        [cpuPlayer.id]: expandDeck(cpuDeck.deck_cards),
+      }
+      const gs = initGameState([player.id, cpuPlayer.id], deckMap)
+
+      // Create game
+      const { data: game, error: gameErr } = await supabase
+        .from('games')
+        .insert({
+          status: 'in_progress',
+          total_rounds: 1,
+          current_round: 1,
+          vp_threshold: 15,
+          cash_threshold: 5000,
+          game_state: gs,
+        })
+        .select('id')
+        .single()
+      if (gameErr) { alert('ゲーム作成失敗: ' + gameErr.message); return }
+
+      await supabase.from('game_players').insert([
+        { game_id: game.id, player_id: player.id, turn_order: 1, victory_points: 0, bye_last_round: false, is_winner: false, deck_id: humanDeck.id },
+        { game_id: game.id, player_id: cpuPlayer.id, turn_order: 2, victory_points: 0, bye_last_round: false, is_winner: false, deck_id: cpuDeck.id },
+      ])
+
+      navigate(`/game/${game.id}`)
+    } finally {
+      setStartingCpu(false)
+    }
+  }
+
   const joinGame = async () => {
     const trimmed = joinId.trim()
     if (!trimmed) return
@@ -80,12 +176,21 @@ export default function GameLobbyPage() {
     <Layout>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-white">ゲームロビー</h1>
-        <button
-          onClick={() => setShowCreate(v => !v)}
-          className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
-        >
-          + ゲーム作成
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={startCpuGame}
+            disabled={startingCpu}
+            className="bg-green-700 hover:bg-green-600 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            {startingCpu ? '準備中...' : '🤖 CPU対戦'}
+          </button>
+          <button
+            onClick={() => setShowCreate(v => !v)}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+          >
+            + ゲーム作成
+          </button>
+        </div>
       </div>
 
       {/* ゲーム作成フォーム */}

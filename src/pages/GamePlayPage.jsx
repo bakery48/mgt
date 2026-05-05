@@ -15,6 +15,7 @@ import {
   processETB, processUpkeep, processAttack, processDamage,
 } from '../lib/keywordEffects'
 import CardDetailModal from '../components/CardDetailModal'
+import { CPU_USERNAME, cpuTakeTurn, cpuDeclareBlockers } from '../lib/cpuPlayer'
 
 // ─── カードコンポーネント ───────────────────────────────────────
 const COLOR_BG = {
@@ -157,6 +158,9 @@ export default function GamePlayPage() {
   const isActive = gs?.active_player === myId
   const hasPrio = gs?.priority === myId
   const oppId = gs ? getOpponent(gs, myId) : null
+  const cpuParticipant = participants.find(p => p.players?.username === CPU_USERNAME)
+  const cpuId = cpuParticipant?.player_id ?? null
+  const isCpuGame = !!cpuId
 
   // ─── ゲーム状態をDBに保存 ──────────────────────────────────
   const saveGs = useCallback(async (newGs) => {
@@ -261,6 +265,30 @@ export default function GamePlayPage() {
 
     return () => chanRef.current?.unsubscribe()
   }, [gameId, player])
+
+  // ─── CPU自動プレイ ─────────────────────────────────────────
+  useEffect(() => {
+    if (!isCpuGame || !cpuId || !gs || !cardData || Object.keys(cardData).length === 0 || savingGs) return
+    if (roundResult) return
+
+    const isCpuTurn = gs.active_player === cpuId
+    const isCpuBlock = gs.phase === 'declare_blockers' && gs.active_player === myId && (gs.combat.attackers?.length ?? 0) > 0
+
+    if (!isCpuTurn && !isCpuBlock) return
+
+    const t = setTimeout(() => {
+      if (isCpuTurn) {
+        const newGs = cpuTakeTurn(gs, cpuId, cardData)
+        if (newGs && newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
+      } else if (isCpuBlock) {
+        const newGs = cpuDeclareBlockers(gs, cpuId, cardData)
+        if (newGs && newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
+      }
+    }, 400)
+
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.phase, gs?.active_player, cpuId, isCpuGame, savingGs, roundResult])
 
   // ─── アクション処理 ────────────────────────────────────────
   const dispatch = useCallback((newGs) => {
