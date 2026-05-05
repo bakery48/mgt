@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
 import Layout from '../components/Layout'
+import { initGameState } from '../lib/gameEngine'
 
 export default function GameRoomPage() {
   const { id: gameId } = useParams()
@@ -106,12 +107,239 @@ export default function GameRoomPage() {
     if (error) { alert(error.message); setStarting(false) }
   }
 
-  const startNextRound = async () => {
+  // ─── イベント効果適用（ホストのみ実行） ──────────────────────
+  const applyEventEffect = async (eventCard, diceResult, parts) => {
+    const ep = eventCard.effect_params || {}
+    const t = eventCard.effect_type
+    const ps = parts || participants
+
+    if (t === 'vp_all') {
+      await Promise.all(ps.map(gp =>
+        supabase.from('game_players')
+          .update({ victory_points: Math.max(0, (gp.victory_points || 0) + ep.amount) })
+          .eq('game_id', gameId).eq('player_id', gp.player_id)
+      ))
+    } else if (t === 'gold_all') {
+      await Promise.all(ps.map(gp =>
+        supabase.from('players')
+          .update({ balance: Math.max(0, (gp.players?.balance || 0) + ep.amount) })
+          .eq('id', gp.player_id)
+      ))
+    } else if (t === 'life_modifier') {
+      return { life_event_modifier: ep.amount }
+    } else if (t === 'vp_last_bonus') {
+      const last = [...ps].sort((a, b) => (a.victory_points || 0) - (b.victory_points || 0))[0]
+      if (last) await supabase.from('game_players')
+        .update({ victory_points: (last.victory_points || 0) + ep.amount })
+        .eq('game_id', gameId).eq('player_id', last.player_id)
+    } else if (t === 'gold_last_bonus') {
+      const last = [...ps].sort((a, b) => (a.players?.balance || 0) - (b.players?.balance || 0))[0]
+      if (last) await supabase.from('players')
+        .update({ balance: (last.players?.balance || 0) + ep.amount })
+        .eq('id', last.player_id)
+    } else if (t === 'price_cheap_surge') {
+      const { data: cards } = await supabase.from('cards').select('id, price').lte('price', ep.threshold)
+      if (cards?.length) await Promise.all(cards.map(c =>
+        supabase.from('cards').update({ price: Math.round(c.price * ep.multiplier) }).eq('id', c.id)
+      ))
+    } else if (t === 'price_expensive_crash' || t === 'price_expensive_surge') {
+      const { data: cards } = await supabase.from('cards').select('id, price').gte('price', ep.threshold)
+      if (cards?.length) await Promise.all(cards.map(c =>
+        supabase.from('cards').update({ price: Math.round(c.price * ep.multiplier) }).eq('id', c.id)
+      ))
+    } else if (t === 'pack_all') {
+      const { data: allCards } = await supabase.from('cards').select('id')
+      if (allCards?.length) {
+        for (const gp of ps) {
+          for (let i = 0; i < 3; i++) {
+            const cardId = allCards[Math.floor(Math.random() * allCards.length)].id
+            const { data: ex } = await supabase.from('player_collection')
+              .select('quantity').eq('player_id', gp.player_id).eq('card_id', cardId).maybeSingle()
+            if (ex) {
+              await supabase.from('player_collection')
+                .update({ quantity: ex.quantity + 1 }).eq('player_id', gp.player_id).eq('card_id', cardId)
+            } else {
+              await supabase.from('player_collection')
+                .insert({ player_id: gp.player_id, card_id: cardId, quantity: 1 })
+            }
+          }
+        }
+      }
+    } else if (t === 'dice_random' && diceResult != null) {
+      const result = (ep.results || []).find(r => diceResult >= r.min && diceResult <= r.max)
+      if (result?.sub_type === 'vp_all') {
+        await Promise.all(ps.map(gp =>
+          supabase.from('game_players')
+            .update({ victory_points: Math.max(0, (gp.victory_points || 0) + result.amount) })
+            .eq('game_id', gameId).eq('player_id', gp.player_id)
+        ))
+      }
+    }
+    return {}
+  }
+
+  // ─── アクション効果適用（各プレイヤー自身が実行） ─────────────
+  const applyActionCardEffect = async (card) => {
+    const ep = card.effect_params || {}
+    const t = card.effect_type
+    const myGp = participants.find(p => p.player_id === player?.id)
+    const oppGp = participants.find(p => p.player_id !== player?.id)
+
+    if (t === 'vp_self') {
+      await supabase.from('game_players')
+        .update({ victory_points: (myGp?.victory_points || 0) + ep.amount })
+        .eq('game_id', gameId).eq('player_id', player.id)
+    } else if (t === 'gold_self') {
+      await supabase.from('players')
+        .update({ balance: (myGp?.players?.balance || 0) + ep.amount })
+        .eq('id', player.id)
+    } else if (t === 'vp_target' || t === 'vp_random') {
+      if (oppGp) await supabase.from('game_players')
+        .update({ victory_points: Math.max(0, (oppGp.victory_points || 0) + ep.amount) })
+        .eq('game_id', gameId).eq('player_id', oppGp.player_id)
+    } else if (t === 'gold_steal') {
+      if (oppGp) {
+        const steal = Math.min(ep.amount, oppGp.players?.balance || 0)
+        await Promise.all([
+          supabase.from('players').update({ balance: Math.max(0, (oppGp.players?.balance || 0) - steal) }).eq('id', oppGp.player_id),
+          supabase.from('players').update({ balance: (myGp?.players?.balance || 0) + steal }).eq('id', player.id),
+        ])
+      }
+    } else if (t === 'pack_self') {
+      const { data: allCards } = await supabase.from('cards').select('id')
+      if (allCards?.length) {
+        for (let i = 0; i < 3; i++) {
+          const cardId = allCards[Math.floor(Math.random() * allCards.length)].id
+          const { data: ex } = await supabase.from('player_collection')
+            .select('quantity').eq('player_id', player.id).eq('card_id', cardId).maybeSingle()
+          if (ex) {
+            await supabase.from('player_collection')
+              .update({ quantity: ex.quantity + 1 }).eq('player_id', player.id).eq('card_id', cardId)
+          } else {
+            await supabase.from('player_collection')
+              .insert({ player_id: player.id, card_id: cardId, quantity: 1 })
+          }
+        }
+      }
+    } else if (t === 'mana_bonus') {
+      return { mana_bonus: ep.amount }
+    } else if (t === 'life_bonus') {
+      return { life_bonus: ep.amount }
+    } else if (t === 'go_first') {
+      return { go_first: true }
+    } else if (t === 'draw_bonus') {
+      return { draw_bonus: ep.amount }
+    }
+    return {}
+  }
+
+  // ─── フェーズ開始（ホスト） ────────────────────────────────────
+  const startEventPhase = async () => {
     setStarting(true)
-    const { error } = await supabase
-      .from('games')
-      .update({ status: 'in_progress', game_state: {} })
-      .eq('id', gameId)
+    const [{ data: events }, { data: actions }] = await Promise.all([
+      supabase.from('event_cards').select('*'),
+      supabase.from('action_cards').select('*'),
+    ])
+    if (!events?.length || !actions?.length) {
+      alert('イベント/アクションカードが見つかりません。\nSQL > event_action_cards.sql を実行してください。')
+      setStarting(false)
+      return
+    }
+    const eventCard = events[Math.floor(Math.random() * events.length)]
+    const actionCards = {}
+    const modifiers = {}
+    for (const gp of participants) {
+      actionCards[gp.player_id] = actions[Math.floor(Math.random() * actions.length)]
+      modifiers[gp.player_id] = {}
+    }
+    await supabase.from('games').update({
+      game_state: {
+        round_phase: 'event',
+        event_card: eventCard,
+        dice_result: null,
+        event_confirmed: {},
+        action_cards: actionCards,
+        action_played: {},
+        modifiers,
+        life_event_modifier: 0,
+      }
+    }).eq('id', gameId)
+    setStarting(false)
+  }
+
+  const rollDice = async () => {
+    const meta = game.game_state || {}
+    const result = Math.floor(Math.random() * 6) + 1
+    await supabase.from('games').update({ game_state: { ...meta, dice_result: result } }).eq('id', gameId)
+  }
+
+  const confirmEvent = async () => {
+    const meta = game.game_state || {}
+    let extra = {}
+    if (isHost) {
+      // 最新のparticipantsデータを取得してから効果適用
+      const { data: freshParts } = await supabase
+        .from('game_players').select('*, players(username, balance)')
+        .eq('game_id', gameId).order('turn_order')
+      extra = await applyEventEffect(meta.event_card, meta.dice_result, freshParts || participants)
+    }
+    const confirmed = { ...(meta.event_confirmed || {}), [player.id]: true }
+    const allConfirmed = participants.every(gp => confirmed[gp.player_id])
+    await supabase.from('games').update({
+      game_state: { ...meta, ...extra, event_confirmed: confirmed, ...(allConfirmed ? { round_phase: 'action' } : {}) }
+    }).eq('id', gameId)
+  }
+
+  const playActionCard = async (play) => {
+    const meta = game.game_state || {}
+    const myCard = meta.action_cards?.[player?.id]
+    let battleMods = {}
+    if (play && myCard) battleMods = await applyActionCardEffect(myCard)
+    const modifiers = { ...(meta.modifiers || {}), [player.id]: { ...(meta.modifiers?.[player.id] || {}), ...battleMods } }
+    const actionPlayed = { ...(meta.action_played || {}), [player.id]: play }
+    const allDone = participants.every(gp => actionPlayed[gp.player_id] != null)
+    await supabase.from('games').update({
+      game_state: { ...meta, modifiers, action_played: actionPlayed, ...(allDone ? { round_phase: 'ready' } : {}) }
+    }).eq('id', gameId)
+  }
+
+  // ─── バトル開始（ホスト）: modifiers適用済みゲーム状態を作成 ──
+  const startBattle = async () => {
+    setStarting(true)
+    const meta = game.game_state || {}
+    const deckMap = {}
+    for (const gp of participants) {
+      const { data: dcData } = await supabase
+        .from('deck_cards').select('card_id, quantity').eq('deck_id', gp.deck_id)
+      const expanded = []
+      for (const dc of (dcData || [])) {
+        for (let i = 0; i < dc.quantity; i++) expanded.push(dc.card_id)
+      }
+      deckMap[gp.player_id] = expanded
+    }
+    const playerOrder = participants.map(gp => gp.player_id)
+    const gs = initGameState(playerOrder, deckMap)
+
+    // バトル修飾子の適用
+    const lifeEvMod = meta.life_event_modifier || 0
+    for (const [pid, mods] of Object.entries(meta.modifiers || {})) {
+      const ps = gs.players[pid]
+      if (!ps) continue
+      ps.life = (ps.life || 20) + (mods.life_bonus || 0) + lifeEvMod
+      if (mods.mana_bonus) ps.mana_pool.colorless = (ps.mana_pool.colorless || 0) + mods.mana_bonus
+      for (let i = 0; i < (mods.draw_bonus || 0); i++) {
+        const card = ps.library.shift()
+        if (card) ps.hand.push(card)
+      }
+    }
+    // 先攻: 1人のみgo_firstの場合
+    const goFirstPids = Object.entries(meta.modifiers || {}).filter(([, m]) => m.go_first).map(([pid]) => pid)
+    if (goFirstPids.length === 1) {
+      gs.active_player = goFirstPids[0]
+      gs.priority = goFirstPids[0]
+    }
+
+    const { error } = await supabase.from('games').update({ status: 'in_progress', game_state: gs }).eq('id', gameId)
     if (error) { alert(error.message); setStarting(false) }
   }
 
@@ -183,10 +411,22 @@ export default function GameRoomPage() {
 
   // ─── ラウンド間画面 ───────────────────────────────────────
   if (status === 'between_rounds') {
+    const meta = game?.game_state || {}
+    const roundPhase = meta.round_phase       // undefined | 'event' | 'action' | 'ready'
+    const eventCard = meta.event_card
+    const myActionCard = meta.action_cards?.[player?.id]
+    const myEventConfirmed = !!meta.event_confirmed?.[player?.id]
+    const myActionDecided = meta.action_played?.[player?.id] != null
+    const confirmedCount = Object.values(meta.event_confirmed || {}).filter(Boolean).length
+    const actionDecidedCount = Object.keys(meta.action_played || {}).length
+    const isDiceEvent = eventCard?.effect_type === 'dice_random'
+    const canConfirmEvent = !myEventConfirmed && (!isDiceEvent || meta.dice_result != null)
+
     return (
       <Layout>
         <div className="max-w-lg mx-auto">
-          <div className="text-center mb-8">
+          {/* ヘッダー */}
+          <div className="text-center mb-6">
             <h1 className="text-2xl font-bold text-white mb-1">
               ラウンド {(game?.current_round ?? 1) - 1} 終了
             </h1>
@@ -196,45 +436,141 @@ export default function GameRoomPage() {
           </div>
 
           {/* スコアボード */}
-          <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden mb-6">
-            <div className="px-4 py-3 border-b border-gray-700">
-              <p className="text-gray-400 text-sm font-semibold">現在のスコア</p>
+          <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden mb-5">
+            <div className="px-4 py-2 border-b border-gray-700">
+              <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">現在のスコア</p>
             </div>
-            {[...participants]
-              .sort((a, b) => b.victory_points - a.victory_points)
-              .map((gp, i) => (
-                <div key={gp.player_id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-700 last:border-0">
-                  <span className="text-xl w-8 text-center shrink-0">
-                    {i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}
-                  </span>
-                  <div className="flex-1">
-                    <p className="text-white font-medium">
-                      {gp.players?.username}
-                      {gp.player_id === player?.id && <span className="text-purple-400 text-xs ml-2">（あなた）</span>}
-                    </p>
-                    <p className="text-gray-400 text-xs">{gp.players?.balance?.toLocaleString()}G</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-yellow-400 font-bold text-lg">{gp.victory_points} VP</p>
-                    {game?.vp_threshold && (
-                      <p className="text-gray-500 text-xs">/ {game.vp_threshold}</p>
-                    )}
-                  </div>
+            {[...participants].sort((a, b) => b.victory_points - a.victory_points).map((gp, i) => (
+              <div key={gp.player_id} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-700 last:border-0">
+                <span className="text-lg w-7 text-center shrink-0">{i === 0 ? '🥇' : i === 1 ? '🥈' : '🥉'}</span>
+                <div className="flex-1 min-w-0">
+                  <span className="text-white text-sm font-medium">{gp.players?.username}</span>
+                  {gp.player_id === player?.id && <span className="text-purple-400 text-xs ml-2">（あなた）</span>}
+                  <span className="text-gray-500 text-xs ml-2">{gp.players?.balance?.toLocaleString()}G</span>
                 </div>
-              ))}
+                <span className="text-yellow-400 font-bold">{gp.victory_points} VP</span>
+              </div>
+            ))}
           </div>
 
-          {isHost ? (
-            <button
-              onClick={startNextRound}
-              disabled={starting}
-              className="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white font-bold py-4 rounded-xl transition-colors text-lg"
-            >
-              {starting ? '準備中...' : `🎮 ラウンド ${game?.current_round} 開始`}
-            </button>
-          ) : (
-            <div className="text-center text-gray-400 py-4">
-              ホストがラウンドを開始するまでお待ちください...
+          {/* ── フェーズ未開始 ── */}
+          {!roundPhase && (
+            isHost ? (
+              <button onClick={startEventPhase} disabled={starting}
+                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 text-white font-bold py-4 rounded-xl transition-colors text-lg">
+                {starting ? '準備中...' : '🌟 フェーズ1: イベント開始'}
+              </button>
+            ) : (
+              <p className="text-center text-gray-400 py-4">ホストがフェーズを開始するまでお待ちください...</p>
+            )
+          )}
+
+          {/* ── フェーズ1: イベント ── */}
+          {roundPhase === 'event' && eventCard && (
+            <div className="bg-gray-800 border border-indigo-600 rounded-xl p-5 mb-4">
+              <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wide mb-3">
+                フェーズ1 — イベントカード（全員共通）
+              </p>
+              <h3 className="text-white text-xl font-bold mb-2">{eventCard.name}</h3>
+              <p className="text-gray-300 text-sm leading-relaxed mb-4">{eventCard.description}</p>
+
+              {/* サイコロ判定 */}
+              {isDiceEvent && (
+                <div className="bg-gray-900 rounded-lg p-4 mb-4 text-center">
+                  {meta.dice_result != null ? (
+                    <div>
+                      <p className="text-5xl font-bold text-white mb-1">🎲 {meta.dice_result}</p>
+                      <p className="text-gray-400 text-sm">
+                        {meta.dice_result <= 3 ? '1〜3: 全員VP-1' : '4〜6: 全員VP+2'}
+                      </p>
+                    </div>
+                  ) : isHost ? (
+                    <button onClick={rollDice}
+                      className="bg-yellow-600 hover:bg-yellow-500 text-white px-8 py-2.5 rounded-lg font-bold transition-colors">
+                      🎲 サイコロを振る
+                    </button>
+                  ) : (
+                    <p className="text-gray-400 text-sm">ホストがサイコロを振ります...</p>
+                  )}
+                </div>
+              )}
+
+              {canConfirmEvent ? (
+                <button onClick={confirmEvent}
+                  className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg transition-colors">
+                  {isHost ? '✓ 効果を適用して確認' : '✓ 確認'}
+                </button>
+              ) : myEventConfirmed ? (
+                <p className="text-green-400 text-center py-2 font-medium">✓ 確認済み</p>
+              ) : null}
+              <p className="text-gray-500 text-xs text-center mt-2">{confirmedCount} / {participants.length} 人確認済み</p>
+            </div>
+          )}
+
+          {/* ── フェーズ2: アクション ── */}
+          {roundPhase === 'action' && (
+            <div className="bg-gray-800 border border-purple-600 rounded-xl p-5 mb-4">
+              <p className="text-purple-400 text-xs font-semibold uppercase tracking-wide mb-3">
+                フェーズ2 — アクションカード（自分のみ）
+              </p>
+              {!myActionDecided ? (
+                myActionCard ? (
+                  <>
+                    <h3 className="text-white text-xl font-bold mb-2">{myActionCard.name}</h3>
+                    <p className="text-gray-300 text-sm leading-relaxed mb-5">{myActionCard.description}</p>
+                    <div className="flex gap-3">
+                      <button onClick={() => playActionCard(true)}
+                        className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 rounded-lg transition-colors">
+                        ▶ プレイする
+                      </button>
+                      <button onClick={() => playActionCard(false)}
+                        className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 rounded-lg transition-colors">
+                        スキップ
+                      </button>
+                    </div>
+                  </>
+                ) : <p className="text-gray-400 text-center py-2">読み込み中...</p>
+              ) : (
+                <p className="text-purple-400 text-center py-3 font-medium">✓ アクション決定済み</p>
+              )}
+              <p className="text-gray-500 text-xs text-center mt-3">{actionDecidedCount} / {participants.length} 人決定済み</p>
+            </div>
+          )}
+
+          {/* ── 準備完了 ── */}
+          {roundPhase === 'ready' && (
+            <div className="bg-gray-800 border border-green-600 rounded-xl p-5 mb-4">
+              <p className="text-green-400 text-center font-bold text-lg mb-4">全員準備完了！</p>
+              {/* バトル修飾子サマリー */}
+              {(() => {
+                const lines = []
+                if ((meta.life_event_modifier || 0) !== 0) {
+                  lines.push(<p key="ev" className="text-red-400 text-sm">イベント: 全員開始ライフ{meta.life_event_modifier > 0 ? '+' : ''}{meta.life_event_modifier}</p>)
+                }
+                for (const gp of participants) {
+                  const mods = meta.modifiers?.[gp.player_id] || {}
+                  const tags = []
+                  if (mods.life_bonus) tags.push(`ライフ+${mods.life_bonus}`)
+                  if (mods.mana_bonus) tags.push(`マナ+${mods.mana_bonus}`)
+                  if (mods.draw_bonus) tags.push(`ドロー+${mods.draw_bonus}`)
+                  if (mods.go_first) tags.push('先攻')
+                  if (tags.length) lines.push(
+                    <p key={gp.player_id} className="text-sm">
+                      <span className="text-gray-400">{gp.players?.username}: </span>
+                      <span className="text-cyan-400">{tags.join(' / ')}</span>
+                    </p>
+                  )
+                }
+                return lines.length > 0 ? <div className="space-y-1 mb-4 bg-gray-900 rounded-lg p-3">{lines}</div> : null
+              })()}
+              {isHost ? (
+                <button onClick={startBattle} disabled={starting}
+                  className="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white font-bold py-4 rounded-xl transition-colors text-lg">
+                  {starting ? '準備中...' : `🎮 ラウンド ${game?.current_round} バトル開始`}
+                </button>
+              ) : (
+                <p className="text-center text-gray-400">ホストがバトルを開始します...</p>
+              )}
             </div>
           )}
         </div>
