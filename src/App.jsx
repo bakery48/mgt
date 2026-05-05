@@ -5,6 +5,8 @@ import CardsPage from './pages/CardsPage'
 import CardCreatePage from './pages/CardCreatePage'
 import MarketPage from './pages/MarketPage'
 import CollectionPage from './pages/CollectionPage'
+import DecksPage from './pages/DecksPage'
+import DeckEditPage from './pages/DeckEditPage'
 
 function PlayerRoute({ children }) {
   const { player, loading } = usePlayer()
@@ -38,6 +40,8 @@ function AppRoutes() {
       <Route path="/cards/create" element={<PlayerRoute><CardCreatePage /></PlayerRoute>} />
       <Route path="/market" element={<PlayerRoute><MarketPage /></PlayerRoute>} />
       <Route path="/collection" element={<PlayerRoute><CollectionPage /></PlayerRoute>} />
+      <Route path="/decks" element={<PlayerRoute><DecksPage /></PlayerRoute>} />
+      <Route path="/decks/:id" element={<PlayerRoute><DeckEditPage /></PlayerRoute>} />
       <Route path="*" element={<Navigate to={player ? '/cards' : '/setup'} replace />} />
     </Routes>
   )
