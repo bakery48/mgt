@@ -57,6 +57,7 @@ function PriceChart({ cardId }) {
 }
 
 function CardModal({ card, market, onClose, onPurchase, purchasing }) {
+  const displayPrice = market?.current_price ?? card.price
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-gray-800 rounded-2xl border border-gray-700 max-w-md w-full p-6" onClick={e => e.stopPropagation()}>
@@ -73,36 +74,46 @@ function CardModal({ card, market, onClose, onPurchase, purchasing }) {
         )}
 
         {card.effect_text && (
-          <p className="text-gray-300 text-sm mb-4 leading-relaxed">{card.effect_text}</p>
+          <p className="text-gray-300 text-sm mb-4 leading-relaxed whitespace-pre-wrap">{card.effect_text.replace(/\\n/g, '\n')}</p>
         )}
 
         <div className="bg-gray-900 rounded-xl p-4 mb-4">
           <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-400">現在価格</span>
-            <span className="text-yellow-400 font-bold font-mono">{market?.current_price?.toLocaleString()}G</span>
+            <span className="text-gray-400">{market ? '現在価格' : '基本価格'}</span>
+            <span className="text-yellow-400 font-bold font-mono">{displayPrice?.toLocaleString()}G</span>
           </div>
-          <div className="flex justify-between text-sm mb-2">
-            <span className="text-gray-400">基本価格</span>
-            <span className="text-gray-300 font-mono">{market?.base_price?.toLocaleString()}G</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-400">流通枚数</span>
-            <span className="text-gray-300">{market?.total_copies}枚</span>
-          </div>
+          {market && (
+            <>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">基本価格</span>
+                <span className="text-gray-300 font-mono">{market.base_price?.toLocaleString()}G</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-400">流通枚数</span>
+                <span className="text-gray-300">{market.total_copies}枚</span>
+              </div>
+            </>
+          )}
         </div>
 
-        <div className="mb-4">
-          <p className="text-gray-400 text-xs mb-2">価格推移</p>
-          <PriceChart cardId={card.id} />
-        </div>
+        {market && (
+          <div className="mb-4">
+            <p className="text-gray-400 text-xs mb-2">価格推移</p>
+            <PriceChart cardId={card.id} />
+          </div>
+        )}
 
-        <button
-          onClick={() => onPurchase(card.id, market?.current_price)}
-          disabled={purchasing}
-          className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-bold py-3 rounded-xl transition-colors"
-        >
-          {purchasing ? '購入中...' : `${market?.current_price?.toLocaleString()}G で購入`}
-        </button>
+        {market ? (
+          <button
+            onClick={() => onPurchase(card.id, displayPrice)}
+            disabled={purchasing}
+            className="w-full bg-yellow-500 hover:bg-yellow-400 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-bold py-3 rounded-xl transition-colors"
+          >
+            {purchasing ? '購入中...' : `${displayPrice?.toLocaleString()}G で購入`}
+          </button>
+        ) : (
+          <p className="text-center text-gray-500 text-sm py-2">マーケット未出品</p>
+        )}
       </div>
     </div>
   )
@@ -288,7 +299,7 @@ export default function MarketPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {filtered.map(card => {
                 const market = Array.isArray(card.card_market) ? card.card_market[0] : card.card_market
-                if (!market) return null
+                const displayPrice = market?.current_price ?? card.price
                 return (
                   <button
                     key={card.id}
@@ -309,8 +320,10 @@ export default function MarketPage() {
                         <div className={`w-3 h-3 rounded-full shrink-0 ${COLOR_DOT[card.color] || 'bg-gray-500'}`} />
                         <p className="text-white text-xs font-medium truncate">{card.name}</p>
                       </div>
-                      <p className="text-yellow-400 text-sm font-bold font-mono">{market.current_price?.toLocaleString()}G</p>
-                      <p className="text-gray-500 text-xs">{market.total_copies}枚流通</p>
+                      <p className="text-yellow-400 text-sm font-bold font-mono">{displayPrice?.toLocaleString()}G</p>
+                      <p className="text-gray-500 text-xs">
+                        {market ? `${market.total_copies}枚流通` : '基本価格'}
+                      </p>
                     </div>
                   </button>
                 )
