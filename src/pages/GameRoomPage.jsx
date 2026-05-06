@@ -137,8 +137,8 @@ export default function GameRoomPage() {
 
   // ─── フェーズ開始トースト ─────────────────────────────────
   const PHASE_TOAST = {
-    event:  'フェーズ1: イベント',
-    action: 'フェーズ2: アクション',
+    event:  'パート1: イベント',
+    action: 'パート2: アクション',
     ready:  '準備完了！',
   }
   useEffect(() => {
@@ -619,18 +619,18 @@ export default function GameRoomPage() {
             isHost ? (
               <button onClick={startEventPhase} disabled={starting}
                 className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-600 text-white font-bold py-4 rounded-xl transition-colors text-lg">
-                {starting ? '準備中...' : '🌟 フェーズ1: イベント開始'}
+                {starting ? '準備中...' : '🌟 パート1: イベント開始'}
               </button>
             ) : (
               <p className="text-center text-gray-400 py-4">ホストがフェーズを開始するまでお待ちください...</p>
             )
           )}
 
-          {/* ── フェーズ1: イベント ── */}
+          {/* ── パート1: イベント ── */}
           {roundPhase === 'event' && eventCard && (
             <div className="bg-gray-800 border border-indigo-600 rounded-xl p-5 mb-4">
               <p className="text-indigo-400 text-xs font-semibold uppercase tracking-wide mb-3">
-                フェーズ1 — イベントカード（全員共通）
+                パート1 — イベントカード（全員共通）
               </p>
               <h3 className="text-white text-xl font-bold mb-2">{eventCard.name}</h3>
               <p className="text-gray-300 text-sm leading-relaxed mb-4">{eventCard.description}</p>
@@ -668,11 +668,11 @@ export default function GameRoomPage() {
             </div>
           )}
 
-          {/* ── フェーズ2: アクション ── */}
+          {/* ── パート2: アクション ── */}
           {roundPhase === 'action' && (
             <div className="bg-gray-800 border border-purple-600 rounded-xl p-5 mb-4">
               <p className="text-purple-400 text-xs font-semibold uppercase tracking-wide mb-3">
-                フェーズ2 — アクションカード（自分のみ）
+                パート2 — アクションカード（自分のみ）
               </p>
               {!myActionDecided ? (
                 myActionCard ? (
