@@ -19,7 +19,62 @@ async function seedMissingCards() {
   const existingNames = new Set((existing || []).map(c => c.name))
   const toInsert = MISSING_CARDS.filter(c => !existingNames.has(c.name))
   if (toInsert.length > 0) {
-    await supabase.from('cards').insert(toInsert)
+    const { error } = await supabase.from('cards').insert(toInsert)
+    if (error) console.error('seedMissingCards failed:', error)
+  }
+}
+
+async function ensureStarterDecks(playerId) {
+  const { count } = await supabase
+    .from('decks')
+    .select('id', { count: 'exact', head: true })
+    .eq('player_id', playerId)
+    .eq('name', STARTER_DECKS[0].name)
+  if (count > 0) return
+
+  const allCardNames = [...new Set(STARTER_DECKS.flatMap(d => d.cards.map(c => c.name)))]
+  const { data: cardRows } = await supabase.from('cards').select('id, name').in('name', allCardNames)
+  if (!cardRows?.length) return
+
+  const nameToId = {}
+  for (const row of cardRows) nameToId[row.name] = row.id
+
+  const collectionMap = {}
+  for (const deck of STARTER_DECKS) {
+    for (const c of deck.cards) {
+      const cardId = nameToId[c.name]
+      if (cardId) collectionMap[cardId] = (collectionMap[cardId] || 0) + c.quantity
+    }
+  }
+  const collectionInserts = Object.entries(collectionMap).map(([card_id, quantity]) => ({
+    player_id: playerId, card_id, quantity,
+  }))
+  if (collectionInserts.length) {
+    const { error: colErr } = await supabase
+      .from('player_collection')
+      .upsert(collectionInserts, { onConflict: 'player_id,card_id' })
+    if (colErr) console.error('player_collection upsert failed:', colErr)
+  }
+
+  for (const template of STARTER_DECKS) {
+    const { data: newDeck, error: deckErr } = await supabase
+      .from('decks')
+      .insert({ name: template.name, player_id: playerId, format: 'magic_league' })
+      .select('id')
+      .single()
+    if (deckErr) {
+      console.error('deck insert failed:', template.name, deckErr)
+      continue
+    }
+    if (newDeck) {
+      const deckCardInserts = template.cards
+        .filter(c => nameToId[c.name])
+        .map(c => ({ deck_id: newDeck.id, card_id: nameToId[c.name], quantity: c.quantity }))
+      if (deckCardInserts.length) {
+        const { error: dcErr } = await supabase.from('deck_cards').insert(deckCardInserts)
+        if (dcErr) console.error('deck_cards insert failed:', template.name, dcErr)
+      }
+    }
   }
 }
 
@@ -38,6 +93,7 @@ export function PlayerProvider({ children }) {
           .eq('id', savedId)
           .single()
         if (data) {
+          await ensureStarterDecks(data.id)
           setPlayer(data)
           setLoading(false)
           return
@@ -48,52 +104,6 @@ export function PlayerProvider({ children }) {
     }
     restore()
   }, [])
-
-  const ensureStarterDecks = async (playerId) => {
-    const { count } = await supabase
-      .from('decks')
-      .select('id', { count: 'exact', head: true })
-      .eq('player_id', playerId)
-      .eq('name', STARTER_DECKS[0].name)
-    if (count > 0) return
-
-    const allCardNames = [...new Set(STARTER_DECKS.flatMap(d => d.cards.map(c => c.name)))]
-    const { data: cardRows } = await supabase.from('cards').select('id, name').in('name', allCardNames)
-    if (!cardRows?.length) return
-
-    const nameToId = {}
-    for (const row of cardRows) nameToId[row.name] = row.id
-
-    const collectionMap = {}
-    for (const deck of STARTER_DECKS) {
-      for (const c of deck.cards) {
-        const cardId = nameToId[c.name]
-        if (cardId) collectionMap[cardId] = (collectionMap[cardId] || 0) + c.quantity
-      }
-    }
-    const collectionInserts = Object.entries(collectionMap).map(([card_id, quantity]) => ({
-      player_id: playerId, card_id, quantity,
-    }))
-    if (collectionInserts.length) {
-      await supabase.from('player_collection').upsert(collectionInserts, { onConflict: 'player_id,card_id' })
-    }
-
-    for (const template of STARTER_DECKS) {
-      const { data: newDeck } = await supabase
-        .from('decks')
-        .insert({ name: template.name, player_id: playerId, format: 'magic_league' })
-        .select('id')
-        .single()
-      if (newDeck) {
-        const deckCardInserts = template.cards
-          .filter(c => nameToId[c.name])
-          .map(c => ({ deck_id: newDeck.id, card_id: nameToId[c.name], quantity: c.quantity }))
-        if (deckCardInserts.length) {
-          await supabase.from('deck_cards').insert(deckCardInserts)
-        }
-      }
-    }
-  }
 
   const createPlayer = async (username) => {
     // 既存ユーザー名があれば再ログイン、なければ新規作成
