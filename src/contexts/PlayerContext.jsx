@@ -50,9 +50,8 @@ export function PlayerProvider({ children }) {
       .single()
     if (error) throw error
     localStorage.setItem(STORAGE_KEY, data.id)
-    setPlayer(data)
 
-    // 全15スターターデッキを一括作成
+    // 全15スターターデッキを一括作成（setPlayer前に完了させる）
     const allCardNames = [...new Set(STARTER_DECKS.flatMap(d => d.cards.map(c => c.name)))]
     const { data: cardRows } = await supabase.from('cards').select('id, name').in('name', allCardNames)
 
@@ -93,6 +92,7 @@ export function PlayerProvider({ children }) {
       }
     }
 
+    setPlayer(data)
     return data
   }
 
