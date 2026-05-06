@@ -56,11 +56,12 @@ export default function GameLobbyPage() {
       .single()
     if (error) { alert(error.message); setCreating(false); return }
 
-    // ホストとして参加
+    // ホストとして参加（初期G: 1000G）
     await supabase.from('game_players').insert({
       game_id: data.id,
       player_id: player.id,
       victory_points: 0,
+      balance: 1000,
       bye_last_round: false,
       turn_order: 1,
       is_winner: false,
@@ -125,8 +126,8 @@ export default function GameLobbyPage() {
       if (gameErr) { alert('ゲーム作成失敗: ' + gameErr.message); return }
 
       await supabase.from('game_players').insert([
-        { game_id: game.id, player_id: player.id, turn_order: 1, victory_points: 0, bye_last_round: false, is_winner: false, deck_id: humanDeckId },
-        { game_id: game.id, player_id: cpuPlayer.id, turn_order: 2, victory_points: 0, bye_last_round: false, is_winner: false, deck_id: cpuDeckId },
+        { game_id: game.id, player_id: player.id, turn_order: 1, victory_points: 0, balance: 1000, bye_last_round: false, is_winner: false, deck_id: humanDeckId },
+        { game_id: game.id, player_id: cpuPlayer.id, turn_order: 2, victory_points: 0, balance: 1000, bye_last_round: false, is_winner: false, deck_id: cpuDeckId },
       ])
 
       navigate(`/game/${game.id}`)

@@ -38,7 +38,7 @@ export default function GameRoomPage() {
       supabase.from('games').select('*').eq('id', gameId).single(),
       supabase
         .from('game_players')
-        .select('*, players(username, balance)')
+        .select('*, players(username)')
         .eq('game_id', gameId)
         .order('turn_order', { ascending: true }),
       supabase.from('decks').select('*, deck_cards(quantity)').eq('player_id', player.id),
@@ -90,6 +90,7 @@ export default function GameRoomPage() {
         game_id: gameId,
         player_id: player.id,
         victory_points: 0,
+        balance: 1000,
         bye_last_round: false,
         turn_order: nextOrder,
         is_winner: false,
@@ -160,18 +161,18 @@ export default function GameRoomPage() {
         .update({ victory_points: (cpuGp?.victory_points || 0) + ep.amount })
         .eq('game_id', gameId).eq('player_id', cpuId)
     } else if (t === 'gold_self') {
-      await supabase.from('players')
-        .update({ balance: Math.max(0, (cpuGp?.players?.balance || 0) + ep.amount) })
-        .eq('id', cpuId)
+      await supabase.from('game_players')
+        .update({ balance: Math.max(0, (cpuGp?.balance || 0) + ep.amount) })
+        .eq('game_id', gameId).eq('player_id', cpuId)
     } else if ((t === 'vp_target' || t === 'vp_random') && humanGp) {
       await supabase.from('game_players')
         .update({ victory_points: Math.max(0, (humanGp.victory_points || 0) + ep.amount) })
         .eq('game_id', gameId).eq('player_id', humanGp.player_id)
     } else if (t === 'gold_steal' && humanGp) {
-      const steal = Math.min(ep.amount, humanGp.players?.balance || 0)
+      const steal = Math.min(ep.amount, humanGp.balance || 0)
       await Promise.all([
-        supabase.from('players').update({ balance: Math.max(0, (humanGp.players?.balance || 0) - steal) }).eq('id', humanGp.player_id),
-        supabase.from('players').update({ balance: (cpuGp?.players?.balance || 0) + steal }).eq('id', cpuId),
+        supabase.from('game_players').update({ balance: Math.max(0, (humanGp.balance || 0) - steal) }).eq('game_id', gameId).eq('player_id', humanGp.player_id),
+        supabase.from('game_players').update({ balance: (cpuGp?.balance || 0) + steal }).eq('game_id', gameId).eq('player_id', cpuId),
       ])
     } else if (t === 'mana_bonus') return { mana_bonus: ep.amount }
     else if (t === 'life_bonus') return { life_bonus: ep.amount }
@@ -246,9 +247,9 @@ export default function GameRoomPage() {
       ))
     } else if (t === 'gold_all') {
       await Promise.all(ps.map(gp =>
-        supabase.from('players')
-          .update({ balance: Math.max(0, (gp.players?.balance || 0) + ep.amount) })
-          .eq('id', gp.player_id)
+        supabase.from('game_players')
+          .update({ balance: Math.max(0, (gp.balance || 0) + ep.amount) })
+          .eq('game_id', gameId).eq('player_id', gp.player_id)
       ))
     } else if (t === 'life_modifier') {
       return { life_event_modifier: ep.amount }
@@ -258,10 +259,10 @@ export default function GameRoomPage() {
         .update({ victory_points: (last.victory_points || 0) + ep.amount })
         .eq('game_id', gameId).eq('player_id', last.player_id)
     } else if (t === 'gold_last_bonus') {
-      const last = [...ps].sort((a, b) => (a.players?.balance || 0) - (b.players?.balance || 0))[0]
-      if (last) await supabase.from('players')
-        .update({ balance: (last.players?.balance || 0) + ep.amount })
-        .eq('id', last.player_id)
+      const last = [...ps].sort((a, b) => (a.balance || 0) - (b.balance || 0))[0]
+      if (last) await supabase.from('game_players')
+        .update({ balance: (last.balance || 0) + ep.amount })
+        .eq('game_id', gameId).eq('player_id', last.player_id)
     } else if (t === 'price_cheap_surge') {
       const { data: cards } = await supabase.from('cards').select('id, price').lte('price', ep.threshold)
       if (cards?.length) await Promise.all(cards.map(c =>
@@ -315,19 +316,19 @@ export default function GameRoomPage() {
         .update({ victory_points: (myGp?.victory_points || 0) + ep.amount })
         .eq('game_id', gameId).eq('player_id', player.id)
     } else if (t === 'gold_self') {
-      await supabase.from('players')
-        .update({ balance: (myGp?.players?.balance || 0) + ep.amount })
-        .eq('id', player.id)
+      await supabase.from('game_players')
+        .update({ balance: (myGp?.balance || 0) + ep.amount })
+        .eq('game_id', gameId).eq('player_id', player.id)
     } else if (t === 'vp_target' || t === 'vp_random') {
       if (oppGp) await supabase.from('game_players')
         .update({ victory_points: Math.max(0, (oppGp.victory_points || 0) + ep.amount) })
         .eq('game_id', gameId).eq('player_id', oppGp.player_id)
     } else if (t === 'gold_steal') {
       if (oppGp) {
-        const steal = Math.min(ep.amount, oppGp.players?.balance || 0)
+        const steal = Math.min(ep.amount, oppGp.balance || 0)
         await Promise.all([
-          supabase.from('players').update({ balance: Math.max(0, (oppGp.players?.balance || 0) - steal) }).eq('id', oppGp.player_id),
-          supabase.from('players').update({ balance: (myGp?.players?.balance || 0) + steal }).eq('id', player.id),
+          supabase.from('game_players').update({ balance: Math.max(0, (oppGp.balance || 0) - steal) }).eq('game_id', gameId).eq('player_id', oppGp.player_id),
+          supabase.from('game_players').update({ balance: (myGp?.balance || 0) + steal }).eq('game_id', gameId).eq('player_id', player.id),
         ])
       }
     } else if (t === 'pack_self') {
@@ -399,7 +400,7 @@ export default function GameRoomPage() {
     if (isHost) {
       // 最新のparticipantsデータを取得してから効果適用
       const { data: freshParts } = await supabase
-        .from('game_players').select('*, players(username, balance)')
+        .from('game_players').select('*, players(username)')
         .eq('game_id', gameId).order('turn_order')
       extra = await applyEventEffect(meta.event_card, meta.dice_result, freshParts || participants)
     }
@@ -526,7 +527,7 @@ export default function GameRoomPage() {
                   </span>
                   <div className="flex-1">
                     <p className="text-white font-medium">{gp.players?.username}</p>
-                    <p className="text-gray-400 text-xs">{gp.players?.balance?.toLocaleString()}G</p>
+                    <p className="text-gray-400 text-xs">{gp.balance?.toLocaleString()}G</p>
                   </div>
                   <div className="text-right">
                     <p className="text-yellow-400 font-bold">{gp.victory_points} VP</p>
@@ -585,7 +586,7 @@ export default function GameRoomPage() {
                 <div className="flex-1 min-w-0">
                   <span className="text-white text-sm font-medium">{gp.players?.username}</span>
                   {gp.player_id === player?.id && <span className="text-purple-400 text-xs ml-2">（あなた）</span>}
-                  <span className="text-gray-500 text-xs ml-2">{gp.players?.balance?.toLocaleString()}G</span>
+                  <span className="text-gray-500 text-xs ml-2">{gp.balance?.toLocaleString()}G</span>
                 </div>
                 <span className="text-yellow-400 font-bold">{gp.victory_points} VP</span>
               </div>
@@ -768,7 +769,7 @@ export default function GameRoomPage() {
                         {i === 0 && <span className="text-xs bg-yellow-600/30 text-yellow-400 border border-yellow-700 px-1.5 py-0.5 rounded">ホスト</span>}
                         {gp.player_id === player?.id && <span className="text-xs text-purple-400">（あなた）</span>}
                       </div>
-                      <p className="text-gray-500 text-xs">{gp.players?.balance?.toLocaleString()}G</p>
+                      <p className="text-gray-500 text-xs">{gp.balance?.toLocaleString()}G</p>
                     </div>
                     <div className="shrink-0 text-right">
                       {gp.deck_id ? (
