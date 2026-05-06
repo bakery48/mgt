@@ -200,10 +200,14 @@ export default function GameRoomPage() {
       const isDiceEvent = meta.event_card?.effect_type === 'dice_random'
       if (isDiceEvent && meta.dice_result == null) return
       const t = setTimeout(async () => {
-        const confirmed = { ...(meta.event_confirmed || {}), [cpuId]: true }
+        // DBから最新のgame_stateを取得して競合上書きを防ぐ
+        const { data: freshGame } = await supabase.from('games').select('game_state').eq('id', gameId).single()
+        const freshMeta = freshGame?.game_state || meta
+        if (freshMeta.event_confirmed?.[cpuId]) return  // すでに確認済み
+        const confirmed = { ...(freshMeta.event_confirmed || {}), [cpuId]: true }
         const allConfirmed = participants.every(gp => confirmed[gp.player_id])
         await supabase.from('games').update({
-          game_state: { ...meta, event_confirmed: confirmed, ...(allConfirmed ? { round_phase: 'action' } : {}) }
+          game_state: { ...freshMeta, event_confirmed: confirmed, ...(allConfirmed ? { round_phase: 'action' } : {}) }
         }).eq('id', gameId)
       }, 700)
       return () => clearTimeout(t)
@@ -218,20 +222,24 @@ export default function GameRoomPage() {
     // CPUアクションカード自動プレイ
     if (roundPhase === 'action' && meta.action_played?.[cpuId] == null) {
       const t = setTimeout(async () => {
+        // DBから最新のgame_stateを取得して競合上書きを防ぐ
+        const { data: freshGame } = await supabase.from('games').select('game_state').eq('id', gameId).single()
+        const freshMeta = freshGame?.game_state || meta
+        if (freshMeta.action_played?.[cpuId] != null) return  // すでに決定済み
         const cpuGp = participants.find(p => p.player_id === cpuId)
-        const cpuCard = meta.action_cards?.[cpuId]
+        const cpuCard = freshMeta.action_cards?.[cpuId]
         const battleMods = cpuCard ? (await applyCpuActionEffect(cpuCard, cpuGp)) : {}
-        const modifiers = { ...(meta.modifiers || {}), [cpuId]: { ...(meta.modifiers?.[cpuId] || {}), ...battleMods } }
-        const actionPlayed = { ...(meta.action_played || {}), [cpuId]: true }
+        const modifiers = { ...(freshMeta.modifiers || {}), [cpuId]: { ...(freshMeta.modifiers?.[cpuId] || {}), ...battleMods } }
+        const actionPlayed = { ...(freshMeta.action_played || {}), [cpuId]: true }
         const allDone = participants.every(gp => actionPlayed[gp.player_id] != null)
         await supabase.from('games').update({
-          game_state: { ...meta, modifiers, action_played: actionPlayed, ...(allDone ? { round_phase: 'ready' } : {}) }
+          game_state: { ...freshMeta, modifiers, action_played: actionPlayed, ...(allDone ? { round_phase: 'ready' } : {}) }
         }).eq('id', gameId)
       }, 700)
       return () => clearTimeout(t)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game?.game_state?.round_phase, game?.game_state?.dice_result, status, cpuId, isCpuGame, isHost, starting])
+  }, [game?.game_state?.round_phase, game?.game_state?.dice_result, game?.game_state?.event_confirmed?.[cpuId], status, cpuId, isCpuGame, isHost, starting])
 
   // ─── イベント効果適用（ホストのみ実行） ──────────────────────
   const applyEventEffect = async (eventCard, diceResult, parts) => {
@@ -395,20 +403,25 @@ export default function GameRoomPage() {
   }
 
   const confirmEvent = async () => {
-    const meta = game.game_state || {}
-    let extra = {}
-    if (isHost) {
-      // 最新のparticipantsデータを取得してから効果適用
-      const { data: freshParts } = await supabase
-        .from('game_players').select('*, players(username)')
-        .eq('game_id', gameId).order('turn_order')
-      extra = await applyEventEffect(meta.event_card, meta.dice_result, freshParts || participants)
+    try {
+      // 常にDBから最新のgame_stateを取得して競合上書きを防ぐ
+      const { data: freshGame } = await supabase.from('games').select('game_state').eq('id', gameId).single()
+      const meta = freshGame?.game_state || {}
+      let extra = {}
+      if (isHost) {
+        const { data: freshParts } = await supabase
+          .from('game_players').select('*, players(username)')
+          .eq('game_id', gameId).order('turn_order')
+        extra = await applyEventEffect(meta.event_card, meta.dice_result, freshParts || participants)
+      }
+      const confirmed = { ...(meta.event_confirmed || {}), [player.id]: true }
+      const allConfirmed = participants.every(gp => confirmed[gp.player_id])
+      await supabase.from('games').update({
+        game_state: { ...meta, ...extra, event_confirmed: confirmed, ...(allConfirmed ? { round_phase: 'action' } : {}) }
+      }).eq('id', gameId)
+    } catch (err) {
+      alert('確認に失敗しました: ' + err.message)
     }
-    const confirmed = { ...(meta.event_confirmed || {}), [player.id]: true }
-    const allConfirmed = participants.every(gp => confirmed[gp.player_id])
-    await supabase.from('games').update({
-      game_state: { ...meta, ...extra, event_confirmed: confirmed, ...(allConfirmed ? { round_phase: 'action' } : {}) }
-    }).eq('id', gameId)
   }
 
   const playActionCard = async (play) => {
