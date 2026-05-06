@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
 import Layout from '../components/Layout'
+import { assignStarterDeck } from '../lib/assignStarterDeck'
 import { initGameState } from '../lib/gameEngine'
 import { CPU_USERNAME } from '../lib/cpuPlayer'
 import { EVENT_CARDS } from '../data/eventCards'
@@ -81,36 +82,54 @@ export default function GameRoomPage() {
 
   const join = async () => {
     setJoining(true)
-    const nextOrder = participants.length + 1
-    const { error } = await supabase.from('game_players').insert({
-      game_id: gameId,
-      player_id: player.id,
-      victory_points: 0,
-      bye_last_round: false,
-      turn_order: nextOrder,
-      is_winner: false,
-    })
-    if (error) alert(error.message)
+    try {
+      // スターターデッキを自動付与
+      const deckId = await assignStarterDeck(player.id)
+      const nextOrder = participants.length + 1
+      const { error } = await supabase.from('game_players').insert({
+        game_id: gameId,
+        player_id: player.id,
+        victory_points: 0,
+        bye_last_round: false,
+        turn_order: nextOrder,
+        is_winner: false,
+        deck_id: deckId,
+      })
+      if (error) alert(error.message)
+    } catch (err) {
+      alert('スターターデッキの付与に失敗しました: ' + err.message)
+    }
     setJoining(false)
-  }
-
-  const updateDeck = async (deckId) => {
-    setSelectedDeck(deckId)
-    await supabase
-      .from('game_players')
-      .update({ deck_id: deckId })
-      .eq('game_id', gameId)
-      .eq('player_id', player.id)
   }
 
   const startGame = async () => {
     if (participants.length < 2) { alert('2人以上必要です'); return }
-    const allDecksSet = participants.every(p => p.deck_id)
-    if (!allDecksSet) { alert('全員がデッキを選択してください'); return }
     setStarting(true)
+
+    // フェーズ1の初期状態を生成してゲームを開始
+    const { EVENT_CARDS } = await import('../data/eventCards')
+    const { ACTION_CARDS } = await import('../data/actionCards')
+    const eventCard = EVENT_CARDS[Math.floor(Math.random() * EVENT_CARDS.length)]
+    const modifiers = {}
+    const actionCards = {}
+    participants.forEach(p => {
+      modifiers[p.player_id] = {}
+      actionCards[p.player_id] = ACTION_CARDS[Math.floor(Math.random() * ACTION_CARDS.length)]
+    })
+    const initialGameState = {
+      round_phase: 'event',
+      event_card: eventCard,
+      dice_result: null,
+      event_confirmed: {},
+      action_cards: actionCards,
+      action_played: {},
+      modifiers,
+      life_event_modifier: 0,
+    }
+
     const { error } = await supabase
       .from('games')
-      .update({ status: 'in_progress', current_round: 1 })
+      .update({ status: 'between_rounds', current_round: 1, game_state: initialGameState })
       .eq('id', gameId)
     if (error) { alert(error.message); setStarting(false) }
   }
@@ -770,71 +789,27 @@ export default function GameRoomPage() {
               disabled={joining}
               className="w-full mt-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white py-3 rounded-xl font-medium transition-colors"
             >
-              {joining ? '参加中...' : 'このゲームに参加する'}
+              {joining ? 'スターターデッキ付与中...' : 'このゲームに参加する'}
             </button>
           )}
         </div>
 
-        {/* デッキ選択 */}
+        {/* スターターデッキ情報 + ゲーム開始 */}
         {joined && (
           <div>
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-3">
-              デッキ選択
+              スターターデッキ
             </h2>
-            <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
-              {myDecks.length === 0 ? (
-                <div className="p-6 text-center">
-                  <p className="text-gray-400 text-sm mb-2">デッキがありません</p>
-                  <button
-                    onClick={() => navigate('/decks')}
-                    className="text-purple-400 hover:text-purple-300 text-sm"
-                  >
-                    デッキを作成する →
-                  </button>
-                </div>
-              ) : (
-                <div className="divide-y divide-gray-700">
-                  {myDecks.map(deck => {
-                    const count = getDeckCount(deck)
-                    const isValid = count >= 40 && count <= 60
-                    const isSelected = selectedDeck === deck.id
-                    return (
-                      <button
-                        key={deck.id}
-                        onClick={() => isValid && updateDeck(deck.id)}
-                        disabled={!isValid}
-                        className={`w-full flex items-center gap-3 px-4 py-3 transition-colors text-left ${
-                          isSelected
-                            ? 'bg-purple-900/40 border-l-2 border-purple-500'
-                            : isValid
-                            ? 'hover:bg-gray-750'
-                            : 'opacity-40 cursor-not-allowed'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                          isSelected ? 'border-purple-500 bg-purple-500' : 'border-gray-500'
-                        }`}>
-                          {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-white text-sm font-medium">{deck.name}</p>
-                          <p className={`text-xs ${isValid ? 'text-green-400' : 'text-red-400'}`}>
-                            {count}枚 {!isValid && '（40〜60枚必要）'}
-                          </p>
-                        </div>
-                        {isSelected && <span className="text-purple-400 text-xs">選択中</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
+            <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-4">
+              <p className="text-green-400 text-sm font-medium mb-1">✓ ランダムなスターターデッキが付与されました</p>
+              <p className="text-gray-500 text-xs">ゲーム開始後にどのデッキが配られたか確認できます</p>
             </div>
 
             {isHost && (
-              <div className="mt-4">
+              <div>
                 <button
                   onClick={startGame}
-                  disabled={starting || !participants.every(p => p.deck_id) || participants.length < 2}
+                  disabled={starting || participants.length < 2}
                   className="w-full bg-green-600 hover:bg-green-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors text-lg"
                 >
                   {starting ? '開始中...' : '🎮 ゲーム開始'}
@@ -842,10 +817,10 @@ export default function GameRoomPage() {
                 {participants.length < 2 && (
                   <p className="text-gray-500 text-xs text-center mt-2">2人以上必要です</p>
                 )}
-                {participants.length >= 2 && !participants.every(p => p.deck_id) && (
-                  <p className="text-gray-500 text-xs text-center mt-2">全員がデッキを選択してください</p>
-                )}
               </div>
+            )}
+            {!isHost && (
+              <p className="text-gray-500 text-sm text-center py-3">ホストがゲームを開始するまでお待ちください</p>
             )}
           </div>
         )}

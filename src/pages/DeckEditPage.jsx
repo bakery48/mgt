@@ -157,6 +157,9 @@ export default function DeckEditPage() {
 
   return (
     <Layout>
+      <div className="mb-4 bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-yellow-400 text-xs">
+        このデッキはバトル練習専用です。ゲームでは参加時にスターターデッキが自動付与されます。
+      </div>
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-4 gap-4">
         <div className="flex items-center gap-3">

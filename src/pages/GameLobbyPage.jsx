@@ -6,6 +6,7 @@ import Layout from '../components/Layout'
 import { CPU_USERNAME } from '../lib/cpuPlayer'
 import { EVENT_CARDS } from '../data/eventCards'
 import { ACTION_CARDS } from '../data/actionCards'
+import { assignStarterDeck } from '../lib/assignStarterDeck'
 
 const STATUS_LABEL = { waiting: '待機中', in_progress: '進行中', finished: '終了' }
 const STATUS_COLOR = { waiting: 'text-green-400', in_progress: 'text-yellow-400', finished: 'text-gray-500' }
@@ -71,19 +72,7 @@ export default function GameLobbyPage() {
     if (!player) return
     setStartingCpu(true)
     try {
-      // Human's deck
-      const { data: humanDecks } = await supabase
-        .from('decks')
-        .select('id, deck_cards(card_id, quantity)')
-        .eq('player_id', player.id)
-        .limit(1)
-      const humanDeck = humanDecks?.[0]
-      if (!humanDeck?.deck_cards?.length) {
-        alert('デッキを先に作成してください')
-        return
-      }
-
-      // Get or create CPU player
+      // CPUプレイヤーの取得または作成
       let { data: cpuPlayer } = await supabase
         .from('players')
         .select('id')
@@ -99,37 +88,13 @@ export default function GameLobbyPage() {
         cpuPlayer = newCpu
       }
 
-      // Get or create CPU deck (copy of human deck)
-      let { data: cpuDecks } = await supabase
-        .from('decks')
-        .select('id, deck_cards(card_id, quantity)')
-        .eq('player_id', cpuPlayer.id)
-        .limit(1)
-      let cpuDeck = cpuDecks?.[0]
-      if (!cpuDeck) {
-        const { data: newDeck } = await supabase
-          .from('decks')
-          .insert({ player_id: cpuPlayer.id, name: 'CPU Deck' })
-          .select('id')
-          .single()
-        await supabase.from('deck_cards').insert(
-          humanDeck.deck_cards.map(dc => ({
-            deck_id: newDeck.id, card_id: dc.card_id, quantity: dc.quantity,
-          }))
-        )
-        cpuDeck = { id: newDeck.id, deck_cards: humanDeck.deck_cards }
-      }
+      // スターターデッキをそれぞれ割り当て
+      const [humanDeckId, cpuDeckId] = await Promise.all([
+        assignStarterDeck(player.id),
+        assignStarterDeck(cpuPlayer.id),
+      ])
 
-      // Build deck maps (used later by startBattle in GameRoomPage)
-      const expandDeck = (cards) => {
-        const arr = []
-        for (const dc of (cards || [])) {
-          for (let i = 0; i < dc.quantity; i++) arr.push(dc.card_id)
-        }
-        return arr
-      }
-
-      // Phase 1 の初期状態をゲーム作成時点で埋め込む
+      // フェーズ1の初期状態をゲーム作成時点で埋め込む
       const eventCard = EVENT_CARDS[Math.floor(Math.random() * EVENT_CARDS.length)]
       const initialGameState = {
         round_phase: 'event',
@@ -160,11 +125,13 @@ export default function GameLobbyPage() {
       if (gameErr) { alert('ゲーム作成失敗: ' + gameErr.message); return }
 
       await supabase.from('game_players').insert([
-        { game_id: game.id, player_id: player.id, turn_order: 1, victory_points: 0, bye_last_round: false, is_winner: false, deck_id: humanDeck.id },
-        { game_id: game.id, player_id: cpuPlayer.id, turn_order: 2, victory_points: 0, bye_last_round: false, is_winner: false, deck_id: cpuDeck.id },
+        { game_id: game.id, player_id: player.id, turn_order: 1, victory_points: 0, bye_last_round: false, is_winner: false, deck_id: humanDeckId },
+        { game_id: game.id, player_id: cpuPlayer.id, turn_order: 2, victory_points: 0, bye_last_round: false, is_winner: false, deck_id: cpuDeckId },
       ])
 
       navigate(`/game/${game.id}`)
+    } catch (err) {
+      alert('エラー: ' + err.message)
     } finally {
       setStartingCpu(false)
     }
