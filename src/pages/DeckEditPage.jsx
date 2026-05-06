@@ -16,6 +16,12 @@ const COLOR_DOT = {
 }
 const TYPE_ORDER = ['creature', 'land', 'instant', 'sorcery', 'enchantment', 'artifact']
 
+const FORMAT_CONFIG = {
+  standard:    { min: 60, maxCopies: 4, landUnlimited: false, label: 'スタンダード',    desc: '60枚以上・同名4枚まで' },
+  limited:     { min: 40, maxCopies: 4, landUnlimited: true,  label: 'リミテッド',      desc: '40枚以上・土地無制限' },
+  magic_league:{ min: 30, maxCopies: 4, landUnlimited: true,  label: 'マジックリーグ', desc: '30枚以上・土地無制限' },
+}
+
 export default function DeckEditPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -24,6 +30,7 @@ export default function DeckEditPage() {
   const [deck, setDeck] = useState(null)
   const [collection, setCollection] = useState([])  // { card, owned }
   const [deckCards, setDeckCards] = useState({})     // { card_id: quantity }
+  const [format, setFormat] = useState('standard')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [validating, setValidating] = useState(false)
@@ -43,6 +50,7 @@ export default function DeckEditPage() {
         supabase.from('deck_cards').select('card_id, quantity').eq('deck_id', id),
       ])
       setDeck(deckData)
+      setFormat(deckData?.format || 'standard')
       setCollection(colData || [])
       const map = {}
       ;(dcData || []).forEach(dc => { map[dc.card_id] = dc.quantity })
@@ -55,14 +63,21 @@ export default function DeckEditPage() {
 
   const totalCount = Object.values(deckCards).reduce((s, q) => s + q, 0)
 
+  const fCfg = FORMAT_CONFIG[format] || FORMAT_CONFIG.standard
+
   const addCard = useCallback((cardId) => {
     setDeckCards(prev => {
       const cur = prev[cardId] || 0
-      if (cur >= 4) return prev
+      const item = collection.find(c => c.cards?.id === cardId)
+      const owned = item?.quantity || 0
+      const isLand = item?.cards?.card_type === 'land'
+      const cfg = FORMAT_CONFIG[format] || FORMAT_CONFIG.standard
+      const maxCopies = (cfg.landUnlimited && isLand) ? Infinity : cfg.maxCopies
+      if (cur >= maxCopies || cur >= owned) return prev
       setDirty(true)
       return { ...prev, [cardId]: cur + 1 }
     })
-  }, [])
+  }, [collection, format])
 
   const removeCard = useCallback((cardId) => {
     setDeckCards(prev => {
@@ -79,6 +94,9 @@ export default function DeckEditPage() {
   const save = async () => {
     setSaving(true)
     setSaveMsg('')
+
+    // Save format to decks table
+    await supabase.from('decks').update({ format }).eq('id', id)
 
     const upsertRows = Object.entries(deckCards)
       .filter(([, q]) => q > 0)
@@ -114,13 +132,16 @@ export default function DeckEditPage() {
 
   const validate = async () => {
     setValidating(true)
-    const { data, error } = await supabase.rpc('validate_deck', { p_deck_id: id })
-    if (error) setValidMsg('検証エラー: ' + error.message)
-    else setValidMsg(data ? '✓ デッキは有効です（40〜60枚）' : '✗ デッキが無効です（40〜60枚にしてください）')
+    const cfg = FORMAT_CONFIG[format] || FORMAT_CONFIG.standard
+    const isValid = totalCount >= cfg.min
+    setValidMsg(isValid
+      ? `✓ デッキは有効です（${cfg.min}枚以上）`
+      : `✗ デッキが無効です（${cfg.min}枚以上にしてください）`
+    )
     setValidating(false)
   }
 
-  const countColor = totalCount < 40 ? 'text-red-400' : totalCount <= 60 ? 'text-green-400' : 'text-red-400'
+  const countColor = totalCount < fCfg.min ? 'text-red-400' : 'text-green-400'
 
   // コレクションカードをタイプ別ソート
   const filteredCollection = collection
@@ -160,6 +181,28 @@ export default function DeckEditPage() {
       <div className="mb-4 bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-yellow-400 text-xs">
         このデッキはバトル練習専用です。ゲームでは参加時にスターターデッキが自動付与されます。
       </div>
+
+      {/* フォーマット選択 */}
+      <div className="mb-4 bg-gray-800 border border-gray-700 rounded-xl p-3">
+        <p className="text-gray-400 text-xs mb-2">フォーマット</p>
+        <div className="flex gap-2">
+          {Object.entries(FORMAT_CONFIG).map(([key, cfg]) => (
+            <button
+              key={key}
+              onClick={() => { setFormat(key); setDirty(true); setValidMsg('') }}
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                format === key
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
+            >
+              <div>{cfg.label}</div>
+              <div className="text-xs opacity-70 mt-0.5">{cfg.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ヘッダー */}
       <div className="flex items-center justify-between mb-4 gap-4">
         <div className="flex items-center gap-3">
@@ -207,7 +250,9 @@ export default function DeckEditPage() {
               <div className="divide-y divide-gray-700 max-h-[600px] overflow-y-auto">
                 {filteredCollection.map(({ cards: card, quantity: owned }) => {
                   const inDeck = deckCards[card.id] || 0
-                  const canAdd = inDeck < 4 && inDeck < owned
+                  const isLand = card.card_type === 'land'
+                  const maxCopies = (fCfg.landUnlimited && isLand) ? Infinity : fCfg.maxCopies
+                  const canAdd = inDeck < maxCopies && inDeck < owned
                   return (
                     <div key={card.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-750 group">
                       <div className={`w-3 h-3 rounded-full shrink-0 ${COLOR_DOT[card.color] || 'bg-gray-500'}`} />
@@ -254,7 +299,7 @@ export default function DeckEditPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">デッキ</h2>
             <span className={`text-2xl font-bold font-mono ${countColor}`}>
-              {totalCount}<span className="text-gray-500 text-sm font-normal ml-1">/ 40〜60</span>
+              {totalCount}<span className="text-gray-500 text-sm font-normal ml-1">/ {fCfg.min}枚以上</span>
             </span>
           </div>
 
@@ -263,31 +308,35 @@ export default function DeckEditPage() {
               <p className="text-gray-500 text-sm text-center py-8">カードを追加してください</p>
             ) : (
               <div className="divide-y divide-gray-700 max-h-[600px] overflow-y-auto">
-                {deckList.map(({ card, card_id, quantity }) => (
-                  <div key={card_id} className="flex items-center gap-3 px-4 py-3">
-                    <div className={`w-3 h-3 rounded-full shrink-0 ${COLOR_DOT[card?.color] || 'bg-gray-500'}`} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white text-sm font-medium truncate">{card?.name}</p>
-                      <span className="text-gray-500 text-xs">{TYPE_LABELS[card?.card_type] || card?.card_type}</span>
+                {deckList.map(({ card, card_id, quantity }) => {
+                  const isLand = card?.card_type === 'land'
+                  const maxCopies = (fCfg.landUnlimited && isLand) ? Infinity : fCfg.maxCopies
+                  return (
+                    <div key={card_id} className="flex items-center gap-3 px-4 py-3">
+                      <div className={`w-3 h-3 rounded-full shrink-0 ${COLOR_DOT[card?.color] || 'bg-gray-500'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white text-sm font-medium truncate">{card?.name}</p>
+                        <span className="text-gray-500 text-xs">{TYPE_LABELS[card?.card_type] || card?.card_type}</span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => removeCard(card_id)}
+                          className="w-7 h-7 rounded-lg bg-gray-700 hover:bg-red-800 text-white text-sm flex items-center justify-center transition-colors"
+                        >
+                          −
+                        </button>
+                        <span className="text-white text-sm font-bold w-4 text-center">{quantity}</span>
+                        <button
+                          onClick={() => addCard(card_id)}
+                          disabled={quantity >= maxCopies}
+                          className="w-7 h-7 rounded-lg bg-gray-700 hover:bg-purple-700 disabled:opacity-30 text-white text-sm flex items-center justify-center transition-colors"
+                        >
+                          ＋
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => removeCard(card_id)}
-                        className="w-7 h-7 rounded-lg bg-gray-700 hover:bg-red-800 text-white text-sm flex items-center justify-center transition-colors"
-                      >
-                        −
-                      </button>
-                      <span className="text-white text-sm font-bold w-4 text-center">{quantity}</span>
-                      <button
-                        onClick={() => addCard(card_id)}
-                        disabled={quantity >= 4}
-                        className="w-7 h-7 rounded-lg bg-gray-700 hover:bg-purple-700 disabled:opacity-30 text-white text-sm flex items-center justify-center transition-colors"
-                      >
-                        ＋
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </div>

@@ -18,6 +18,19 @@ import CardDetailModal from '../components/CardDetailModal'
 import { CPU_USERNAME, cpuTakeTurn, cpuDeclareBlockers } from '../lib/cpuPlayer'
 
 // ─── カードコンポーネント ───────────────────────────────────────
+const TYPE_LABELS_JP = {
+  creature: 'クリーチャー', instant: 'インスタント', sorcery: 'ソーサリー',
+  enchantment: 'エンチャント', artifact: 'アーティファクト', land: '土地',
+}
+const KEYWORD_LABELS = {
+  flying: '飛行', trample: 'トランプル', haste: '速攻', first_strike: '先制攻撃',
+  double_strike: '二段攻撃', deathtouch: '接死', lifelink: '絆魂', vigilance: '警戒',
+  reach: '到達', defender: '防衛', menace: '威迫', indestructible: '破壊不能',
+  flash: '瞬速', hexproof: '呪禁', shroud: '被覆', cycling: 'サイクリング',
+  flashback: 'フラッシュバック', kicker: 'キッカー', unearth: 'アンアース',
+  equip: '装備', delve: '探査',
+}
+
 const COLOR_BG = {
   white: 'bg-yellow-50 text-gray-900', blue: 'bg-blue-700 text-white',
   black: 'bg-gray-900 text-white border-gray-600', red: 'bg-red-700 text-white',
@@ -25,13 +38,50 @@ const COLOR_BG = {
   multicolor: 'bg-gradient-to-br from-yellow-600 to-purple-700 text-white',
 }
 
-function MiniCard({ card, perm, selected, onClick, onDetail, disabled, dimmed, equipped }) {
+function HoverCardTooltip({ card, perm }) {
+  if (!card) return null
+  const kws = card.keywords || []
+  return (
+    <div className="fixed bottom-4 left-4 z-30 bg-gray-900 border border-gray-600 rounded-xl p-3 w-56 shadow-2xl pointer-events-none">
+      <div className={`rounded-lg p-2 mb-2 ${COLOR_BG[card.color] || 'bg-gray-700 text-white'}`}>
+        <div className="flex items-center justify-between gap-1">
+          <p className="text-sm font-bold leading-tight">{card.name}</p>
+          {card.mana_cost && <p className="text-xs font-mono shrink-0">{card.mana_cost}</p>}
+        </div>
+        {card.card_type === 'creature' && (
+          <p className="text-xs font-mono mt-1">
+            {perm?.power ?? card.power}/{perm?.toughness ?? card.toughness}
+            {perm?.damage > 0 && <span className="text-red-300"> -{perm.damage}</span>}
+          </p>
+        )}
+      </div>
+      <p className="text-gray-400 text-xs">{TYPE_LABELS_JP[card.card_type] || card.card_type}</p>
+      {kws.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1">
+          {kws.map((k, i) => (
+            <span key={i} className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">
+              {KEYWORD_LABELS[k.type] || k.type}
+            </span>
+          ))}
+        </div>
+      )}
+      {card.effect_text && (
+        <p className="text-gray-400 text-xs mt-2 leading-relaxed">{card.effect_text}</p>
+      )}
+      <p className="text-gray-600 text-xs mt-2 italic">右クリックで詳細</p>
+    </div>
+  )
+}
+
+function MiniCard({ card, perm, selected, onClick, onDetail, onHover, disabled, dimmed, equipped }) {
   const kws = (card?.keywords || []).map(k => k.type)
   const isTapped = perm?.tapped
   return (
     <button
       onClick={onClick}
       onContextMenu={onDetail ? (e) => { e.preventDefault(); onDetail() } : undefined}
+      onMouseEnter={onHover ? () => onHover(card, perm) : undefined}
+      onMouseLeave={onHover ? () => onHover(null, null) : undefined}
       disabled={disabled}
       className={`
         relative border-2 rounded-lg transition-all select-none
@@ -63,11 +113,13 @@ function MiniCard({ card, perm, selected, onClick, onDetail, disabled, dimmed, e
   )
 }
 
-function HandCard({ card, onClick, onDetail, disabled, highlight }) {
+function HandCard({ card, onClick, onDetail, onHover, disabled, highlight }) {
   return (
     <button
       onClick={onClick}
       onContextMenu={onDetail ? (e) => { e.preventDefault(); onDetail() } : undefined}
+      onMouseEnter={onHover ? () => onHover(card, null) : undefined}
+      onMouseLeave={onHover ? () => onHover(null, null) : undefined}
       disabled={disabled}
       className={`
         border-2 rounded-lg p-2 transition-all shrink-0 w-20 h-28 flex flex-col text-left
@@ -153,6 +205,8 @@ export default function GamePlayPage() {
   const [roundResult, setRoundResult] = useState(null)
   const [detailCard, setDetailCard] = useState(null)
   const [detailPerm, setDetailPerm] = useState(null)
+  const [hoverCard, setHoverCard] = useState(null)
+  const [hoverPerm, setHoverPerm] = useState(null)
 
   const myId = player?.id
   const isActive = gs?.active_player === myId
@@ -308,6 +362,11 @@ export default function GamePlayPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.phase, gs?.priority, roundResult, savingGs])
 
+
+  const handleHover = useCallback((card, perm) => {
+    setHoverCard(card || null)
+    setHoverPerm(perm || null)
+  }, [])
 
   const dispatch = useCallback((newGs) => {
     saveGs(newGs)
@@ -639,6 +698,7 @@ export default function GamePlayPage() {
                       if (canAssign) handleAssignBlocker(perm.instance_id)
                     }}
                     onDetail={() => { setDetailCard(card); setDetailPerm(perm) }}
+                    onHover={handleHover}
                     dimmed={false}
                   />
                 )
@@ -695,6 +755,7 @@ export default function GamePlayPage() {
                           setDetailCard(card)
                           setDetailPerm({ ...perm, power: ep?.power ?? perm.power, toughness: ep?.toughness ?? perm.toughness })
                         }}
+                        onHover={handleHover}
                         equipped={equippedSet.has(perm.instance_id)}
                         disabled={!isLand && !canAtt && !canBlk && !canEquipThis && !(isEquipTarget && !isEquip)}
                       />
@@ -732,6 +793,7 @@ export default function GamePlayPage() {
                     disabled={!canPlay}
                     onClick={() => handleHandCardClick(cardId)}
                     onDetail={() => { setDetailCard(card); setDetailPerm(null) }}
+                    onHover={handleHover}
                   />
                 )
               })}
@@ -961,6 +1023,9 @@ export default function GamePlayPage() {
           </div>
         </div>
       )}
+
+      {/* ─── ホバーカード詳細 ─── */}
+      <HoverCardTooltip card={hoverCard} perm={hoverPerm} />
 
       {/* ─── カード詳細モーダル ─── */}
       <CardDetailModal
