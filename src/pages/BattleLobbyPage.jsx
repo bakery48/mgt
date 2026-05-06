@@ -22,7 +22,7 @@ export default function BattleLobbyPage() {
   const fetchData = async () => {
     setLoading(true)
     const [{ data: deckData }, { data: gameData }] = await Promise.all([
-      supabase.from('decks').select('id, name, format').eq('player_id', player.id).order('created_at'),
+      supabase.from('decks').select('id, name, format').eq('player_id', player.id),
       supabase.from('games').select('*, game_players(player_id, players(username))').eq('status', 'waiting'),
     ])
     const myDecks = deckData || []

@@ -22,7 +22,7 @@ export default function BattleRoomPage() {
     const [{ data: gameData }, { data: gpData }, { data: deckData }] = await Promise.all([
       supabase.from('games').select('*').eq('id', gameId).single(),
       supabase.from('game_players').select('*, players(username), decks(name)').eq('game_id', gameId).order('turn_order'),
-      supabase.from('decks').select('id, name, format').eq('player_id', player.id).order('created_at'),
+      supabase.from('decks').select('id, name, format').eq('player_id', player.id),
     ])
     setGame(gameData)
     setParticipants(gpData || [])

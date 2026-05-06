@@ -19,7 +19,6 @@ export default function DecksPage() {
       .from('decks')
       .select('*')
       .eq('player_id', player.id)
-      .order('created_at', { ascending: false })
     if (deckError) { console.error('fetchDecks error:', deckError); setLoading(false); return }
     const deckIds = (deckData || []).map(d => d.id)
     let cardCounts = {}
