@@ -59,7 +59,7 @@ async function ensureStarterDecks(playerId) {
   for (const template of STARTER_DECKS) {
     const { data: newDeck, error: deckErr } = await supabase
       .from('decks')
-      .insert({ name: template.name, player_id: playerId, format: 'magic_league' })
+      .insert({ name: template.name, player_id: playerId })
       .select('id')
       .single()
     if (deckErr) {
