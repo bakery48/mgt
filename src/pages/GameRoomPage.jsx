@@ -90,7 +90,7 @@ export default function GameRoomPage() {
         game_id: gameId,
         player_id: player.id,
         victory_points: 0,
-        balance: 1000,
+        balance: game?.starting_balance ?? 1000,
         bye_last_round: false,
         turn_order: nextOrder,
         is_winner: false,
@@ -446,7 +446,7 @@ export default function GameRoomPage() {
     for (const [pid, mods] of Object.entries(meta.modifiers || {})) {
       const ps = gs.players[pid]
       if (!ps) continue
-      ps.life = (ps.life || 20) + (mods.life_bonus || 0) + lifeEvMod
+      ps.life = (game?.starting_life ?? 20) + (mods.life_bonus || 0) + lifeEvMod
       if (mods.mana_bonus) ps.mana_pool.colorless = (ps.mana_pool.colorless || 0) + mods.mana_bonus
       for (let i = 0; i < (mods.draw_bonus || 0); i++) {
         const card = ps.library.shift()
