@@ -279,7 +279,6 @@ export default function GamePlayPage() {
 
     const t = setTimeout(() => {
       if (cpuHasPriority) {
-        // CPUが相手ターン中に優先権を持っている→自動パス
         const newGs = passPriority(gs, cpuId, cardData)
         if (newGs && newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
       } else if (isCpuTurn) {
@@ -295,7 +294,21 @@ export default function GamePlayPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.phase, gs?.active_player, gs?.priority, cpuId, isCpuGame, savingGs, roundResult])
 
-  // ─── アクション処理 ────────────────────────────────────────
+  // ─── 非インタラクティブフェーズの自動優先権パス ────────────
+  const AUTO_PASS_PHASES = ['untap', 'upkeep', 'draw', 'combat_begin', 'combat_end', 'end_step']
+  useEffect(() => {
+    if (!gs || !myId || roundResult || savingGs) return
+    if (gs.priority !== myId) return
+    if (!AUTO_PASS_PHASES.includes(gs.phase)) return
+    const t = setTimeout(() => {
+      const newGs = passPriority(gs, myId, cardData)
+      if (newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
+    }, 150)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.phase, gs?.priority, roundResult, savingGs])
+
+
   const dispatch = useCallback((newGs) => {
     saveGs(newGs)
     setSelectedHandCard(null)
