@@ -9,11 +9,11 @@ export const PHASES = [
 ]
 export const PHASE_LABELS = {
   untap: 'アンタップ', upkeep: 'アップキープ', draw: 'ドロー',
-  main1: 'メイン1', combat_begin: '戦闘開始',
-  declare_attackers: '攻撃宣言', declare_blockers: 'ブロック宣言',
-  first_strike_damage: '先制ダメージ', combat_damage: '戦闘ダメージ',
-  combat_end: '戦闘終了', main2: 'メイン2',
-  end_step: 'エンドステップ', cleanup: 'クリーンアップ',
+  main1: '戦闘前メイン', combat_begin: '戦闘開始',
+  declare_attackers: '攻撃クリーチャー指定', declare_blockers: 'ブロッククリーチャー指定',
+  first_strike_damage: '先制戦闘ダメージ', combat_damage: '戦闘ダメージ',
+  combat_end: '戦闘終了', main2: '戦闘後メイン',
+  end_step: '終了', cleanup: 'クリンナップ',
 }
 
 const COLOR_TO_MANA = {
