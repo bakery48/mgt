@@ -207,6 +207,7 @@ export default function GamePlayPage() {
   const [detailPerm, setDetailPerm] = useState(null)
   const [hoverCard, setHoverCard] = useState(null)
   const [hoverPerm, setHoverPerm] = useState(null)
+  const [surrendering, setSurrendering] = useState(false)
 
   const myId = player?.id
   const isActive = gs?.active_player === myId
@@ -959,6 +960,36 @@ export default function GamePlayPage() {
               </p>
             ))}
           </div>
+
+          {/* 降参 */}
+          {!roundResult && (
+            surrendering ? (
+              <div className="bg-red-950 border border-red-700 rounded-lg p-2 text-center">
+                <p className="text-red-300 text-xs mb-2">本当に降参しますか？</p>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => { setSurrendering(false) }}
+                    className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 text-xs py-1.5 rounded"
+                  >
+                    戻る
+                  </button>
+                  <button
+                    onClick={() => { setRoundResult({ winner: oppId, loser: myId }) }}
+                    className="flex-1 bg-red-700 hover:bg-red-600 text-white text-xs py-1.5 rounded font-bold"
+                  >
+                    降参する
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setSurrendering(true)}
+                className="w-full bg-gray-800 hover:bg-red-950 border border-gray-700 hover:border-red-700 text-gray-500 hover:text-red-400 text-xs py-1.5 rounded-lg transition-colors"
+              >
+                🏳 降参
+              </button>
+            )
+          )}
 
           {/* 墓地（フラッシュバック/アンアース対応） */}
           {myPs.graveyard?.length > 0 && (
