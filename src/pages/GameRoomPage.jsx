@@ -21,6 +21,7 @@ export default function GameRoomPage() {
   const [starting, setStarting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [phaseToast, setPhaseToast] = useState(null)
 
   const isHost = participants.length > 0 && participants[0]?.player_id === player?.id
   const status = game?.status
@@ -110,6 +111,22 @@ export default function GameRoomPage() {
       .eq('id', gameId)
     if (error) { alert(error.message); setStarting(false) }
   }
+
+  // ─── フェーズ開始トースト ─────────────────────────────────
+  const PHASE_TOAST = {
+    event:  'フェーズ1: イベント',
+    action: 'フェーズ2: アクション',
+    ready:  '準備完了！',
+  }
+  useEffect(() => {
+    const phase = game?.game_state?.round_phase
+    if (!phase) return
+    const msg = PHASE_TOAST[phase]
+    if (!msg) return
+    setPhaseToast(msg)
+    const t = setTimeout(() => setPhaseToast(null), 500)
+    return () => clearTimeout(t)
+  }, [game?.game_state?.round_phase])
 
   // ─── CPU自動プレイ（ラウンド間フェーズ） ────────────────────
   const applyCpuActionEffect = async (card, cpuGp) => {
@@ -437,6 +454,14 @@ export default function GameRoomPage() {
 
   const finalWinner = participants.find(p => p.player_id === game?.winner_id)
 
+  const toastOverlay = phaseToast && (
+    <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+      <div className="bg-gray-900 border border-purple-500 text-white text-2xl font-bold px-10 py-5 rounded-2xl shadow-2xl">
+        {phaseToast}
+      </div>
+    </div>
+  )
+
   if (loading) {
     return (
       <Layout>
@@ -451,6 +476,7 @@ export default function GameRoomPage() {
   if (status === 'finished') {
     return (
       <Layout>
+        {toastOverlay}
         <div className="max-w-lg mx-auto text-center py-16">
           <div className="text-7xl mb-6">🏆</div>
           <h1 className="text-3xl font-bold text-white mb-2">ゲーム終了！</h1>
@@ -507,6 +533,7 @@ export default function GameRoomPage() {
 
     return (
       <Layout>
+        {toastOverlay}
         <div className="max-w-lg mx-auto">
           {/* ヘッダー */}
           <div className="text-center mb-6">
@@ -664,6 +691,7 @@ export default function GameRoomPage() {
   // ─── 待合室（waiting / 初回） ─────────────────────────────
   return (
     <Layout>
+      {toastOverlay}
       {/* ゲーム情報ヘッダー */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 mb-6">
         <div className="flex items-start justify-between gap-4 mb-4">
