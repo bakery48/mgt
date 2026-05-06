@@ -15,12 +15,24 @@ export default function DecksPage() {
 
   const fetchDecks = async () => {
     setLoading(true)
-    const { data } = await supabase
+    const { data: deckData, error: deckError } = await supabase
       .from('decks')
-      .select('*, deck_cards(quantity)')
+      .select('*')
       .eq('player_id', player.id)
       .order('created_at', { ascending: false })
-    setDecks(data || [])
+    if (deckError) { console.error('fetchDecks error:', deckError); setLoading(false); return }
+    const deckIds = (deckData || []).map(d => d.id)
+    let cardCounts = {}
+    if (deckIds.length > 0) {
+      const { data: dcData } = await supabase
+        .from('deck_cards')
+        .select('deck_id, quantity')
+        .in('deck_id', deckIds)
+      for (const row of (dcData || [])) {
+        cardCounts[row.deck_id] = (cardCounts[row.deck_id] || 0) + row.quantity
+      }
+    }
+    setDecks((deckData || []).map(d => ({ ...d, total_cards: cardCounts[d.id] || 0 })))
     setLoading(false)
   }
 
@@ -48,8 +60,7 @@ export default function DecksPage() {
     fetchDecks()
   }
 
-  const getDeckCount = (deck) =>
-    (deck.deck_cards || []).reduce((sum, dc) => sum + dc.quantity, 0)
+  const getDeckCount = (deck) => deck.total_cards || 0
 
   const getValidityColor = (count) => {
     if (count === 0) return 'text-gray-500'
