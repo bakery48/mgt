@@ -147,7 +147,7 @@ export default function GameRoomPage() {
     const msg = PHASE_TOAST[phase]
     if (!msg) return
     setPhaseToast(msg)
-    const t = setTimeout(() => setPhaseToast(null), 500)
+    const t = setTimeout(() => setPhaseToast(null), 1000)
     return () => clearTimeout(t)
   }, [game?.game_state?.round_phase])
 
@@ -504,7 +504,7 @@ export default function GameRoomPage() {
 
   const toastOverlay = phaseToast && (
     <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
-      <div className="bg-gray-900 border border-purple-500 text-white text-2xl font-bold px-10 py-5 rounded-2xl shadow-2xl">
+      <div className="bg-gray-900 border-2 border-purple-400 text-white text-4xl font-bold px-16 py-8 rounded-3xl shadow-2xl tracking-wide">
         {phaseToast}
       </div>
     </div>

@@ -273,11 +273,16 @@ export default function GamePlayPage() {
 
     const isCpuTurn = gs.active_player === cpuId
     const isCpuBlock = gs.phase === 'declare_blockers' && gs.active_player === myId && (gs.combat.attackers?.length ?? 0) > 0
+    const cpuHasPriority = gs.priority === cpuId && !isCpuTurn
 
-    if (!isCpuTurn && !isCpuBlock) return
+    if (!isCpuTurn && !isCpuBlock && !cpuHasPriority) return
 
     const t = setTimeout(() => {
-      if (isCpuTurn) {
+      if (cpuHasPriority) {
+        // CPUが相手ターン中に優先権を持っている→自動パス
+        const newGs = passPriority(gs, cpuId, cardData)
+        if (newGs && newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
+      } else if (isCpuTurn) {
         const newGs = cpuTakeTurn(gs, cpuId, cardData)
         if (newGs && newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
       } else if (isCpuBlock) {
@@ -288,7 +293,7 @@ export default function GamePlayPage() {
 
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gs?.phase, gs?.active_player, cpuId, isCpuGame, savingGs, roundResult])
+  }, [gs?.phase, gs?.active_player, gs?.priority, cpuId, isCpuGame, savingGs, roundResult])
 
   // ─── アクション処理 ────────────────────────────────────────
   const dispatch = useCallback((newGs) => {
