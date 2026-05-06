@@ -363,6 +363,25 @@ export default function GamePlayPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.phase, gs?.priority, roundResult, savingGs])
 
+  // ─── 攻撃可能クリーチャーが0体なら自動で攻撃宣言スキップ ──
+  useEffect(() => {
+    if (!gs || !myId || roundResult || savingGs) return
+    if (gs.phase !== 'declare_attackers' || gs.active_player !== myId) return
+    if (!cardData || Object.keys(cardData).length === 0) return
+    const canAttack = (gs.players[myId]?.battlefield || []).some(perm => {
+      const card = cardData[perm.card_id]
+      return card?.card_type === 'creature'
+        && !perm.summoning_sick && !perm.tapped
+        && !(card.keywords || []).some(k => k.type === 'defender')
+    })
+    if (canAttack) return
+    const t = setTimeout(() => {
+      const newGs = declareAttackers(gs, myId, [], cardData)
+      if (newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
+    }, 150)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.phase, gs?.active_player, roundResult, savingGs])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -954,11 +973,17 @@ export default function GamePlayPage() {
           {/* ログ */}
           <div className="flex-1 bg-gray-950 rounded-lg p-2 overflow-y-auto max-h-48">
             <p className="text-gray-600 text-xs mb-1">ログ</p>
-            {[...(gs.log || [])].reverse().map((entry, i) => (
-              <p key={i} className="text-gray-400 text-xs leading-relaxed border-b border-gray-800 py-0.5">
-                {entry.msg}
-              </p>
-            ))}
+            {[...(gs.log || [])].reverse().map((entry, i) => {
+              const oppName = oppInfo?.players?.username || '相手'
+              const msg = (entry.msg || '')
+                .replace(new RegExp(myId, 'g'), 'あなた')
+                .replace(new RegExp(oppId, 'g'), oppName)
+              return (
+                <p key={i} className="text-gray-400 text-xs leading-relaxed border-b border-gray-800 py-0.5">
+                  {msg}
+                </p>
+              )
+            })}
           </div>
 
           {/* 降参 */}
