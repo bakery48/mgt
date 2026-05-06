@@ -271,6 +271,17 @@ export function PlayerProvider({ children }) {
   }, [])
 
   const createPlayer = async (username) => {
+    // 既存ユーザー名があれば再ログイン、なければ新規作成
+    const { data: existing } = await supabase
+      .from('players')
+      .select()
+      .eq('username', username)
+      .maybeSingle()
+    if (existing) {
+      localStorage.setItem(STORAGE_KEY, existing.id)
+      setPlayer(existing)
+      return
+    }
     const { data, error } = await supabase
       .from('players')
       .insert({ username, balance: 10000 })
