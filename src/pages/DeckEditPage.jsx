@@ -77,13 +77,14 @@ export default function DeckEditPage() {
   const save = async () => {
     setSaving(true)
     setSaveMsg('')
-    // 既存を削除してから再挿入
-    await supabase.from('deck_cards').delete().eq('deck_id', id)
     const rows = Object.entries(deckCards)
       .filter(([, q]) => q > 0)
       .map(([card_id, quantity]) => ({ deck_id: id, card_id, quantity }))
+    // 既存を削除してから再挿入
+    const { error: delErr } = await supabase.from('deck_cards').delete().eq('deck_id', id)
+    if (delErr) { setSaveMsg('保存失敗: ' + delErr.message); setSaving(false); return }
     if (rows.length > 0) {
-      const { error } = await supabase.from('deck_cards').insert(rows)
+      const { error } = await supabase.from('deck_cards').upsert(rows, { onConflict: 'deck_id,card_id' })
       if (error) { setSaveMsg('保存失敗: ' + error.message); setSaving(false); return }
     }
     setDirty(false)
