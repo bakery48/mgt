@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
@@ -31,6 +31,7 @@ export default function DeckEditPage() {
   const [search, setSearch] = useState('')
   const [dirty, setDirty] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
+  const savedDeckRef = useRef({})  // tracks last-saved state for diff-based save
 
   useEffect(() => {
     if (!player) return
@@ -46,6 +47,7 @@ export default function DeckEditPage() {
       const map = {}
       ;(dcData || []).forEach(dc => { map[dc.card_id] = dc.quantity })
       setDeckCards(map)
+      savedDeckRef.current = { ...map }
       setLoading(false)
     }
     load()
@@ -77,16 +79,33 @@ export default function DeckEditPage() {
   const save = async () => {
     setSaving(true)
     setSaveMsg('')
-    const rows = Object.entries(deckCards)
+
+    const upsertRows = Object.entries(deckCards)
       .filter(([, q]) => q > 0)
       .map(([card_id, quantity]) => ({ deck_id: id, card_id, quantity }))
-    // 既存を削除してから再挿入
-    const { error: delErr } = await supabase.from('deck_cards').delete().eq('deck_id', id)
-    if (delErr) { setSaveMsg('保存失敗: ' + delErr.message); setSaving(false); return }
-    if (rows.length > 0) {
-      const { error } = await supabase.from('deck_cards').upsert(rows, { onConflict: 'deck_id,card_id' })
+
+    // Cards that existed before but are now gone
+    const removedIds = Object.keys(savedDeckRef.current).filter(cid => !deckCards[cid])
+
+    // Upsert current cards
+    if (upsertRows.length > 0) {
+      const { error } = await supabase.from('deck_cards').upsert(upsertRows, { onConflict: 'deck_id,card_id' })
       if (error) { setSaveMsg('保存失敗: ' + error.message); setSaving(false); return }
     }
+
+    // Delete only the cards that were explicitly removed
+    if (removedIds.length > 0) {
+      const { error } = await supabase.from('deck_cards').delete().eq('deck_id', id).in('card_id', removedIds)
+      if (error) { setSaveMsg('保存失敗: ' + error.message); setSaving(false); return }
+    }
+
+    // If deck is now empty and savedDeck was not empty, delete all
+    if (upsertRows.length === 0 && Object.keys(savedDeckRef.current).length > 0) {
+      const { error } = await supabase.from('deck_cards').delete().eq('deck_id', id)
+      if (error) { setSaveMsg('保存失敗: ' + error.message); setSaving(false); return }
+    }
+
+    savedDeckRef.current = { ...deckCards }
     setDirty(false)
     setSaveMsg('保存しました')
     setTimeout(() => setSaveMsg(''), 2000)
@@ -156,7 +175,7 @@ export default function DeckEditPage() {
           </button>
           <button
             onClick={save}
-            disabled={saving || !dirty}
+            disabled={saving}
             className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-sm px-4 py-2 rounded-lg transition-colors"
           >
             {saving ? '保存中...' : '保存'}
