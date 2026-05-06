@@ -96,7 +96,8 @@ export default function DeckEditPage() {
     setSaveMsg('')
 
     // Save format to decks table
-    await supabase.from('decks').update({ format }).eq('id', id)
+    const { error: fmtErr } = await supabase.from('decks').update({ format }).eq('id', id)
+    if (fmtErr) { setSaveMsg('保存失敗: ' + fmtErr.message); setSaving(false); return }
 
     const upsertRows = Object.entries(deckCards)
       .filter(([, q]) => q > 0)
