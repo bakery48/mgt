@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
 import Layout from '../components/Layout'
-import { initGameState } from '../lib/gameEngine'
 import { CPU_USERNAME } from '../lib/cpuPlayer'
 
 const STATUS_LABEL = { waiting: '待機中', in_progress: '進行中', finished: '終了' }
@@ -119,7 +118,7 @@ export default function GameLobbyPage() {
         cpuDeck = { id: newDeck.id, deck_cards: humanDeck.deck_cards }
       }
 
-      // Build deck maps
+      // Build deck maps (used later by startBattle in GameRoomPage)
       const expandDeck = (cards) => {
         const arr = []
         for (const dc of (cards || [])) {
@@ -127,22 +126,17 @@ export default function GameLobbyPage() {
         }
         return arr
       }
-      const deckMap = {
-        [player.id]: expandDeck(humanDeck.deck_cards),
-        [cpuPlayer.id]: expandDeck(cpuDeck.deck_cards),
-      }
-      const gs = initGameState([player.id, cpuPlayer.id], deckMap)
 
-      // Create game
+      // Create game in between_rounds so Phase 1 runs first
       const { data: game, error: gameErr } = await supabase
         .from('games')
         .insert({
-          status: 'in_progress',
-          total_rounds: 1,
+          status: 'between_rounds',
+          total_rounds: 5,
           current_round: 1,
           vp_threshold: 15,
           cash_threshold: 5000,
-          game_state: gs,
+          game_state: {},
         })
         .select('id')
         .single()
