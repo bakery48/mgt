@@ -58,7 +58,7 @@ async function ensureStarterDecks(playerId) {
     // カード枚数確認（空なら挿入）
     const { count } = await supabase
       .from('deck_cards')
-      .select('id', { count: 'exact', head: true })
+      .select('deck_id', { count: 'exact', head: true })
       .eq('deck_id', deckId)
     if (count > 0) continue
 
