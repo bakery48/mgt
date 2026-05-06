@@ -193,7 +193,7 @@ export default function GameLobbyPage() {
             disabled={startingCpu}
             className="bg-green-700 hover:bg-green-600 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
           >
-            {startingCpu ? '準備中...' : '🤖 CPU対戦'}
+            {startingCpu ? '準備中...' : '🤖 CPUとゲーム開始'}
           </button>
           <button
             onClick={() => setShowCreate(v => !v)}
