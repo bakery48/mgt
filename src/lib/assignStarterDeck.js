@@ -1,24 +1,9 @@
 import { supabase } from './supabase'
 import { STARTER_DECKS } from '../data/starterDecks'
 
-// 既存のスターターデッキからランダムに1つ選んで deck_id を返す
-// 存在しない場合はフォールバックで1つ作成する
+// ゲーム参加時にランダムなスターターデッキを新規作成して deck_id を返す
+// 練習用デッキ（decks テーブル）とは独立した専用ゲームデッキを毎回作成する
 export async function assignStarterDeck(playerId) {
-  const starterNames = STARTER_DECKS.map(d => d.name)
-
-  // 既存スターターデッキを検索
-  const { data: existingDecks } = await supabase
-    .from('decks')
-    .select('id, name')
-    .eq('player_id', playerId)
-    .in('name', starterNames)
-
-  if (existingDecks?.length > 0) {
-    const pick = existingDecks[Math.floor(Math.random() * existingDecks.length)]
-    return pick.id
-  }
-
-  // フォールバック: デッキが未作成の場合は1つ作成
   const template = STARTER_DECKS[Math.floor(Math.random() * STARTER_DECKS.length)]
   const cardNames = template.cards.map(c => c.name)
 
@@ -31,7 +16,7 @@ export async function assignStarterDeck(playerId) {
 
   const { data: deck, error: deckErr } = await supabase
     .from('decks')
-    .insert({ player_id: playerId, name: template.name, format: 'magic_league' })
+    .insert({ player_id: playerId, name: `[ゲーム用] ${template.name}`, format: 'magic_league' })
     .select('id')
     .single()
   if (deckErr) throw new Error('デッキ作成失敗: ' + deckErr.message)
