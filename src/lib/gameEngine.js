@@ -381,7 +381,7 @@ export function advancePhase(state) {
 export function finishCleanup(state) {
   const ap = state.active_player
   const ps = state.players[ap]
-  return {
+  const cleaned = {
     ...state,
     cleanup_discard: 0,
     players: {
@@ -393,6 +393,8 @@ export function finishCleanup(state) {
       },
     },
   }
+  // クリーンアップ完了後は自動的に次のターン（アンタップ）へ進む
+  return advancePhase(cleaned)
 }
 
 // 攻撃宣言（防衛クリーチャーを除外）
