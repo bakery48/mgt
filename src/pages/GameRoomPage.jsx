@@ -5,6 +5,8 @@ import { usePlayer } from '../contexts/PlayerContext'
 import Layout from '../components/Layout'
 import { initGameState } from '../lib/gameEngine'
 import { CPU_USERNAME } from '../lib/cpuPlayer'
+import { EVENT_CARDS } from '../data/eventCards'
+import { ACTION_CARDS } from '../data/actionCards'
 
 export default function GameRoomPage() {
   const { id: gameId } = useParams()
@@ -336,20 +338,11 @@ export default function GameRoomPage() {
   // ─── フェーズ開始（ホスト） ────────────────────────────────────
   const startEventPhase = async () => {
     setStarting(true)
-    const [{ data: events }, { data: actions }] = await Promise.all([
-      supabase.from('event_cards').select('*'),
-      supabase.from('action_cards').select('*'),
-    ])
-    if (!events?.length || !actions?.length) {
-      alert('イベント/アクションカードが見つかりません。\nSQL > event_action_cards.sql を実行してください。')
-      setStarting(false)
-      return
-    }
-    const eventCard = events[Math.floor(Math.random() * events.length)]
+    const eventCard = EVENT_CARDS[Math.floor(Math.random() * EVENT_CARDS.length)]
     const actionCards = {}
     const modifiers = {}
     for (const gp of participants) {
-      actionCards[gp.player_id] = actions[Math.floor(Math.random() * actions.length)]
+      actionCards[gp.player_id] = ACTION_CARDS[Math.floor(Math.random() * ACTION_CARDS.length)]
       modifiers[gp.player_id] = {}
     }
     await supabase.from('games').update({
