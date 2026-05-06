@@ -38,7 +38,7 @@ export const STARTER_DECKS = [
       { name: '影の暗殺者', quantity: 3 },
       { name: '骸骨の戦士', quantity: 3 },
       { name: '死霊の騎士', quantity: 3 },
-      { name: '吸血の悪魔', quantity: 3 },
+      { name: '怨念の騎兵', quantity: 3 },
       { name: '闇の消去', quantity: 3 },
       { name: '霊魂の呼び出し', quantity: 3 },
     ],
@@ -64,7 +64,7 @@ export const STARTER_DECKS = [
     cards: [
       { name: '森', quantity: 12 },
       { name: '回復の妖精', quantity: 3 },
-      { name: '蔦の壁', quantity: 3 },
+      { name: '野生の猛者', quantity: 3 },
       { name: '森の守護者', quantity: 3 },
       { name: '大樹の精霊', quantity: 3 },
       { name: '巨大化', quantity: 3 },
@@ -148,7 +148,7 @@ export const STARTER_DECKS = [
   },
   {
     id: 'sd11', name: '速攻の嵐',
-    description: '速攻クリーチャーだけで固めた超高速アグロデッキ',
+    description: '速攻クリーチャーと直接ダメージで制圧する超高速アグロデッキ',
     color: 'red',
     cards: [
       { name: '山', quantity: 6 },
@@ -172,7 +172,7 @@ export const STARTER_DECKS = [
       { name: '水晶の幻影', quantity: 3 },
       { name: '護法の騎士', quantity: 3 },
       { name: '神聖なる壁', quantity: 3 },
-      { name: '鋼の番人', quantity: 3 },
+      { name: '守護の盾', quantity: 3 },
       { name: '意思の断絶', quantity: 3 },
     ],
   },
@@ -194,7 +194,7 @@ export const STARTER_DECKS = [
   },
   {
     id: 'sd14', name: '絆魂の癒し',
-    description: '絆魂持ち中心でライフを回復しつつ削り切るライフゲインデッキ',
+    description: '絆魂とライフゲイン呪文でライフを回復しながら削り切るデッキ',
     color: 'white',
     cards: [
       { name: '平野', quantity: 6 },
