@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
 import Layout from '../components/Layout'
 import { CPU_USERNAME } from '../lib/cpuPlayer'
+import { EVENT_CARDS } from '../data/eventCards'
+import { ACTION_CARDS } from '../data/actionCards'
 
 const STATUS_LABEL = { waiting: '待機中', in_progress: '進行中', finished: '終了' }
 const STATUS_COLOR = { waiting: 'text-green-400', in_progress: 'text-yellow-400', finished: 'text-gray-500' }
@@ -127,7 +129,22 @@ export default function GameLobbyPage() {
         return arr
       }
 
-      // Create game in between_rounds so Phase 1 runs first
+      // Phase 1 の初期状態をゲーム作成時点で埋め込む
+      const eventCard = EVENT_CARDS[Math.floor(Math.random() * EVENT_CARDS.length)]
+      const initialGameState = {
+        round_phase: 'event',
+        event_card: eventCard,
+        dice_result: null,
+        event_confirmed: {},
+        action_cards: {
+          [player.id]: ACTION_CARDS[Math.floor(Math.random() * ACTION_CARDS.length)],
+          [cpuPlayer.id]: ACTION_CARDS[Math.floor(Math.random() * ACTION_CARDS.length)],
+        },
+        action_played: {},
+        modifiers: { [player.id]: {}, [cpuPlayer.id]: {} },
+        life_event_modifier: 0,
+      }
+
       const { data: game, error: gameErr } = await supabase
         .from('games')
         .insert({
@@ -136,7 +153,7 @@ export default function GameLobbyPage() {
           current_round: 1,
           vp_threshold: 15,
           cash_threshold: 5000,
-          game_state: {},
+          game_state: initialGameState,
         })
         .select('id')
         .single()

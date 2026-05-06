@@ -13,6 +13,7 @@ export default function GameRoomPage() {
   const navigate = useNavigate()
   const { player } = usePlayer()
   const channelRef = useRef(null)
+  const autoStartedRef = useRef(false)
 
   const [game, setGame] = useState(null)
   const [participants, setParticipants] = useState([])
@@ -165,11 +166,14 @@ export default function GameRoomPage() {
     const meta = game.game_state
     const roundPhase = meta.round_phase
 
-    // イベントフェーズ自動開始（CPU対戦のみ）
+    // イベントフェーズ自動開始（CPU対戦のみ・二重実行防止）
     if (!roundPhase && isHost) {
-      const t = setTimeout(() => startEventPhase(), 1000)
+      if (autoStartedRef.current) return
+      autoStartedRef.current = true
+      const t = setTimeout(() => startEventPhase(), 800)
       return () => clearTimeout(t)
     }
+    autoStartedRef.current = false  // フェーズが始まったらリセット
 
     // CPU自動イベント確認
     if (roundPhase === 'event' && !meta.event_confirmed?.[cpuId]) {
@@ -338,10 +342,14 @@ export default function GameRoomPage() {
   // ─── フェーズ開始（ホスト） ────────────────────────────────────
   const startEventPhase = async () => {
     setStarting(true)
+    // fresh fetch to avoid stale closure on participants
+    const { data: freshParts } = await supabase
+      .from('game_players').select('player_id').eq('game_id', gameId)
+    const parts = freshParts?.length ? freshParts : participants
     const eventCard = EVENT_CARDS[Math.floor(Math.random() * EVENT_CARDS.length)]
     const actionCards = {}
     const modifiers = {}
-    for (const gp of participants) {
+    for (const gp of parts) {
       actionCards[gp.player_id] = ACTION_CARDS[Math.floor(Math.random() * ACTION_CARDS.length)]
       modifiers[gp.player_id] = {}
     }
