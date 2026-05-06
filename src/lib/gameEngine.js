@@ -412,13 +412,19 @@ export function declareAttackers(state, pid, attackerIids, cardData) {
     const hasVigilance = (card.keywords || []).some(k => k.type === 'vigilance')
     return { ...p, attacking: true, tapped: !hasVigilance }
   })
-  return log({
+  let next = log({
     ...state,
     combat: { ...state.combat, attackers: validIids },
     players: { ...state.players, [pid]: { ...ps, battlefield: newBf } },
     priority_passed: [],
     priority: pid,
   }, `${validIids.length} 体で攻撃`)
+
+  // 攻撃者0体のとき戦闘フェーズ全体をスキップしてメイン2へ
+  if (validIids.length === 0) {
+    while (next.phase !== 'main2') next = advancePhase(next)
+  }
+  return next
 }
 
 // ブロック宣言
