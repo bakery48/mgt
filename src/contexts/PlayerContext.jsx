@@ -54,7 +54,7 @@ export function PlayerProvider({ children }) {
       .from('decks')
       .select('id', { count: 'exact', head: true })
       .eq('player_id', playerId)
-      .not('name', 'like', '[ゲーム用]%')
+      .eq('name', STARTER_DECKS[0].name)
     if (count > 0) return
 
     const allCardNames = [...new Set(STARTER_DECKS.flatMap(d => d.cards.map(c => c.name)))]
