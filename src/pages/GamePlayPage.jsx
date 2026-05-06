@@ -609,13 +609,19 @@ export default function GamePlayPage() {
     }
   }
 
+  const isBattleMode = game?.game_state?.game_type === 'battle'
+
   const handleRoundEnd = async () => {
-    await supabase.rpc('process_round_end', {
-      p_game_id: gameId,
-      p_winner_id: roundResult.winner,
-      p_loser_id: roundResult.loser,
-    })
-    navigate(`/game/${gameId}`)
+    if (isBattleMode) {
+      navigate('/battle')
+    } else {
+      await supabase.rpc('process_round_end', {
+        p_game_id: gameId,
+        p_winner_id: roundResult.winner,
+        p_loser_id: roundResult.loser,
+      })
+      navigate(`/game/${gameId}`)
+    }
   }
 
   const myLife = gs?.players?.[myId]?.life ?? 20

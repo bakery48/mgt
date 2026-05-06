@@ -10,6 +10,8 @@ import DeckEditPage from './pages/DeckEditPage'
 import GameLobbyPage from './pages/GameLobbyPage'
 import GameRoomPage from './pages/GameRoomPage'
 import GamePlayPage from './pages/GamePlayPage'
+import BattleLobbyPage from './pages/BattleLobbyPage'
+import BattleRoomPage from './pages/BattleRoomPage'
 
 function PlayerRoute({ children }) {
   const { player, loading } = usePlayer()
@@ -48,6 +50,8 @@ function AppRoutes() {
       <Route path="/game" element={<PlayerRoute><GameLobbyPage /></PlayerRoute>} />
       <Route path="/game/:id" element={<PlayerRoute><GameRoomPage /></PlayerRoute>} />
       <Route path="/game/:id/play" element={<PlayerRoute><GamePlayPage /></PlayerRoute>} />
+      <Route path="/battle" element={<PlayerRoute><BattleLobbyPage /></PlayerRoute>} />
+      <Route path="/battle/:id" element={<PlayerRoute><BattleRoomPage /></PlayerRoute>} />
       <Route path="*" element={<Navigate to={player ? '/cards' : '/setup'} replace />} />
     </Routes>
   )
