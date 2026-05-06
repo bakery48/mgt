@@ -25,7 +25,7 @@ export default function BattleLobbyPage() {
       supabase.from('decks').select('id, name, format').eq('player_id', player.id).order('created_at'),
       supabase.from('games').select('*, game_players(player_id, players(username))').eq('status', 'waiting'),
     ])
-    const myDecks = (deckData || []).filter(d => !d.name.startsWith('[ゲーム用]'))
+    const myDecks = deckData || []
     setDecks(myDecks)
     if (myDecks.length > 0 && !selectedDeckId) setSelectedDeckId(myDecks[0].id)
     const battles = (gameData || []).filter(g => g.game_state?.game_type === 'battle')

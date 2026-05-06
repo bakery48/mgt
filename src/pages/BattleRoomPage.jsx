@@ -26,7 +26,7 @@ export default function BattleRoomPage() {
     ])
     setGame(gameData)
     setParticipants(gpData || [])
-    const myDecks = (deckData || []).filter(d => !d.name.startsWith('[ゲーム用]'))
+    const myDecks = deckData || []
     setDecks(myDecks)
     if (myDecks.length > 0 && !selectedDeckId) setSelectedDeckId(myDecks[0].id)
     setLoading(false)
