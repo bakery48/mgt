@@ -209,6 +209,8 @@ export default function GameRoomPage() {
         await supabase.from('games').update({
           game_state: { ...freshMeta, event_confirmed: confirmed, ...(allConfirmed ? { round_phase: 'action' } : {}) }
         }).eq('id', gameId)
+        // Realtimeに頼らず即時UI更新
+        await fetchRoom()
       }, 700)
       return () => clearTimeout(t)
     }
@@ -235,6 +237,8 @@ export default function GameRoomPage() {
         await supabase.from('games').update({
           game_state: { ...freshMeta, modifiers, action_played: actionPlayed, ...(allDone ? { round_phase: 'ready' } : {}) }
         }).eq('id', gameId)
+        // Realtimeに頼らず即時UI更新
+        await fetchRoom()
       }, 700)
       return () => clearTimeout(t)
     }
@@ -400,6 +404,7 @@ export default function GameRoomPage() {
     const meta = game.game_state || {}
     const result = Math.floor(Math.random() * 6) + 1
     await supabase.from('games').update({ game_state: { ...meta, dice_result: result } }).eq('id', gameId)
+    await fetchRoom()
   }
 
   const confirmEvent = async () => {
@@ -419,6 +424,8 @@ export default function GameRoomPage() {
       await supabase.from('games').update({
         game_state: { ...meta, ...extra, event_confirmed: confirmed, ...(allConfirmed ? { round_phase: 'action' } : {}) }
       }).eq('id', gameId)
+      // Realtimeに頼らず即時UI更新
+      await fetchRoom()
     } catch (err) {
       alert('確認に失敗しました: ' + err.message)
     }
@@ -435,6 +442,7 @@ export default function GameRoomPage() {
     await supabase.from('games').update({
       game_state: { ...meta, modifiers, action_played: actionPlayed, ...(allDone ? { round_phase: 'ready' } : {}) }
     }).eq('id', gameId)
+    await fetchRoom()
   }
 
   // ─── バトル開始（ホスト）: modifiers適用済みゲーム状態を作成 ──
