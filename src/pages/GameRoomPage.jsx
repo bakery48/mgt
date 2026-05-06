@@ -455,6 +455,12 @@ export default function GameRoomPage() {
 
   const finalWinner = participants.find(p => p.player_id === game?.winner_id)
 
+  const debugInfo = (
+    <div className="fixed bottom-2 right-2 bg-black/80 text-xs text-gray-300 px-3 py-2 rounded-lg z-50 font-mono">
+      status: {game?.status ?? 'null'} | phase: {game?.game_state?.round_phase ?? 'none'} | cpu: {cpuId ? '✓' : '✗'} | host: {isHost ? '✓' : '✗'}
+    </div>
+  )
+
   const toastOverlay = phaseToast && (
     <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
       <div className="bg-gray-900 border border-purple-500 text-white text-2xl font-bold px-10 py-5 rounded-2xl shadow-2xl">
@@ -466,6 +472,7 @@ export default function GameRoomPage() {
   if (loading) {
     return (
       <Layout>
+        {debugInfo}
         <div className="flex items-center justify-center py-20">
           <div className="text-gray-400">読み込み中...</div>
         </div>
@@ -478,6 +485,7 @@ export default function GameRoomPage() {
     return (
       <Layout>
         {toastOverlay}
+        {debugInfo}
         <div className="max-w-lg mx-auto text-center py-16">
           <div className="text-7xl mb-6">🏆</div>
           <h1 className="text-3xl font-bold text-white mb-2">ゲーム終了！</h1>
@@ -535,6 +543,7 @@ export default function GameRoomPage() {
     return (
       <Layout>
         {toastOverlay}
+        {debugInfo}
         <div className="max-w-lg mx-auto">
           {/* ヘッダー */}
           <div className="text-center mb-6">
@@ -693,6 +702,7 @@ export default function GameRoomPage() {
   return (
     <Layout>
       {toastOverlay}
+      {debugInfo}
       {/* ゲーム情報ヘッダー */}
       <div className="bg-gray-800 border border-gray-700 rounded-xl p-5 mb-6">
         <div className="flex items-start justify-between gap-4 mb-4">
