@@ -207,5 +207,26 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '飛行\n簒奪 1（ダメージ時）\nこのクリーチャーがダメージを与えるたび、対戦相手から勝利点を1奪う。',
  '[{"type":"flying"},{"type":"簒奪","value":1,"trigger":"damage"}]', 3000);
 
+-- ── スターターデッキ用追加カード ──────────────────────────────
+-- 以下はスターターデッキ定義で参照されるが初期シードに含まれていなかったカード
+INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price)
+VALUES
+('神秘の潮流', 'sorcery',  'blue',  '{2}{U}', null, null,
+ 'カードを2枚引く。',
+ '[]', 800),
+
+('怨念の騎兵', 'creature', 'black', '{2}{B}', 2, 2,
+ '接死、威迫を持つ。',
+ '[{"type":"deathtouch"},{"type":"menace"}]', 900),
+
+('巨大化',     'instant',  'green', '{G}',    null, null,
+ 'クリーチャー1体を対象とし、ターン終了時までそれは+3/+3の修整を受ける。',
+ '[]', 600),
+
+('神聖なる壁', 'creature', 'white', '{1}{W}', 0, 6,
+ '防衛を持つ。',
+ '[{"type":"defender"}]', 700)
+ON CONFLICT (name) DO NOTHING;
+
 -- トリガーを再有効化
 ALTER TABLE cards ENABLE TRIGGER USER;
