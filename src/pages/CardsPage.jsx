@@ -243,12 +243,15 @@ export default function CardsPage() {
       await new Promise(r => setTimeout(r, 150))
       const artUrl = await fetchScryfallArt(card.name)
       if (artUrl) {
-        await supabase.from('cards').update({ art_url: artUrl }).eq('id', card.id)
-        updated++
-        setBulkStatus(s => ({ ...s, updated, log: [...s.log, `✅ ${card.name}`] }))
+        const { error: updateErr } = await supabase.from('cards').update({ art_url: artUrl }).eq('id', card.id)
+        if (updateErr) {
+          setBulkStatus(s => ({ ...s, log: [...s.log, `⚠️ ${card.name}: ${updateErr.message}`] }))
+        } else {
+          updated++
+          setBulkStatus(s => ({ ...s, updated, log: [...s.log, `✅ ${card.name}`] }))
+        }
       } else {
         notFound++
-        setBulkStatus(s => ({ ...s, notFound, log: [...s.log, `❌ ${card.name}`] }))
       }
     }
     setBulkStatus(s => ({ ...s, running: false, log: [...s.log, `完了: ${updated}枚更新, ${notFound}枚未登録`] }))
