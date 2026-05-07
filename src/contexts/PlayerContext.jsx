@@ -32,7 +32,7 @@ async function ensureStarterDecks(playerId) {
   const nameToId = {}
   for (const row of cardRows) nameToId[row.name] = row.id
 
-  // 既存デッキを名前で取得
+  // 既存デッキを名前で取得（重複があれば古い方を削除）
   const { data: existingDecks } = await supabase
     .from('decks')
     .select('id, name')
@@ -40,6 +40,10 @@ async function ensureStarterDecks(playerId) {
     .in('name', STARTER_DECKS.map(d => d.name))
   const existingByName = {}
   for (const d of (existingDecks || [])) {
+    if (existingByName[d.name]) {
+      // 重複 → 古い方（先に登録された方）を削除
+      await supabase.from('decks').delete().eq('id', existingByName[d.name])
+    }
     existingByName[d.name] = d.id
   }
 

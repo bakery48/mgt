@@ -61,11 +61,18 @@ export default function DecksPage() {
 
   const getDeckCount = (deck) => deck.total_cards || 0
 
-  const getValidityColor = (count) => {
+  const getMinCount = (deck) => {
+    if (deck.format === 'magic_league') return 30
+    if (deck.format === 'limited') return 40
+    return 60
+  }
+
+  const getValidityColor = (deck) => {
+    const count = getDeckCount(deck)
+    const min = getMinCount(deck)
     if (count === 0) return 'text-gray-500'
-    if (count < 40) return 'text-red-400'
-    if (count <= 60) return 'text-green-400'
-    return 'text-red-400'
+    if (count < min) return 'text-red-400'
+    return 'text-green-400'
   }
 
   return (
@@ -144,13 +151,13 @@ export default function DecksPage() {
                   </button>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className={`text-2xl font-bold font-mono ${getValidityColor(count)}`}>
+                  <span className={`text-2xl font-bold font-mono ${getValidityColor(deck)}`}>
                     {count}
                   </span>
                   <span className="text-gray-500 text-sm">枚</span>
                 </div>
-                <p className={`text-xs mt-1 ${getValidityColor(count)}`}>
-                  {count === 0 ? 'カード未追加' : count < 40 ? `あと${40 - count}枚必要` : count <= 60 ? '有効' : '枚数オーバー'}
+                <p className={`text-xs mt-1 ${getValidityColor(deck)}`}>
+                  {count === 0 ? 'カード未追加' : count < getMinCount(deck) ? `あと${getMinCount(deck) - count}枚必要` : '有効'}
                 </p>
               </div>
             )
