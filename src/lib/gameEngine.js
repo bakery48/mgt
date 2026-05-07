@@ -1503,7 +1503,7 @@ export const SPELL_EFFECT_TYPES = [
   'draw_cards', 'gain_life', 'deal_damage', 'deal_damage_all',
   'destroy_creature', 'destroy_permanent',
   'bounce_creature', 'bounce_permanent', 'bounce_all_attackers',
-  'pump_creature', 'reanimate', 'counter_spell',
+  'pump_creature', 'reanimate', 'counter_spell', 'draw_then_discard',
 ]
 
 const TARGETED_EFFECTS = [
@@ -1724,6 +1724,18 @@ function applySpellEffect(state, controllerId, effect, target, kicked, cardData)
           spell_name: entryCard.name,
         },
       }, `${entryCard.name} を対象に波の消去。${affectedPlayer} は${unlessPay}を支払うか選択`)
+    }
+
+    case 'draw_then_discard': {
+      const count = effect.value ?? 1
+      const ps = state.players[controllerId]
+      const drawn = ps.library.slice(0, count)
+      const s = log({
+        ...state,
+        players: { ...state.players, [controllerId]: { ...ps, hand: [...ps.hand, ...drawn], library: ps.library.slice(count) } },
+        cleanup_discard: (state.cleanup_discard || 0) + count,
+      }, `カードを${count}枚引き、その後${count}枚捨てる`)
+      return s
     }
 
     default:

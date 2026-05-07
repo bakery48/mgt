@@ -166,8 +166,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 青インスタント ───────────────────────────────────────────
 ('論破',             'instant',  'blue', '{1}{U}{U}',   null, null,
- '呪文1つを対象とし、それを打ち消す。カードを1枚引き、その後カードを1枚捨てる。（打ち消し/ドロー効果は現在未実装）',
- '[]', 500),
+ '呪文1つを対象とし、それを打ち消す。カードを1枚引き、その後カードを1枚捨てる。',
+ '[{"type":"counter_spell"},{"type":"draw_then_discard","value":1}]', 500),
 
 ('熟慮',             'instant',  'blue', '{1}{U}',       null, null,
  'カードを1枚引く。フラッシュバック（2）（青）',
@@ -783,3 +783,4 @@ UPDATE cards SET effect_text='瞬速を持つ。戦場に出たとき、対戦�
 ALTER TABLE cards ENABLE TRIGGER USER;
 
 UPDATE cards SET effect_text='呪文1つを対象とし、そのコントローラーが{3}を支払わないかぎり、それを打ち消す。', keywords='[{"type":"counter_spell","unless_pay":"{3}"}]'::jsonb WHERE name='波の消去';
+UPDATE cards SET effect_text='呪文1つを対象とし、それを打ち消す。カードを1枚引き、その後カードを1枚捨てる。', keywords='[{"type":"counter_spell"},{"type":"draw_then_discard","value":1}]'::jsonb WHERE name='論破';
