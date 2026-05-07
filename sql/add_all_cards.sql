@@ -248,8 +248,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"etb_trigger","effect":"minus_all_opp_creatures_eot","power":-2,"toughness":-2}]', 2000),
 
 ('税血の徴収者',       'creature', 'black', '{4}{B}',       3, 4,
- '飛行を持つ。税血の徴収者が戦場に出たとき、このターンに対戦相手がライフを失っていた場合、各対戦相手はカードを1枚捨てる。（ETB効果は現在未実装）',
- '[{"type":"flying"}]', 800),
+ '飛行を持つ。税血の徴収者が戦場に出たとき、このターンに対戦相手がライフを失っていた場合、各対戦相手はカードを1枚捨てる。',
+ '[{"type":"flying"},{"type":"etb_trigger","condition":"opp_lost_life","effect":"opponent_discard","count":1}]', 800),
 
 ('マラキールの門番',   'creature', 'black', '{B}{B}',       2, 2,
  'キッカー（黒）。マラキールの門番が戦場に出たとき、それがキッカーされていた場合、プレイヤー1人を対象とする。そのプレイヤーはクリーチャーを1体生け贄に捧げる。（キッカー/ETB効果は現在未実装）',
@@ -793,3 +793,4 @@ UPDATE cards SET effect_text='あなたのエンドステップの開始時に�
 UPDATE cards SET effect_text='あなたがコントロールする攻撃している吸血鬼はすべて接死と絆魂を持つ。あなたがコントロールする吸血鬼1体が死亡するたび、あなたは2点のライフを支払ってもよい。そうしたなら、カードを1枚引く。', keywords='[{"type":"subtype_vampire"},{"type":"lord_effect","subtype":"vampire","condition":"attacking","grant_keywords":["deathtouch","lifelink"]},{"type":"death_trigger","subtype":"vampire","effect":"pay_life_draw","life_cost":2,"draw":1}]'::jsonb WHERE name='交叉路の騒動屋';
 UPDATE cards SET effect_text='このクリーチャーか他の吸血鬼があなたのコントロール下で墓地に置かれるたび、あなたは{B}を支払ってもよい。そうしたなら、対戦相手1人は2点のライフを失い、あなたは2点のライフを得る。', keywords='[{"type":"subtype_vampire"},{"type":"death_trigger","subtype":"vampire","effect":"pay_mana_drain","cost":"{B}","damage":2,"gain":2}]'::jsonb WHERE name='カラストリアの貴人';
 UPDATE cards SET effect_text='このクリーチャーか他のクリーチャーがあなたのコントロール下で死亡するたび、対戦相手1人は1点のライフを失い、あなたは1点のライフを得る。', keywords='[{"type":"death_trigger","effect":"auto_drain","damage":1,"gain":1}]'::jsonb WHERE name='復讐に燃えた血術師';
+UPDATE cards SET effect_text='飛行を持つ。税血の徴収者が戦場に出たとき、このターンに対戦相手がライフを失っていた場合、各対戦相手はカードを1枚捨てる。', keywords='[{"type":"flying"},{"type":"etb_trigger","condition":"opp_lost_life","effect":"opponent_discard","count":1}]'::jsonb WHERE name='\''税血の徴収者'\'';

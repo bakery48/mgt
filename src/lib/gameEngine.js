@@ -541,6 +541,20 @@ function applyEtbTriggers(state, pid, card, cardData) {
     if (kw.effect === 'pending_return_hand_from_gy') {
       s = { ...s, pending_etb_return_hand: { pid, cardName: card.name, restriction: kw.restriction ?? 'any' } }
     }
+    // 対戦相手ライフロス条件ETB（税血の徴収者など）
+    if (kw.condition === 'opp_lost_life') {
+      const opp = getOpponent(s, pid)
+      const oppCurrentLife = s.players[opp].life
+      const oppStartLife = (s.life_at_turn_start || {})[opp] ?? oppCurrentLife
+      if (oppCurrentLife < oppStartLife) {
+        if (kw.effect === 'opponent_discard') {
+          const count = kw.count ?? 1
+          const existing = s.pending_discard?.pid === opp ? (s.pending_discard.count || 0) : 0
+          s = log({ ...s, pending_discard: { pid: opp, count: existing + count } },
+            `${card.name} ETB → 対戦相手はカードを${count}枚捨てる`)
+        }
+      }
+    }
   }
 
   // ally_etb_trigger: 他のクリーチャーが戦場に出たとき誘発する能力（内陸の聖別者など）
