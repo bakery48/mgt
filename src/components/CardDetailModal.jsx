@@ -51,6 +51,27 @@ const KW_TOOLTIPS = {
 const ORIG_KW = new Set(['拝金', '徴収', '栄光', '簒奪'])
 const TRIGGER_LABELS = { etb: '戦場に出た時', upkeep: 'アップキープ', attack: '攻撃時', damage: 'ダメージ時' }
 
+const SUBTYPE_LABELS = {
+  subtype_vampire: '吸血鬼',
+  subtype_angel: '天使',
+  subtype_dragon: 'ドラゴン',
+  subtype_elf: 'エルフ',
+  subtype_goblin: 'ゴブリン',
+  subtype_zombie: 'ゾンビ',
+  subtype_human: '人間',
+  subtype_knight: '騎士',
+  subtype_wizard: 'ウィザード',
+  subtype_warrior: '戦士',
+  subtype_merfolk: '人魚',
+  subtype_beast: '野獣',
+  subtype_spirit: '精霊',
+}
+
+function getSubtypeLabel(keywords) {
+  const subtypes = (keywords || []).map(kw => SUBTYPE_LABELS[kw.type]).filter(Boolean)
+  return subtypes.length ? subtypes.join('・') : null
+}
+
 function kwLabel(kw) {
   if (ORIG_KW.has(kw.type)) {
     return `${kw.type} ${kw.value ?? ''}G（${TRIGGER_LABELS[kw.trigger] ?? kw.trigger}）`
@@ -126,6 +147,7 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
           <div className="flex items-center gap-2 mb-3 flex-wrap">
             <span className="text-gray-300 text-sm">
               {TYPE_LABELS[card.card_type] || card.card_type}
+              {getSubtypeLabel(keywords) && <span className="text-gray-400"> — {getSubtypeLabel(keywords)}</span>}
             </span>
             <span className="text-gray-600">·</span>
             <span className="text-gray-400 text-sm">{COLOR_LABELS[card.color] || card.color}</span>

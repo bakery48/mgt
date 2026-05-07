@@ -13,6 +13,29 @@ const TYPE_LABELS = {
   land: '土地',
 }
 
+const SUBTYPE_LABELS = {
+  subtype_vampire: '吸血鬼',
+  subtype_angel: '天使',
+  subtype_dragon: 'ドラゴン',
+  subtype_elf: 'エルフ',
+  subtype_goblin: 'ゴブリン',
+  subtype_zombie: 'ゾンビ',
+  subtype_human: '人間',
+  subtype_knight: '騎士',
+  subtype_wizard: 'ウィザード',
+  subtype_warrior: '戦士',
+  subtype_merfolk: '人魚',
+  subtype_beast: '野獣',
+  subtype_spirit: '精霊',
+}
+
+function getSubtypeLabel(keywords) {
+  const subtypes = (keywords || [])
+    .map(kw => SUBTYPE_LABELS[kw.type])
+    .filter(Boolean)
+  return subtypes.length ? subtypes.join('・') : null
+}
+
 const COLOR_LABELS = {
   white: '白', blue: '青', black: '黒', red: '赤', green: '緑', colorless: '無色', multicolor: '多色',
 }
@@ -124,6 +147,7 @@ function CardItem({ card, onClick }) {
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <span className={`text-xs px-2 py-0.5 rounded border ${TYPE_BADGE[card.card_type] || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
             {TYPE_LABELS[card.card_type] || card.card_type}
+            {getSubtypeLabel(card.keywords) && ` — ${getSubtypeLabel(card.keywords)}`}
           </span>
           {card.mana_cost && (
             <span className="text-xs text-gray-400 font-mono">{card.mana_cost}</span>
