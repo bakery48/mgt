@@ -1180,6 +1180,9 @@ export function getEffectiveKeywords(perm, card, alliedBattlefield, cardData) {
       })
       if (hasDragon) base.push(kw.grant)
     }
+    if (kw.condition === 'self_attacking' && perm.attacking) {
+      base.push(kw.grant)
+    }
   }
 
   // lord_effect: 他の味方クリーチャーへのキーワード付与

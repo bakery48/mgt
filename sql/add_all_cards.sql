@@ -117,8 +117,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 青クリーチャー ───────────────────────────────────────────
 ('帆凧の海賊',       'creature', 'blue', '{1}{U}',       2, 1,
- '帆凧の海賊が攻撃しているかぎり、これは飛行を持つ。（攻撃時飛行は現在未実装）',
- '[]', 400),
+ '帆凧の海賊が攻撃しているかぎり、これは飛行を持つ。',
+ '[{"type":"conditional_keyword","condition":"self_attacking","grant":"flying"}]', 400),
 
 ('幽体の船乗り',     'creature', 'blue', '{U}',           1, 1,
  '瞬速、飛行を持つ。（４）（青）：カードを１枚引く。（起動型能力は現在未実装）',
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の帆凧の海賊を更新（攻撃時飛行実装）
+UPDATE cards SET
+  effect_text = '帆凧の海賊が攻撃しているかぎり、これは飛行を持つ。',
+  keywords = '[{"type":"conditional_keyword","condition":"self_attacking","grant":"flying"}]'::jsonb
+WHERE name = '帆凧の海賊';
 
 -- 既存行の謎めいた洞窟を更新（起動型能力実装）
 UPDATE cards SET
