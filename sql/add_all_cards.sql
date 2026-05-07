@@ -49,8 +49,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"lifelink"},{"type":"etb_trigger","effect":"gain_life","value":1},{"type":"etb_trigger","effect":"draw_cards","value":1}]', 700),
 
 ('オドリックの十字軍','creature', 'white', '{2}{W}',    2, 2,
- '警戒を持つ。このクリーチャーのパワーとタフネスはそれぞれあなたがコントロールするクリーチャーの数に等しい。（動的P/Tは現在未実装）',
- '[{"type":"vigilance"}]', 700),
+ '警戒を持つ。このクリーチャーのパワーとタフネスはそれぞれあなたがコントロールするクリーチャーの数に等しい。',
+ '[{"type":"vigilance"},{"type":"pt_equals_count","effect":"creatures_controlled"}]', 700),
 
 ('絢爛たる天使',     'creature', 'white', '{2}{W}',    2, 3,
  '飛行を持つ。他のクリーチャーが自分のコントロール下で戦場に出るたび、ライフを1点得る。（誘発型能力は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行のオドリックの十字軍を更新（動的P/T追加）
+UPDATE cards SET
+  effect_text = '警戒を持つ。このクリーチャーのパワーとタフネスはそれぞれあなたがコントロールするクリーチャーの数に等しい。',
+  keywords = '[{"type":"vigilance"},{"type":"pt_equals_count","effect":"creatures_controlled"}]'::jsonb
+WHERE name = 'オドリックの十字軍';
 
 -- 既存行の聖戦士の奇襲兵を更新（起動型能力追加）
 UPDATE cards SET

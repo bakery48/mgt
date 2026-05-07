@@ -903,6 +903,18 @@ export function checkStateBasedActions(state) {
 export function getEffectivePT(perm, card, battlefield, cardData) {
   let power = perm.power ?? card?.power ?? 0
   let toughness = perm.toughness ?? card?.toughness ?? 1
+
+  // pt_equals_count：P/T をコントロールするクリーチャー数に置き換え
+  const ptCount = (card?.keywords || []).find(k => k.type === 'pt_equals_count')
+  if (ptCount?.effect === 'creatures_controlled') {
+    const count = battlefield.filter(p => {
+      const c = cardData[p.card_id] || {}
+      return c.card_type === 'creature'
+    }).length
+    power = count
+    toughness = count
+  }
+
   // +1/+1 カウンター
   const p1p1 = perm.counters?.p1p1 ?? 0
   power += p1p1
