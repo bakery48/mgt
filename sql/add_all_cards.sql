@@ -53,8 +53,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"vigilance"},{"type":"pt_equals_count","effect":"creatures_controlled"}]', 700),
 
 ('絢爛たる天使',     'creature', 'white', '{2}{W}',    2, 3,
- '飛行を持つ。他のクリーチャーが自分のコントロール下で戦場に出るたび、ライフを1点得る。（誘発型能力は現在未実装）',
- '[{"type":"flying"}]', 700),
+ '飛行を持つ。他のクリーチャーが自分のコントロール下で戦場に出るたび、ライフを1点得る。',
+ '[{"type":"flying"},{"type":"subtype_angel"},{"type":"ally_etb_trigger","condition":"other_creature","effect":"gain_life","value":1}]', 700),
 
 ('セラの天使',       'creature', 'white', '{3}{W}{W}', 4, 4,
  '飛行、警戒を持つ。',
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の絢爛たる天使を更新（他クリーチャーETB誘発実装）
+UPDATE cards SET
+  effect_text = '飛行を持つ。他のクリーチャーが自分のコントロール下で戦場に出るたび、ライフを1点得る。',
+  keywords = '[{"type":"flying"},{"type":"subtype_angel"},{"type":"ally_etb_trigger","condition":"other_creature","effect":"gain_life","value":1}]'::jsonb
+WHERE name = '絢爛たる天使';
 
 -- 既存行の内陸の聖別者を更新（他クリーチャーETB誘発実装）
 UPDATE cards SET
