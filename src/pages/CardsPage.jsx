@@ -243,9 +243,12 @@ export default function CardsPage() {
       await new Promise(r => setTimeout(r, 150))
       const artUrl = await fetchScryfallArt(card.name)
       if (artUrl) {
-        const { error: updateErr } = await supabase.from('cards').update({ art_url: artUrl }).eq('id', card.id)
+        const { data: updateData, error: updateErr } = await supabase
+          .from('cards').update({ art_url: artUrl }).eq('id', card.id).select('id')
         if (updateErr) {
           setBulkStatus(s => ({ ...s, log: [...s.log, `⚠️ ${card.name}: ${updateErr.message}`] }))
+        } else if (!updateData || updateData.length === 0) {
+          setBulkStatus(s => ({ ...s, log: [...s.log, `🔒 ${card.name}: RLSでブロック（権限なし）`] }))
         } else {
           updated++
           setBulkStatus(s => ({ ...s, updated, log: [...s.log, `✅ ${card.name}`] }))
