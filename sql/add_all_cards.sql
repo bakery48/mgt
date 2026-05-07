@@ -899,3 +899,60 @@ UPDATE cards SET keywords = keywords || '[{"type":"subtype_ninja"}]'::jsonb WHER
 UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"},{"type":"subtype_warrior"}]'::jsonb WHERE name IN ('二段攻撃の戦士', '黒赤の略奪者') AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
 -- 多色・追加: 人間
 UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"}]'::jsonb WHERE name IN ('緑白の守護者', '青緑の探求者') AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+
+-- ─── サブタイプ修正（正確なMTGクリーチャータイプに更新）───────────────
+-- strip & re-add 方式：全subtype_*を削除して正しいものを付け直す
+
+-- 白
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_cat"},{"type":"subtype_soldier"}]'::jsonb WHERE name = 'アジャニの群れ仲間';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_soldier"}]'::jsonb WHERE name = '司教の兵士';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_soldier"}]'::jsonb WHERE name = '聖戦士の奇襲兵';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_soldier"}]'::jsonb WHERE name = '不屈の古参兵';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_angel"},{"type":"subtype_cleric"}]'::jsonb WHERE name = '鼓舞する監視者';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_soldier"}]'::jsonb WHERE name = 'オドリックの十字軍';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_angel"}]'::jsonb WHERE name = '光の模範';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_noble"}]'::jsonb WHERE name = '不動の女王、リンデン';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_rabbit"},{"type":"subtype_cleric"}]'::jsonb WHERE name = '内陸の聖別者';
+
+-- 青
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_pirate"}]'::jsonb WHERE name = '帆凧の海賊';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_spirit"},{"type":"subtype_pirate"}]'::jsonb WHERE name = '幽体の船乗り';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_elemental"}]'::jsonb WHERE name = '氷嵐の精霊';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_pirate"}]'::jsonb WHERE name = '風雲艦隊のスパイ';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_shark"},{"type":"subtype_pirate"}]'::jsonb WHERE name = '大ヒレの用心棒';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_wall"}]'::jsonb WHERE name = 'ルーン封じの壁';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_faerie"},{"type":"subtype_rogue"}]'::jsonb WHERE name = '嘲笑するスプライト';
+
+-- 黒
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_scout"}]'::jsonb WHERE name = '吸血鬼の侵入者';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_skeleton"},{"type":"subtype_pirate"}]'::jsonb WHERE name = '腑抜けの略奪者';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_rogue"}]'::jsonb WHERE name = '流城の血泥棒';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_warlock"}]'::jsonb WHERE name = '吸血鬼の魂呼び';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_shaman"}]'::jsonb WHERE name = '吸血鬼の夜鷲';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_shaman"}]'::jsonb WHERE name = 'カラストリアの貴人';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_warlock"}]'::jsonb WHERE name = '復讐に燃えた血術師';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_phyrexian"},{"type":"subtype_worm"}]'::jsonb WHERE name = '虐殺のワーム';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_noble"}]'::jsonb WHERE name = '税血の徴収者';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_warrior"}]'::jsonb WHERE name = 'マラキールの門番';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_warlock"}]'::jsonb WHERE name = '血なまぐさい吸血者';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_vampire"},{"type":"subtype_rogue"}]'::jsonb WHERE name = '鼓動の追跡者';
+
+-- 赤
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_warrior"}]'::jsonb WHERE name = 'カルガの竜騎兵';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_lizard"}]'::jsonb WHERE name = '火吹きラガーク';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_goblin"},{"type":"subtype_shaman"}]'::jsonb WHERE name = '龍王の召使い';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_dwarf"},{"type":"subtype_berserker"}]'::jsonb WHERE name = 'アクスガルドの騎兵';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_elder"},{"type":"subtype_dinosaur"}]'::jsonb WHERE name = '原初の嵐、エターリ';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_goblin"},{"type":"subtype_pirate"}]'::jsonb WHERE name = '狂信的扇動者';
+
+-- 緑
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_dinosaur"}]'::jsonb WHERE name = '打ち壊すブロントドン';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"}]'::jsonb WHERE name = '温厚な司書';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_cat"},{"type":"subtype_druid"}]'::jsonb WHERE name = '用心深い演劇役者';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_treefolk"}]'::jsonb WHERE name = 'マグニゴスの歩哨';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_elf"},{"type":"subtype_druid"}]'::jsonb WHERE name = '春花のドルイド';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_elf"},{"type":"subtype_druid"}]'::jsonb WHERE name = 'エルフの再生家';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_elf"},{"type":"subtype_shaman"}]'::jsonb WHERE name = '野心の発動者';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_elf"},{"type":"subtype_archer"}]'::jsonb WHERE name = 'ソーンウィールドの射手';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_snake"},{"type":"subtype_cleric"}]'::jsonb WHERE name = '生類の侍臣';
+UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_warrior"}]'::jsonb WHERE name = '狩猟の統率者、スーラク';
