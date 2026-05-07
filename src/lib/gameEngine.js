@@ -434,8 +434,7 @@ function applyEtbTriggers(state, pid, card, cardData) {
       const drawn = ps.library.slice(0, count)
       s = { ...s, players: { ...s.players, [pid]: { ...ps, hand: [...ps.hand, ...drawn], library: ps.library.slice(count) } } }
       s = log(s, `${card.name} ETB → カードを${count}枚引いた`)
-      // cleanup_discard と同様の仕組みで手札捨てを要求
-      s = { ...s, cleanup_discard: (s.cleanup_discard || 0) + count }
+      s = { ...s, pending_discard: { pid, count: (s.pending_discard?.count || 0) + count } }
     }
     // 各対戦相手がライフを失い、自分がライフを得る（吸血鬼の落とし子など）
     if (kw.effect === 'drain_each_opp') {
@@ -1219,6 +1218,21 @@ export function discardCard(state, pid, cardId) {
   return log(s, `手札を1枚捨てた（残り捨て枚数: ${remaining}）`)
 }
 
+// 即時捨て（draw_then_discard 解決時など）
+export function resolvePendingDiscard(state, pid, cardId) {
+  const pd = state.pending_discard
+  if (!pd || pd.pid !== pid || pd.count <= 0) return state
+  const ps = state.players[pid]
+  if (!(ps.hand || []).includes(cardId)) return state
+  const newHand = removeOne(ps.hand, cardId)
+  const remaining = pd.count - 1
+  return log({
+    ...state,
+    pending_discard: remaining > 0 ? { pid, count: remaining } : null,
+    players: { ...state.players, [pid]: { ...ps, hand: newHand, graveyard: [...ps.graveyard, cardId] } },
+  }, `カードを1枚捨てた`)
+}
+
 // 状況起因処理（ライフ0チェック等）
 export function checkStateBasedActions(state) {
   return state
@@ -1730,12 +1744,11 @@ function applySpellEffect(state, controllerId, effect, target, kicked, cardData)
       const count = effect.value ?? 1
       const ps = state.players[controllerId]
       const drawn = ps.library.slice(0, count)
-      const s = log({
+      return log({
         ...state,
         players: { ...state.players, [controllerId]: { ...ps, hand: [...ps.hand, ...drawn], library: ps.library.slice(count) } },
-        cleanup_discard: (state.cleanup_discard || 0) + count,
+        pending_discard: { pid: controllerId, count: (state.pending_discard?.count || 0) + count },
       }, `カードを${count}枚引き、その後${count}枚捨てる`)
-      return s
     }
 
     default:

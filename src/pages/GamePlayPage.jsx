@@ -11,7 +11,7 @@ import {
   castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
   discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
   activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor,
-  resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand, respondToCounter,
+  resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand, respondToCounter, resolvePendingDiscard,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -1318,6 +1318,36 @@ export default function GamePlayPage() {
           )}
         </div>
       </div>
+
+      {/* ─── 即時捨てモーダル（draw_then_discard 解決時）─── */}
+      {gs.pending_discard?.pid === myId && gs.pending_discard.count > 0 && (
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 pb-4">
+          <div className="bg-gray-800 border border-blue-500 rounded-xl p-4 w-full max-w-2xl mx-4">
+            <p className="text-blue-300 font-bold text-center mb-3">
+              カードを {gs.pending_discard.count} 枚捨ててください
+            </p>
+            <div className="flex gap-2 overflow-x-auto justify-center pb-1">
+              {(myPs?.hand || []).map(cardId => {
+                const card = cardData[cardId]
+                return (
+                  <button
+                    key={cardId}
+                    onClick={() => {
+                      const newGs = resolvePendingDiscard(gs, myId, cardId)
+                      if (newGs !== gs) dispatch(newGs)
+                    }}
+                    className={`shrink-0 w-20 h-28 rounded-lg p-1.5 border-2 border-blue-400 hover:border-blue-200 text-left text-xs flex flex-col ${COLOR_BG[card?.color] || 'bg-gray-700 text-white'}`}
+                  >
+                    {card?.art_url && <img src={card.art_url} alt="" className="w-full h-12 object-cover rounded mb-1" />}
+                    <p className="font-bold leading-tight line-clamp-2">{card?.name || '?'}</p>
+                    <p className="text-xs opacity-70 mt-auto">{card?.mana_cost || ''}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── 手札整理モーダル（クリーンアップ時 手札>7枚）─── */}
       {(gs.cleanup_discard ?? 0) > 0 && isActive && (
