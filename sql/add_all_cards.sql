@@ -10,7 +10,7 @@ DO $$BEGIN
     SELECT DISTINCT ON (name) id FROM cards ORDER BY name
   );
   ALTER TABLE cards ADD CONSTRAINT cards_name_key UNIQUE (name);
-EXCEPTION WHEN duplicate_object THEN NULL;
+EXCEPTION WHEN duplicate_object OR duplicate_table THEN NULL;
 END $$;
 
 INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price) VALUES
