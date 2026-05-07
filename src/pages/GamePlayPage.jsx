@@ -33,8 +33,8 @@ const KEYWORD_LABELS = {
 }
 // バッジ非表示の内部用キーワードタイプ
 const INTERNAL_KEYWORD_TYPES = new Set([
-  'subtype_dragon', 'on_cast_trigger', 'conditional_keyword',
-  'protection', 'spell_effect', // 効果系は effect_text で説明
+  'subtype_dragon', 'subtype_angel', 'on_cast_trigger', 'conditional_keyword',
+  'protection', 'spell_effect', 'lord_effect', // 効果系は effect_text で説明
 ])
 
 const COLOR_BG = {

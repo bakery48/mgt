@@ -69,8 +69,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"gain_life_trigger","effect":"counter_p1p1","value":1},{"type":"on_counter_trigger","effect":"draw_cards","value":1}]', 1100),
 
 ('黎明をもたらす者ライラ', 'creature', 'white', '{3}{W}{W}', 5, 5,
- '伝説のクリーチャー。飛行、先制攻撃、絆魂を持つ。あなたのコントロールする他の天使は＋１/＋１の修整を受けるとともに絆魂を持つ。（ロード効果は現在未実装）',
- '[{"type":"flying"},{"type":"first_strike"},{"type":"lifelink"}]', 2500),
+ '伝説のクリーチャー。飛行、先制攻撃、絆魂を持つ。あなたのコントロールする他の天使は＋１/＋１の修整を受けるとともに絆魂を持つ。',
+ '[{"type":"flying"},{"type":"first_strike"},{"type":"lifelink"},{"type":"subtype_angel"},{"type":"lord_effect","subtype":"angel","power_bonus":1,"toughness_bonus":1,"grant_keywords":["lifelink"]}]', 2500),
 
 ('不動の女王、リンデン', 'creature', 'white', '{W}{W}{W}', 3, 3,
  '伝説のクリーチャー。警戒、絆魂を持つ。あなたのコントロールする白のクリーチャーが攻撃するたび、ライフを1点得る。（攻撃誘発は現在未実装）',
@@ -701,5 +701,11 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の黎明をもたらす者ライラを更新（ロード効果実装）
+UPDATE cards SET
+  effect_text = '伝説のクリーチャー。飛行、先制攻撃、絆魂を持つ。あなたのコントロールする他の天使は＋１/＋１の修整を受けるとともに絆魂を持つ。',
+  keywords = '[{"type":"flying"},{"type":"first_strike"},{"type":"lifelink"},{"type":"subtype_angel"},{"type":"lord_effect","subtype":"angel","power_bonus":1,"toughness_bonus":1,"grant_keywords":["lifelink"]}]'::jsonb
+WHERE name = '黎明をもたらす者ライラ';
 
 ALTER TABLE cards ENABLE TRIGGER USER;

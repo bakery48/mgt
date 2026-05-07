@@ -962,6 +962,21 @@ export function getEffectivePT(perm, card, battlefield, cardData) {
       toughness += (pumpKw.toughness ?? 0) * count
     }
   }
+  // lord_effect: 他の味方クリーチャーへのP/T修整
+  const myCard = card
+  const mySubtypes = (myCard?.keywords || []).filter(k => k.type.startsWith('subtype_')).map(k => k.type)
+  for (const ally of battlefield) {
+    if (ally.instance_id === perm.instance_id) continue
+    const allyCard = cardData[ally.card_id] || {}
+    for (const kw of (allyCard.keywords || [])) {
+      if (kw.type !== 'lord_effect') continue
+      const targetSubtype = 'subtype_' + kw.subtype
+      if (mySubtypes.includes(targetSubtype)) {
+        power += kw.power_bonus ?? 0
+        toughness += kw.toughness_bonus ?? 0
+      }
+    }
+  }
   for (const te of (perm.temp_effects || [])) {
     power += te.power ?? 0
     toughness += te.toughness ?? 0
@@ -982,6 +997,20 @@ export function getEffectiveKeywords(perm, card, alliedBattlefield, cardData) {
         return (c.keywords || []).some(k => k.type === 'subtype_dragon')
       })
       if (hasDragon) base.push(kw.grant)
+    }
+  }
+
+  // lord_effect: 他の味方クリーチャーへのキーワード付与
+  const mySubtypes2 = (card.keywords || []).filter(k => k.type.startsWith('subtype_')).map(k => k.type)
+  for (const ally of alliedBattlefield) {
+    if (ally.instance_id === perm.instance_id) continue
+    const allyCard = cardData[ally.card_id] || {}
+    for (const kw of (allyCard.keywords || [])) {
+      if (kw.type !== 'lord_effect') continue
+      const targetSubtype = 'subtype_' + kw.subtype
+      if (mySubtypes2.includes(targetSubtype) && kw.grant_keywords) {
+        base.push(...kw.grant_keywords)
+      }
     }
   }
 
