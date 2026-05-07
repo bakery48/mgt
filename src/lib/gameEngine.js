@@ -1418,6 +1418,51 @@ export function equipArtifact(state, pid, equipIid, targetIid, cardData) {
   }, `${equipCard.name} を装備（${targetCard.name}）`)
 }
 
+export function hasAdditionalCost(card) {
+  return (card?.keywords || []).some(k => k.type === 'additional_cost')
+}
+
+// 追加コスト付きキャスト（踊り食いなど）
+// 生け贄パス：自クリーチャーを生け贄 + 対象を追放
+export function castSpellSacrificeAndExile(state, pid, cardId, card, sacrificeInstanceId, exileTarget, cardData) {
+  if (!canPlaySorcerySpeed(state, pid)) return state
+  const ps = state.players[pid]
+  if (!hasMana(ps.mana_pool, card.mana_cost)) return state
+  const sacrificePerm = ps.battlefield.find(p => p.instance_id === sacrificeInstanceId)
+  if (!sacrificePerm) return state
+  const newPool = spendMana(ps.mana_pool, card.mana_cost)
+  const newBf = ps.battlefield.filter(p => p.instance_id !== sacrificeInstanceId)
+  const newGy = [...ps.graveyard, sacrificePerm.card_id, cardId]
+  let s = log({
+    ...state,
+    players: { ...state.players, [pid]: { ...ps, hand: removeOne(ps.hand, cardId), battlefield: newBf, graveyard: newGy, mana_pool: newPool } },
+  }, `${card.name} 詠唱（生け贄コスト）`)
+  if (exileTarget) {
+    s = applySpellEffect(s, pid, { type: 'exile_creature' }, exileTarget, false, cardData)
+  }
+  return s
+}
+
+// 追加マナパス：{3}{B} 追加支払い + 対象を追放
+export function castSpellPayExtraAndExile(state, pid, cardId, card, extraCost, exileTarget, cardData) {
+  if (!canPlaySorcerySpeed(state, pid)) return state
+  const ps = state.players[pid]
+  const totalCost = card.mana_cost + extraCost // 文字列結合でまとめてチェック
+  if (!hasMana(ps.mana_pool, card.mana_cost)) return state
+  if (!hasMana(ps.mana_pool, extraCost)) return state
+  let newPool = spendMana(ps.mana_pool, card.mana_cost)
+  newPool = spendMana(newPool, extraCost)
+  const newGy = [...ps.graveyard, cardId]
+  let s = log({
+    ...state,
+    players: { ...state.players, [pid]: { ...ps, hand: removeOne(ps.hand, cardId), graveyard: newGy, mana_pool: newPool } },
+  }, `${card.name} 詠唱（追加マナ支払い）`)
+  if (exileTarget) {
+    s = applySpellEffect(s, pid, { type: 'exile_creature' }, exileTarget, false, cardData)
+  }
+  return s
+}
+
 // フラッシュバック（墓地から詠唱→追放）
 export function castFlashback(state, pid, cardId, card) {
   const ps = state.players[pid]
@@ -1541,12 +1586,12 @@ export const SPELL_EFFECT_TYPES = [
   'draw_cards', 'gain_life', 'deal_damage', 'deal_damage_all',
   'destroy_creature', 'destroy_permanent',
   'bounce_creature', 'bounce_permanent', 'bounce_all_attackers',
-  'pump_creature', 'reanimate', 'counter_spell', 'draw_then_discard',
+  'pump_creature', 'reanimate', 'counter_spell', 'draw_then_discard', 'exile_creature',
 ]
 
 const TARGETED_EFFECTS = [
   'deal_damage', 'destroy_creature', 'destroy_permanent',
-  'bounce_creature', 'bounce_permanent', 'pump_creature', 'reanimate',
+  'bounce_creature', 'bounce_permanent', 'pump_creature', 'reanimate', 'exile_creature',
 ]
 
 export function spellNeedsTarget(card) {
@@ -1560,6 +1605,7 @@ export function spellNeedsTarget(card) {
 export function getSpellTargetingType(card) {
   for (const kw of (card?.keywords || [])) {
     if (kw.type === 'counter_spell') return 'opp_stack_spell'
+    if (kw.type === 'exile_creature') return 'opp_creature'
     if (kw.type === 'deal_damage') return 'opp_creature_or_player'
     if (kw.type === 'destroy_creature') return 'opp_creature'
     if (kw.type === 'destroy_permanent') return 'any_permanent'
@@ -1707,6 +1753,24 @@ function applySpellEffect(state, controllerId, effect, target, kicked, cardData)
           ...state,
           players: { ...state.players, [pid]: { ...ps, battlefield: newBf } },
         }, `${card.name} は${sign(te.power)}/${sign(te.toughness)}の修整を受けた`)
+      }
+      return state
+    }
+
+    case 'exile_creature': {
+      if (!target || target.type !== 'creature') return state
+      for (const [tPid, tPs] of Object.entries(state.players)) {
+        const perm = tPs.battlefield.find(p => p.instance_id === target.id)
+        if (perm) {
+          const newBf = tPs.battlefield.filter(p => p.instance_id !== target.id)
+          return log({
+            ...state,
+            players: {
+              ...state.players,
+              [tPid]: { ...tPs, battlefield: newBf, exile: [...(tPs.exile || []), perm.card_id] },
+            },
+          }, `${cardData[perm.card_id]?.name ?? 'クリーチャー'} を追放した`)
+        }
       }
       return state
     }

@@ -12,6 +12,7 @@ import {
   discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
   activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor,
   resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand, respondToCounter, resolvePendingDiscard,
+  hasAdditionalCost, castSpellSacrificeAndExile, castSpellPayExtraAndExile,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -232,6 +233,8 @@ export default function GamePlayPage() {
   const [etbBounceOppMode, setEtbBounceOppMode] = useState(false)
   const [etbReturnHandMode, setEtbReturnHandMode] = useState(null)
   const [counterResponseMode, setCounterResponseMode] = useState(null) // pending_counter_response for myId
+  const [additionalCostModal, setAdditionalCostModal] = useState(null) // { cardId, card, extraCost }
+  const [sacrificeForSpellMode, setSacrificeForSpellMode] = useState(null) // { cardId, card } — 生け贄選択中
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -504,6 +507,16 @@ export default function GamePlayPage() {
       return
     }
 
+    // 追加コスト選択が必要な呪文
+    if (hasAdditionalCost(card) && hasPrio) {
+      if (!canPlaySorcerySpeed(gs, myId)) return
+      if (card.mana_cost && !hasMana(myPs.mana_pool, card.mana_cost)) return
+      const addCostKw = (card.keywords || []).find(k => k.type === 'additional_cost')
+      setAdditionalCostModal({ cardId, card, extraCost: addCostKw?.pay_mana ?? '{3}{B}' })
+      setSelectedHandCard(null)
+      return
+    }
+
     // 目標が必要な呪文はターゲットモードに入る
     if (spellNeedsTarget(card) && hasPrio) {
       const isFlash = (card.keywords || []).some(k => k.type === 'flash')
@@ -553,11 +566,18 @@ export default function GamePlayPage() {
   // 目標選択（クリーチャー）
   const handleTargetCreature = (instanceId) => {
     if (!targetingMode) return
-    const { cardId, card, kickerPaid } = targetingMode
+    const { cardId, card, kickerPaid, additionalCostType, sacrificeId, extraCost } = targetingMode
     const target = { type: 'creature', id: instanceId }
-    const newGs = castSpellTargeted(gs, myId, cardId, card, target, kickerPaid, 0, cardData)
+    let newGs
+    if (additionalCostType === 'sacrifice') {
+      newGs = castSpellSacrificeAndExile(gs, myId, cardId, card, sacrificeId, target, cardData)
+    } else if (additionalCostType === 'pay_mana') {
+      newGs = castSpellPayExtraAndExile(gs, myId, cardId, card, extraCost, target, cardData)
+    } else {
+      newGs = castSpellTargeted(gs, myId, cardId, card, target, kickerPaid, 0, cardData)
+    }
     if (newGs !== gs) dispatch(newGs)
-    else setTargetingMode(null)
+    setTargetingMode(null)
   }
 
   // 目標選択（プレイヤー）
@@ -955,9 +975,16 @@ export default function GamePlayPage() {
                           toughness: effPT?.toughness ?? perm.toughness,
                         }}
                         effectiveKwTypes={effKws}
-                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip)}
+                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea)}
                         dimmed={inAttackPhase && !canAtt && !isSelAtt}
                         onClick={() => {
+                          if (sacrificeForSpellMode && isCrea) {
+                            // 生け贄選択 → 対戦相手クリーチャーのターゲット選択へ
+                            const { cardId: sfCardId, card: sfCard, extraCost } = sacrificeForSpellMode
+                            setTargetingMode({ cardId: sfCardId, card: sfCard, targetingType: 'opp_creature', additionalCostType: 'sacrifice', sacrificeId: perm.instance_id, extraCost })
+                            setSacrificeForSpellMode(null)
+                            return
+                          }
                           if (targetingMode?.targetingType === 'own_creature' && isCrea) handleTargetCreature(perm.instance_id)
                           else if (targetingMode?.targetingType === 'any_creature' && isCrea) handleTargetCreature(perm.instance_id)
                           else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
@@ -1555,6 +1582,53 @@ export default function GamePlayPage() {
             : false
         }
       />
+
+      {/* ─── 追加コスト選択モーダル（踊り食いなど）─── */}
+      {additionalCostModal && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-purple-600 rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+            <p className="text-purple-300 font-bold text-center text-lg mb-1">{additionalCostModal.card?.name}</p>
+            <p className="text-gray-400 text-sm text-center mb-5">追加コストを選択してください</p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setSacrificeForSpellMode({ cardId: additionalCostModal.cardId, card: additionalCostModal.card, extraCost: additionalCostModal.extraCost })
+                  setAdditionalCostModal(null)
+                }}
+                className="w-full py-3 rounded-lg font-bold bg-red-800 hover:bg-red-700 text-white transition-colors"
+              >
+                自分のクリーチャーを生け贄に捧げる
+              </button>
+              <button
+                onClick={() => {
+                  const { cardId, card, extraCost } = additionalCostModal
+                  if (!hasMana(myPs.mana_pool, extraCost)) return
+                  setTargetingMode({ cardId, card, targetingType: 'opp_creature', additionalCostType: 'pay_mana', extraCost })
+                  setAdditionalCostModal(null)
+                }}
+                disabled={!hasMana(myPs?.mana_pool || {}, additionalCostModal.extraCost)}
+                className="w-full py-3 rounded-lg font-bold bg-blue-800 hover:bg-blue-700 text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {additionalCostModal.extraCost} を支払う
+              </button>
+              <button
+                onClick={() => setAdditionalCostModal(null)}
+                className="w-full py-2 rounded-lg text-gray-400 hover:text-white text-sm transition-colors"
+              >
+                キャンセル
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 生け贄選択ガイドバナー ─── */}
+      {sacrificeForSpellMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 bg-red-900/90 border border-red-500 text-red-200 px-4 py-2 rounded-lg text-sm font-bold shadow-lg">
+          生け贄にするクリーチャーを選択
+          <button onClick={() => setSacrificeForSpellMode(null)} className="ml-3 text-xs opacity-70 hover:opacity-100">✕</button>
+        </div>
+      )}
 
       {/* ─── カウンター呪文への応答モーダル ─── */}
       {counterResponseMode && (
