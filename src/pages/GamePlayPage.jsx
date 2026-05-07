@@ -14,6 +14,7 @@ import {
   resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand, respondToCounter, resolvePendingDiscard,
   hasAdditionalCost, castSpellSacrificeAndExile, castSpellPayExtraAndExile,
   resolveReturnFromGy, finishReturnFromGy, resolveRaidLook,
+  resolveAttackSacrifice, declineAttackSacrifice,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -238,6 +239,7 @@ export default function GamePlayPage() {
   const [sacrificeForSpellMode, setSacrificeForSpellMode] = useState(null) // { cardId, card } — 生け贄選択中
   const [returnFromGyMode, setReturnFromGyMode] = useState(null) // pending_return_from_gy for myId
   const [raidLookMode, setRaidLookMode] = useState(null) // pending_raid_look for myId
+  const [attackSacrificeMode, setAttackSacrificeMode] = useState(null) // pending_attack_sacrifice for myId
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -492,6 +494,12 @@ export default function GamePlayPage() {
     if (gs.pending_raid_look.pid === myId) setRaidLookMode(gs.pending_raid_look)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_raid_look])
+
+  useEffect(() => {
+    if (!gs?.pending_attack_sacrifice) { setAttackSacrificeMode(null); return }
+    if (gs.pending_attack_sacrifice.pid === myId) setAttackSacrificeMode(gs.pending_attack_sacrifice)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_attack_sacrifice])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -990,9 +998,15 @@ export default function GamePlayPage() {
                           toughness: effPT?.toughness ?? perm.toughness,
                         }}
                         effectiveKwTypes={effKws}
-                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea)}
+                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea) || (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode?.attackerInstanceId)}
                         dimmed={inAttackPhase && !canAtt && !isSelAtt}
                         onClick={() => {
+                          if (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode.attackerInstanceId) {
+                            const newGs = resolveAttackSacrifice(gs, myId, perm.instance_id, cardData)
+                            if (newGs !== gs) dispatch(newGs)
+                            setAttackSacrificeMode(null)
+                            return
+                          }
                           if (sacrificeForSpellMode && isCrea) {
                             // 生け贄選択 → 対戦相手クリーチャーのターゲット選択へ
                             const { cardId: sfCardId, card: sfCard, extraCost } = sacrificeForSpellMode
@@ -1711,6 +1725,26 @@ export default function GamePlayPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ─── 攻撃誘発：任意生け贄バナー（吸血鬼の大食家など）─── */}
+      {attackSacrificeMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900 border border-red-500 text-white px-4 py-3 rounded-xl shadow-2xl text-sm flex items-center gap-3 max-w-sm">
+          <div>
+            <p className="font-bold text-red-300">{attackSacrificeMode.cardName} 攻撃誘発</p>
+            <p className="text-gray-400 text-xs">別のクリーチャーを生け贄→カード1枚引き＋ブロックされない</p>
+          </div>
+          <button
+            onClick={() => {
+              const newGs = declineAttackSacrifice(gs, myId)
+              if (newGs !== gs) dispatch(newGs)
+              setAttackSacrificeMode(null)
+            }}
+            className="shrink-0 px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-xs font-bold"
+          >
+            しない
+          </button>
         </div>
       )}
 

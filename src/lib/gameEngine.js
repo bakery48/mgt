@@ -901,7 +901,7 @@ export function advancePhase(state, cardData = {}) {
               (cardData[aura.card_id]?.keywords || []).some(k => k.type === 'prevent_untap')
             )
           )
-          return { ...p, tapped: hasPreventUntap ? p.tapped : false, damage: 0, attacking: false, blocking: null, summoning_sick: false }
+          return { ...p, tapped: hasPreventUntap ? p.tapped : false, damage: 0, attacking: false, blocking: null, summoning_sick: false, unblockable_this_turn: false }
         }),
       },
     }
@@ -1032,6 +1032,11 @@ function applyAttackTriggers(state, attackingPid, attackerIids, cardData) {
           `${card.name} 攻撃誘発 → ライフを${amount}点得た`
         )
         s = applyLifeGainTriggers(s, attackingPid, cardData)
+      }
+
+      // 任意生け贄 → カードを引く ＋ ブロックされない（吸血鬼の大食家など）
+      if (kw.effect === 'optional_sacrifice_draw_unblockable') {
+        s = { ...s, pending_attack_sacrifice: { pid: attackingPid, attackerInstanceId: iid, cardName: card.name } }
       }
 
       if (kw.effect === 'drakuseth_damage') {
@@ -1482,6 +1487,33 @@ export function equipArtifact(state, pid, equipIid, targetIid, cardData) {
   }, `${equipCard.name} を装備（${targetCard.name}）`)
 }
 
+// 攻撃誘発：任意生け贄 → ドロー ＋ ブロックされない
+export function resolveAttackSacrifice(state, pid, sacrificeInstanceId, cardData) {
+  const pas = state.pending_attack_sacrifice
+  if (!pas || pas.pid !== pid) return state
+  const ps = state.players[pid]
+  const sacPerm = ps.battlefield.find(p => p.instance_id === sacrificeInstanceId)
+  if (!sacPerm || sacrificeInstanceId === pas.attackerInstanceId) return state
+  // 生け贄
+  const newBf = ps.battlefield.map(p =>
+    p.instance_id === pas.attackerInstanceId ? { ...p, unblockable_this_turn: true } : p
+  ).filter(p => p.instance_id !== sacrificeInstanceId)
+  const newGy = [...ps.graveyard, sacPerm.card_id]
+  // カードを1枚引く
+  const drawn = ps.library.slice(0, 1)
+  const newLib = ps.library.slice(1)
+  return log({
+    ...state,
+    pending_attack_sacrifice: null,
+    players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy, hand: [...ps.hand, ...drawn], library: newLib } },
+  }, `${pas.cardName} 攻撃誘発 → ${cardData[sacPerm.card_id]?.name} を生け贄、カード1枚引き、ブロックされない`)
+}
+
+export function declineAttackSacrifice(state, pid) {
+  if (!state.pending_attack_sacrifice || state.pending_attack_sacrifice.pid !== pid) return state
+  return { ...state, pending_attack_sacrifice: null }
+}
+
 export function hasAdditionalCost(card) {
   return (card?.keywords || []).some(k => k.type === 'additional_cost')
 }
@@ -1628,6 +1660,8 @@ export function getValidBlockers(state, defId, cardData) {
     const attKws = attCard.keywords || []
     const attKwTypes = getEffectiveKeywords(att, attCard, state.players[ap].battlefield, cardData)
     const attFlying = attKwTypes.includes('flying')
+    // このターンブロックされない（吸血鬼の大食家など）
+    if (att.unblockable_this_turn) { result[att.instance_id] = []; continue }
     // protection from X: attacker cannot be blocked by X-colored creatures
     const attProtection = attKws.find(k => k.type === 'protection')?.value ?? null
 
