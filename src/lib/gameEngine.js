@@ -280,6 +280,65 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
   return applyOnCastTriggers(afterCast, pid, card, cardData)
 }
 
+// パーマネントが戦場に出たとき誘発する ETB 能力を処理する
+function applyEtbTriggers(state, pid, card, cardData) {
+  let s = state
+  for (const kw of (card?.keywords || [])) {
+    if (kw.type !== 'etb_trigger') continue
+    if (kw.effect === 'draw_cards') {
+      const count = kw.value ?? 1
+      const ps = s.players[pid]
+      const drawn = ps.deck.slice(0, count)
+      s = log({
+        ...s,
+        players: {
+          ...s.players,
+          [pid]: { ...ps, hand: [...ps.hand, ...drawn], deck: ps.deck.slice(count) },
+        },
+      }, `${card.name} ETB → カードを${count}枚引いた`)
+    }
+    if (kw.effect === 'gain_life') {
+      const amount = kw.value ?? 1
+      const ps = s.players[pid]
+      s = log(
+        { ...s, players: { ...s.players, [pid]: { ...ps, life: ps.life + amount } } },
+        `${card.name} ETB → ライフを${amount}点得た`
+      )
+      s = applyLifeGainTriggers(s, pid, cardData)
+    }
+    // カードを引いてから1枚捨てる（氷嵐の精霊など）
+    if (kw.effect === 'draw_then_discard') {
+      const count = kw.value ?? 1
+      const ps = s.players[pid]
+      const drawn = ps.deck.slice(0, count)
+      s = { ...s, players: { ...s.players, [pid]: { ...ps, hand: [...ps.hand, ...drawn], deck: ps.deck.slice(count) } } }
+      s = log(s, `${card.name} ETB → カードを${count}枚引いた`)
+      // cleanup_discard と同様の仕組みで手札捨てを要求
+      s = { ...s, cleanup_discard: (s.cleanup_discard || 0) + count }
+    }
+    // 各対戦相手がライフを失い、自分がライフを得る（吸血鬼の落とし子など）
+    if (kw.effect === 'drain_each_opp') {
+      const dmg = kw.damage ?? 2
+      const gain = kw.life ?? 2
+      const opponents = Object.keys(s.players).filter(id => id !== pid)
+      for (const oppId of opponents) {
+        const oppPs = s.players[oppId]
+        s = log(
+          { ...s, players: { ...s.players, [oppId]: { ...oppPs, life: oppPs.life - dmg } } },
+          `${card.name} ETB → 相手${dmg}点ライフ失う`
+        )
+      }
+      const myPs = s.players[pid]
+      s = log(
+        { ...s, players: { ...s.players, [pid]: { ...myPs, life: myPs.life + gain } } },
+        `${card.name} ETB → ライフを${gain}点得た`
+      )
+      s = applyLifeGainTriggers(s, pid, cardData)
+    }
+  }
+  return s
+}
+
 // ライフを得たとき誘発する能力を処理する
 function applyLifeGainTriggers(state, gainerId, cardData) {
   let s = state
@@ -386,6 +445,8 @@ function resolveStack(state, cardData) {
       },
     }
     newState = log(newState, `${card?.name} が戦場に出た${top.kicked ? '（キッカー済）' : ''}${isAura && top.target ? '（エンチャント）' : ''}`)
+    // ETB 誘発能力を処理
+    newState = applyEtbTriggers(newState, top.controller, card, cardData)
   } else {
     // instant/sorcery: 呪文効果を適用
     for (const effect of (card?.keywords || [])) {

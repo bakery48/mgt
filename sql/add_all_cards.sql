@@ -29,8 +29,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"gain_life_trigger","effect":"counter_p1p1","value":1}]', 800),
 
 ('お手伝いする狩人', 'creature', 'white', '{1}{W}',    1, 1,
- '警戒を持つ。お手伝いする狩人が戦場に出たとき、カードを1枚引く。（ETB効果は現在未実装）',
- '[{"type":"vigilance"}]', 500),
+ '警戒を持つ。お手伝いする狩人が戦場に出たとき、カードを1枚引く。',
+ '[{"type":"vigilance"},{"type":"etb_trigger","effect":"draw_cards","value":1}]', 500),
 
 ('司教の兵士',       'creature', 'white', '{1}{W}',    2, 2,
  '絆魂を持つ。',
@@ -45,8 +45,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 700),
 
 ('鼓舞する監視者',   'creature', 'white', '{2}{W}',    2, 1,
- '飛行、絆魂を持つ。鼓舞する監視者が戦場に出たとき、ライフを1点得てカードを1枚引く。（ETB効果は現在未実装）',
- '[{"type":"flying"},{"type":"lifelink"}]', 700),
+ '飛行、絆魂を持つ。鼓舞する監視者が戦場に出たとき、ライフを1点得てカードを1枚引く。',
+ '[{"type":"flying"},{"type":"lifelink"},{"type":"etb_trigger","effect":"gain_life","value":1},{"type":"etb_trigger","effect":"draw_cards","value":1}]', 700),
 
 ('オドリックの十字軍','creature', 'white', '{2}{W}',    2, 2,
  '警戒を持つ。このクリーチャーのパワーとタフネスはそれぞれあなたがコントロールするクリーチャーの数に等しい。（動的P/Tは現在未実装）',
@@ -129,8 +129,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"hexproof"}]', 3000),
 
 ('氷嵐の精霊',       'creature', 'blue', '{4}{U}',       3, 4,
- '飛行を持つ。氷嵐の精霊が戦場に出たとき、カードを１枚引き、その後カードを１枚捨てる。（ETB効果は現在未実装）',
- '[{"type":"flying"}]', 500),
+ '飛行を持つ。氷嵐の精霊が戦場に出たとき、カードを１枚引き、その後カードを１枚捨てる。',
+ '[{"type":"flying"},{"type":"etb_trigger","effect":"draw_then_discard","value":1}]', 500),
 
 ('風雲艦隊のスパイ', 'creature', 'blue', '{2}{U}',       2, 2,
  '強襲 ― 風雲艦隊のスパイが戦場に出たとき、あなたがこのターンに攻撃していた場合、カードを１枚引く。（強襲ETBは現在未実装）',
@@ -240,8 +240,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 700),
 
 ('吸血鬼の落とし子',   'creature', 'black', '{2}{B}',       2, 2,
- '吸血鬼の落とし子が戦場に出たとき、各対戦相手は２点のライフを失い、あなたは２点のライフを得る。（ETB効果は現在未実装）',
- '[]', 600),
+ '吸血鬼の落とし子が戦場に出たとき、各対戦相手は２点のライフを失い、あなたは２点のライフを得る。',
+ '[{"type":"etb_trigger","effect":"drain_each_opp","damage":2,"life":2}]', 600),
 
 ('虐殺のワーム',       'creature', 'black', '{3}{B}{B}{B}', 6, 5,
  '虐殺のワームが戦場に出たとき、ターン終了時まで、対戦相手がコントロールするすべてのクリーチャーは－２/－２の修整を受ける。対戦相手がコントロールするクリーチャー１体が死亡するたび、そのプレイヤーは２点のライフを失う。（ETB/誘発型能力は現在未実装）',
@@ -619,6 +619,16 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行の ETB 実装カードを更新
+UPDATE cards SET effect_text='警戒を持つ。お手伝いする狩人が戦場に出たとき、カードを1枚引く。',
+  keywords='[{"type":"vigilance"},{"type":"etb_trigger","effect":"draw_cards","value":1}]'::jsonb WHERE name='お手伝いする狩人';
+UPDATE cards SET effect_text='飛行、絆魂を持つ。鼓舞する監視者が戦場に出たとき、ライフを1点得てカードを1枚引く。',
+  keywords='[{"type":"flying"},{"type":"lifelink"},{"type":"etb_trigger","effect":"gain_life","value":1},{"type":"etb_trigger","effect":"draw_cards","value":1}]'::jsonb WHERE name='鼓舞する監視者';
+UPDATE cards SET effect_text='飛行を持つ。氷嵐の精霊が戦場に出たとき、カードを１枚引き、その後カードを１枚捨てる。',
+  keywords='[{"type":"flying"},{"type":"etb_trigger","effect":"draw_then_discard","value":1}]'::jsonb WHERE name='氷嵐の精霊';
+UPDATE cards SET effect_text='吸血鬼の落とし子が戦場に出たとき、各対戦相手は２点のライフを失い、あなたは２点のライフを得る。',
+  keywords='[{"type":"etb_trigger","effect":"drain_each_opp","damage":2,"life":2}]'::jsonb WHERE name='吸血鬼の落とし子';
 
 -- 既存行のアジャニの群れ仲間を更新（gain_life_trigger追加）
 UPDATE cards SET
