@@ -90,6 +90,47 @@ function kwLabel(kw) {
   return extras.length ? `${base}（${extras.join('/')}）` : base
 }
 
+// 効果テキスト内のキーワードをツールチップ付きspanにする
+const KW_JP_TOOLTIPS = {
+  'トランプル': 'ブロッカーへの超過ダメージがプレイヤーに通る',
+  'フラッシュバック': '墓地からコストを払って唱えられる（その後追放）',
+  '先制攻撃': '通常クリーチャーより先にダメージを与える',
+  '二段攻撃': '先制攻撃と通常攻撃の両方を行う',
+  '破壊不能': '破壊されない',
+  '飛行': '飛行持ちかリーチ持ちのクリーチャーにしかブロックされない',
+  '速攻': '召喚酔いなし。出たターンから攻撃・能力使用が可能',
+  '警戒': '攻撃してもタップしない',
+  '到達': '飛行クリーチャーをブロックできる',
+  '絆魂': '与えたダメージ分だけライフを得る',
+  '接死': '与えたダメージは致死ダメージとして扱われる',
+  '威迫': '2体以上でしかブロックできない',
+  '防衛': '攻撃できない',
+  '呪禁': '対戦相手の呪文・能力の対象にならない',
+  '被覆': '呪文・能力の対象にならない',
+  '瞬速': 'インスタントのタイミングで唱えられる',
+  '護法': '対戦相手が対象にするには追加コストが必要',
+  'キッカー': '追加コストを払うことで強化効果を得る',
+  '発掘': '墓地からコストを払って戦場に戻す（次の終了ステップに追放）',
+  '探査': '墓地のカードを除外してマナコストを軽減できる',
+  '装備': 'コストを払ってクリーチャーに装備する',
+  '拝金': '指定タイミングにGを獲得する',
+  '徴収': '攻撃するたびに対戦相手からGを奪う',
+  '栄光': 'ダメージを与えるたびVPを獲得する',
+  '簒奪': 'ダメージを与えるたびに対戦相手からVPを奪う',
+}
+const KW_PATTERN = new RegExp(
+  `(${Object.keys(KW_JP_TOOLTIPS).sort((a, b) => b.length - a.length).join('|')})`, 'g'
+)
+function renderWithTooltips(text) {
+  if (!text) return null
+  return text.replace(/\\n/g, '\n').split(KW_PATTERN).map((part, i) => {
+    const tip = KW_JP_TOOLTIPS[part]
+    return tip
+      ? <span key={i} title={tip} className="underline decoration-dotted cursor-help">{part}</span>
+      : part
+  })
+}
+
 // card: DBのカードオブジェクト
 // perm: ゲーム中のpermanentオブジェクト（任意）
 // effectivePower / effectiveToughness: 装備込みP/T（任意）
@@ -108,11 +149,6 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
   const dispTough = effectiveToughness ?? perm?.toughness ?? card.toughness
   const frame = FRAME[card.color] || DEFAULT_FRAME
   const subtypeLabel = getSubtypeLabel(keywords)
-  const visibleKws = keywords.filter(kw => MTG_KW_LABELS[kw.type] || ORIG_KW.has(kw.type))
-
-  // キーワード能力のテキスト（実際のカードのような表示用）
-  const kwText = visibleKws.map(kw => kwLabel(kw)).join('、')
-
   // 起動型能力ラベル
   const ability = keywords.find(k => k.type === 'activated_ability')
   let abilityLabel = null
@@ -197,24 +233,19 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
               </div>
             )}
 
-            {/* キーワード能力（イタリック表示） */}
-            {kwText && (
-              <p className="text-sm italic mb-2 leading-snug">{kwText}</p>
-            )}
-
             {/* 起動型能力テキスト */}
             {abilityLabel && (
               <p className="text-sm mb-2 leading-snug">{abilityLabel}</p>
             )}
 
-            {/* 効果テキスト */}
+            {/* 効果テキスト（キーワードにツールチップ付き） */}
             {card.effect_text && (
               <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                {card.effect_text.replace(/\\n/g, '\n')}
+                {renderWithTooltips(card.effect_text)}
               </p>
             )}
 
-            {!kwText && !card.effect_text && !abilityLabel && (
+            {!card.effect_text && !abilityLabel && (
               <p className="text-sm opacity-40 italic">（効果なし）</p>
             )}
 

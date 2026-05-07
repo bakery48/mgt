@@ -97,17 +97,52 @@ const FRAME = {
 }
 const DEFAULT_FRAME = FRAME.colorless
 
+// 効果テキスト内のキーワードをツールチップ付きspanにする
+const KW_JP_TOOLTIPS = {
+  'トランプル': 'ブロッカーへの超過ダメージがプレイヤーに通る',
+  'フラッシュバック': '墓地からコストを払って唱えられる（その後追放）',
+  '先制攻撃': '通常クリーチャーより先にダメージを与える',
+  '二段攻撃': '先制攻撃と通常攻撃の両方を行う',
+  '破壊不能': '破壊されない',
+  '飛行': '飛行持ちかリーチ持ちのクリーチャーにしかブロックされない',
+  '速攻': '召喚酔いなし。出たターンから攻撃・能力使用が可能',
+  '警戒': '攻撃してもタップしない',
+  '到達': '飛行クリーチャーをブロックできる',
+  '絆魂': '与えたダメージ分だけライフを得る',
+  '接死': '与えたダメージは致死ダメージとして扱われる',
+  '威迫': '2体以上でしかブロックできない',
+  '防衛': '攻撃できない',
+  '呪禁': '対戦相手の呪文・能力の対象にならない',
+  '被覆': '呪文・能力の対象にならない',
+  '瞬速': 'インスタントのタイミングで唱えられる',
+  '護法': '対戦相手が対象にするには追加コストが必要',
+  'キッカー': '追加コストを払うことで強化効果を得る',
+  '発掘': '墓地からコストを払って戦場に戻す（次の終了ステップに追放）',
+  '探査': '墓地のカードを除外してマナコストを軽減できる',
+  '装備': 'コストを払ってクリーチャーに装備する',
+  '拝金': '指定タイミングにGを獲得する',
+  '徴収': '攻撃するたびに対戦相手からGを奪う',
+  '栄光': 'ダメージを与えるたびVPを獲得する',
+  '簒奪': 'ダメージを与えるたびに対戦相手からVPを奪う',
+}
+const KW_PATTERN = new RegExp(
+  `(${Object.keys(KW_JP_TOOLTIPS).sort((a, b) => b.length - a.length).join('|')})`, 'g'
+)
+function renderWithTooltips(text, cls = '') {
+  if (!text) return null
+  return text.replace(/\\n/g, '\n').split(KW_PATTERN).map((part, i) => {
+    const tip = KW_JP_TOOLTIPS[part]
+    return tip
+      ? <span key={i} title={tip} className="underline decoration-dotted cursor-help">{part}</span>
+      : part
+  })
+}
+
 function CardItem({ card, onClick }) {
   const keywords = Array.isArray(card.keywords) ? card.keywords : []
   const frame = FRAME[card.color] || DEFAULT_FRAME
   const subtypeLabel = getSubtypeLabel(keywords)
   const isCrea = card.card_type === 'creature'
-
-  const visibleKws = keywords.filter(kw => MTG_KEYWORD_LABELS[kw.type] || ORIGINAL_KW.has(kw.type))
-  const kwText = visibleKws.map(kw => {
-    if (ORIGINAL_KW.has(kw.type)) return kw.type
-    return MTG_KEYWORD_LABELS[kw.type]
-  }).join('、')
 
   return (
     <div
@@ -150,15 +185,11 @@ function CardItem({ card, onClick }) {
         {/* テキストボックス */}
         <div className={`rounded-md border border-black/10 px-2 py-1.5 min-h-[56px] flex flex-col justify-between ${frame.textbox}`}>
           <div>
-            {kwText && (
-              <p className="text-xs italic mb-1 leading-snug line-clamp-1">{kwText}</p>
-            )}
-            {card.effect_text && (
+            {card.effect_text ? (
               <p className="text-xs leading-snug line-clamp-3 whitespace-pre-wrap">
-                {card.effect_text.replace(/\\n/g, '\n')}
+                {renderWithTooltips(card.effect_text)}
               </p>
-            )}
-            {!kwText && !card.effect_text && (
+            ) : (
               <p className="text-xs opacity-30 italic">（効果なし）</p>
             )}
           </div>
