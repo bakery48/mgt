@@ -13,7 +13,7 @@ import {
   activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor,
   resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand, respondToCounter, resolvePendingDiscard,
   hasAdditionalCost, castSpellSacrificeAndExile, castSpellPayExtraAndExile,
-  resolveReturnFromGy, finishReturnFromGy,
+  resolveReturnFromGy, finishReturnFromGy, resolveRaidLook,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -237,6 +237,7 @@ export default function GamePlayPage() {
   const [additionalCostModal, setAdditionalCostModal] = useState(null) // { cardId, card, extraCost }
   const [sacrificeForSpellMode, setSacrificeForSpellMode] = useState(null) // { cardId, card } — 生け贄選択中
   const [returnFromGyMode, setReturnFromGyMode] = useState(null) // pending_return_from_gy for myId
+  const [raidLookMode, setRaidLookMode] = useState(null) // pending_raid_look for myId
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -485,6 +486,12 @@ export default function GamePlayPage() {
     if (gs.pending_return_from_gy.pid === myId) setReturnFromGyMode(gs.pending_return_from_gy)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_return_from_gy])
+
+  useEffect(() => {
+    if (!gs?.pending_raid_look) { setRaidLookMode(null); return }
+    if (gs.pending_raid_look.pid === myId) setRaidLookMode(gs.pending_raid_look)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_raid_look])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -1590,6 +1597,37 @@ export default function GamePlayPage() {
             : false
         }
       />
+
+      {/* ─── 強襲ETBモーダル：ライブラリートップ確認（腑抜けの略奪者など）─── */}
+      {raidLookMode && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-purple-600 rounded-xl p-5 w-full max-w-xl mx-4 shadow-2xl">
+            <p className="text-purple-300 font-bold text-center text-lg mb-1">強襲 — ライブラリートップ確認</p>
+            <p className="text-gray-400 text-sm text-center mb-4">残すカードを1枚選んでください。他は墓地に置かれます。</p>
+            <div className="flex gap-3 justify-center pb-1">
+              {raidLookMode.cards.map((cid, i) => {
+                const c = cardData[cid]
+                return (
+                  <button
+                    key={`${cid}-${i}`}
+                    onClick={() => {
+                      const newGs = resolveRaidLook(gs, myId, cid, cardData)
+                      if (newGs !== gs) dispatch(newGs)
+                      setRaidLookMode(null)
+                    }}
+                    className={`w-28 h-40 rounded-xl p-2 border-2 border-purple-500 hover:border-purple-300 text-left text-xs flex flex-col ${COLOR_BG[c?.color] || 'bg-gray-700 text-white'} transition-colors`}
+                  >
+                    {c?.art_url && <img src={c.art_url} alt="" className="w-full h-16 object-cover rounded mb-1" />}
+                    <p className="font-bold leading-tight line-clamp-3">{c?.name || '?'}</p>
+                    <p className="text-xs opacity-70 mt-auto">{c?.mana_cost || ''}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <p className="text-gray-600 text-xs text-center mt-3">クリックしたカードがライブラリーの一番上に残ります</p>
+          </div>
+        </div>
+      )}
 
       {/* ─── 墓地回収モーダル（死の円舞曲など）─── */}
       {returnFromGyMode && (

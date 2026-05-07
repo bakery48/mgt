@@ -204,8 +204,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"cant_block"}]', 400),
 
 ('腑抜けの略奪者',     'creature', 'black', '{2}{B}',       2, 2,
- '接死を持つ。強襲 ― 腑抜けの略奪者が戦場に出たとき、あなたがこのターンに攻撃していた場合、あなたのライブラリーの上から3枚を見る。そのうち1枚をライブラリーの一番上に置き、残りを墓地に置く。（ETB効果は現在未実装）',
- '[{"type":"deathtouch"}]', 400),
+ '接死を持つ。強襲 ― 腑抜けの略奪者が戦場に出たとき、あなたがこのターンに攻撃していた場合、あなたのライブラリーの上から3枚を見る。そのうち1枚をライブラリーの一番上に置き、残りを墓地に置く。',
+ '[{"type":"deathtouch"},{"type":"etb_trigger","condition":"raid","effect":"raid_look_top","n":3,"keep":1}]', 400),
 
 ('吸血鬼の新生子',     'creature', 'black', '{B}',           0, 3,
  '（2）、タップ：各対戦相手は1点のライフを失い、あなたは1点のライフを得る。',
@@ -787,3 +787,4 @@ UPDATE cards SET effect_text='呪文1つを対象とし、それを打ち消す�
 UPDATE cards SET effect_text='エンチャント（クリーチャー）。星明かりの罠が戦場に出たとき、エンチャントされているクリーチャーをタップする。エンチャントされているクリーチャーはそのコントローラーのアンタップ・ステップにアンタップしない。', keywords='[{"type":"aura","enchant":"opp_creature"},{"type":"etb_trigger","effect":"tap_attached"},{"type":"prevent_untap"}]'::jsonb WHERE name='星明かりの罠';
 UPDATE cards SET effect_text='追加コストとして、クリーチャー1体を生け贄に捧げるか{3}{B}を支払う。クリーチャー1体を対象とし、それを追放する。', keywords='[{"type":"additional_cost","pay_mana":"{3}{B}"},{"type":"exile_creature"}]'::jsonb WHERE name='踊り食い';
 UPDATE cards SET effect_text='あなたの墓地にあるクリーチャー・カードを最大2枚まで対象とし、それらをオーナーの手札に戻す。その後、カードを1枚捨てる。', keywords='[{"type":"return_from_gy","count":2,"restriction":"creature","then_discard":1}]'::jsonb WHERE name='死の円舞曲';
+UPDATE cards SET effect_text='接死を持つ。強襲 ― 腑抜けの略奪者が戦場に出たとき、あなたがこのターンに攻撃していた場合、あなたのライブラリーの上から3枚を見る。そのうち1枚をライブラリーの一番上に置き、残りを墓地に置く。', keywords='[{"type":"deathtouch"},{"type":"etb_trigger","condition":"raid","effect":"raid_look_top","n":3,"keep":1}]'::jsonb WHERE name='腑抜けの略奪者';

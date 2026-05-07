@@ -398,6 +398,19 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
 function applyEtbTriggers(state, pid, card, cardData) {
   let s = state
   for (const kw of (card?.keywords || [])) {
+    // 強襲ETB: このターン攻撃していた場合に誘発
+    if (kw.type === 'etb_trigger' && kw.condition === 'raid') {
+      if (!s.players[pid].has_attacked) continue
+      if (kw.effect === 'raid_look_top') {
+        const n = kw.n ?? 3
+        const ps = s.players[pid]
+        const topCards = ps.library.slice(0, n)
+        if (topCards.length > 0) {
+          s = { ...s, pending_raid_look: { pid, cards: topCards, keep: kw.keep ?? 1 } }
+        }
+      }
+      continue
+    }
     if (kw.type === 'etb_exile_target') {
       // 追放対象が必要 → pending_etb_exile をセットして UI に委譲
       const bf = s.players[pid].battlefield
@@ -610,6 +623,23 @@ export function resolveEtbReturnHand(state, pid, cardId, cardData) {
     { ...state, pending_etb_return_hand: null, players: { ...state.players, [pid]: { ...ps, graveyard: newGy, hand: newHand } } },
     `${state.pending_etb_return_hand?.cardName} ETB → ${returnCard.name || 'カード'} を手札に戻した`
   )
+}
+
+// 強襲ETB: ライブラリートップN枚確認 → 1枚をトップに残し残りを墓地へ
+export function resolveRaidLook(state, pid, keepCardId, cardData) {
+  const prl = state.pending_raid_look
+  if (!prl || prl.pid !== pid) return state
+  const ps = state.players[pid]
+  const { cards } = prl
+  const milled = cards.filter(id => id !== keepCardId)
+  // library から最初のN枚を取り除き、keep をトップに戻す
+  const newLibrary = [keepCardId, ...ps.library.slice(cards.length)]
+  const newGy = [...ps.graveyard, ...milled]
+  return log({
+    ...state,
+    pending_raid_look: null,
+    players: { ...state.players, [pid]: { ...ps, library: newLibrary, graveyard: newGy } },
+  }, `ライブラリートップを確認 → ${cardData[keepCardId]?.name ?? keepCardId} を残し${milled.length}枚を墓地へ`)
 }
 
 // 墓地回収スペル：カードを1枚ずつ選択して手札に戻す
@@ -861,6 +891,7 @@ export function advancePhase(state, cardData = {}) {
       [nextAP]: {
         ...ps,
         land_played: false,
+        has_attacked: false,
         mana_pool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
         battlefield: ps.battlefield.map(p => {
           // prevent_untap オーラが付いているクリーチャーはアンタップしない
@@ -1084,7 +1115,7 @@ export function declareAttackers(state, pid, attackerIids, cardData) {
   let next = log({
     ...state,
     combat: { ...state.combat, attackers: validIids },
-    players: { ...state.players, [pid]: { ...ps, battlefield: newBf } },
+    players: { ...state.players, [pid]: { ...ps, battlefield: newBf, has_attacked: validIids.length > 0 } },
     priority_passed: [],
     priority: pid,
   }, `${validIids.length} 体で攻撃`)
