@@ -76,7 +76,8 @@ const KW_TOOLTIPS = {
 }
 
 function KeywordTag({ kw }) {
-  const label = MTG_KEYWORD_LABELS[kw.type] || kw.type
+  const label = MTG_KEYWORD_LABELS[kw.type] || (ORIGINAL_KW.has(kw.type) ? kw.type : null)
+  if (!label) return null  // 内部管理用キーワードは非表示
   const isOriginal = ORIGINAL_KW.has(kw.type)
   const tip = KW_TOOLTIPS[kw.type]
   return (
