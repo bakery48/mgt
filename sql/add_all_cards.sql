@@ -412,8 +412,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 1500),
 
 ('樹上の罠紡ぎ',           'creature', 'green', '{3}{G}',        1, 4,
- '到達、接死を持つ。（2）（緑）：あなたのコントロールするクリーチャー1体の上に＋1/＋1カウンターを1個置く。この能力はソーサリーとしてのみ起動できる。（起動型能力は現在未実装）',
- '[{"type":"reach"},{"type":"deathtouch"}]', 500),
+ '到達、接死を持つ。（2）（緑）：あなたのコントロールするクリーチャー1体の上に＋1/＋1カウンターを1個置く。この能力はソーサリーとしてのみ起動できる。',
+ '[{"type":"reach"},{"type":"deathtouch"},{"type":"activated_ability","cost_str":"{2}{G}","effect":"put_counter_target","counter":{"p":1,"t":1},"targeting":"own_creature","sorcery_speed":true}]', 500),
 
 -- ── 緑インスタント ───────────────────────────────────────────
 ('噛み締め',               'instant',  'green', '{1}{G}',        null, null,
@@ -957,3 +957,4 @@ UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM json
 UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_snake"},{"type":"subtype_cleric"}]'::jsonb WHERE name = '生類の侍臣';
 UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_warrior"}]'::jsonb WHERE name = '狩猟の統率者、スーラク';
 UPDATE cards SET effect_text='優しいインドリクが戦場に出たとき、対戦相手がコントロールするクリーチャー1体を対象とするファイトを選んでもよい。', keywords='[{"type":"subtype_beast"},{"type":"etb_trigger","effect":"pending_etb_fight","optional":true}]'::jsonb WHERE name='優しいインドリク';
+UPDATE cards SET effect_text='到達、接死を持つ。（2）（緑）：あなたのコントロールするクリーチャー1体の上に＋1/＋1カウンターを1個置く。この能力はソーサリーとしてのみ起動できる。', keywords='[{"type":"subtype_spider"},{"type":"reach"},{"type":"deathtouch"},{"type":"activated_ability","cost_str":"{2}{G}","effect":"put_counter_target","counter":{"p":1,"t":1},"targeting":"own_creature","sorcery_speed":true}]'::jsonb WHERE name='樹上の罠紡ぎ';

@@ -1032,7 +1032,7 @@ export default function GamePlayPage() {
                           toughness: effPT?.toughness ?? perm.toughness,
                         }}
                         effectiveKwTypes={effKws}
-                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea) || (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode?.attackerInstanceId) || (vampireCounterMode && isCrea && (cardData[perm.card_id]?.keywords || []).some(k => k.type === 'subtype_vampire')) || (forcedSacrificeMode && isCrea)}
+                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea) || (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode?.attackerInstanceId) || (vampireCounterMode && isCrea && (cardData[perm.card_id]?.keywords || []).some(k => k.type === 'subtype_vampire')) || (forcedSacrificeMode && isCrea) || (activatedAbilityMode?.targetingType === 'own_creature' && isCrea)}
                         dimmed={inAttackPhase && !canAtt && !isSelAtt}
                         onClick={() => {
                           if (forcedSacrificeMode && isCrea) {
@@ -1063,6 +1063,7 @@ export default function GamePlayPage() {
                           if (targetingMode?.targetingType === 'own_creature' && isCrea) handleTargetCreature(perm.instance_id)
                           else if (targetingMode?.targetingType === 'any_creature' && isCrea) handleTargetCreature(perm.instance_id)
                           else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
+                          else if (activatedAbilityMode?.targetingType === 'own_creature' && isCrea) handleActivatedAbilityTarget(perm.instance_id)
                           else if (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type)) handleActivatedAbilityTarget(perm.instance_id)
                           else if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
                           else if (isCrea && !perm.tapped && !perm.summoning_sick && (card?.keywords || []).some(k => k.type === 'tap_for_mana')) {
@@ -1705,7 +1706,7 @@ export default function GamePlayPage() {
                 const c = cardData[detailPerm.card_id] || {}
                 const ability = (c.keywords || []).find(k => k.type === 'activated_ability')
                 if (ability?.targeting) {
-                  setActivatedAbilityMode({ instanceId: detailPerm.instance_id, card: c, ability })
+                  setActivatedAbilityMode({ instanceId: detailPerm.instance_id, card: c, ability, targetingType: ability.targeting })
                   setDetailCard(null); setDetailPerm(null)
                 } else if (ability?.cost === 'discard_card') {
                   setDiscardForAbilityMode({ instanceId: detailPerm.instance_id, card: c })
@@ -1727,7 +1728,7 @@ export default function GamePlayPage() {
                   return (myPs?.hand?.length ?? 0) > 0 && canPlayInstantSpeed(gs, myId)
                 const cs = ability.cost_str || (ability.cost != null ? `{${ability.cost}}` : null)
                 if (cs && !hasMana(myPs?.mana_pool || {}, cs)) return false
-                if (!canPlayInstantSpeed(gs, myId)) return false
+                if (ability.sorcery_speed ? !canPlaySorcerySpeed(gs, myId) : !canPlayInstantSpeed(gs, myId)) return false
                 if (ability.tap_self && detailPerm?.tapped) return false
                 if (ability.condition === 'controls_5_lands') {
                   const landCount = (myPs?.battlefield || []).filter(p => (cardData[p.card_id] || {}).card_type === 'land').length

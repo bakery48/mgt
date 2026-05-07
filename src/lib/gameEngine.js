@@ -229,7 +229,6 @@ export function activateAbility(state, pid, instanceId, cardData) {
 
 // 対象が必要な起動型能力（生け贄コストを伴うものなど）
 export function activateAbilityTargeted(state, pid, instanceId, cardData, target) {
-  if (!canPlayInstantSpeed(state, pid)) return state
   const ps = state.players[pid]
   const perm = ps.battlefield.find(p => p.instance_id === instanceId)
   if (!perm) return state
@@ -237,8 +236,15 @@ export function activateAbilityTargeted(state, pid, instanceId, cardData, target
   const ability = (card.keywords || []).find(k => k.type === 'activated_ability' && k.targeting)
   if (!ability) return state
 
+  // ソーサリー速度制限チェック
+  if (ability.sorcery_speed) {
+    if (!canPlaySorcerySpeed(state, pid)) return state
+  } else {
+    if (!canPlayInstantSpeed(state, pid)) return state
+  }
+
   // マナコスト支払い
-  const costStr = ability.cost ? `{${ability.cost}}` : null
+  const costStr = ability.cost_str || (ability.cost ? `{${ability.cost}}` : null)
   let newPool = { ...ps.mana_pool }
   if (costStr) {
     if (!hasMana(newPool, costStr)) return state
@@ -256,6 +262,22 @@ export function activateAbilityTargeted(state, pid, instanceId, cardData, target
   // 対象への効果
   if (ability.effect === 'destroy_artifact_or_enchantment' && target) {
     s = _destroyPermanent(s, target.id, cardData)
+  }
+  if (ability.effect === 'put_counter_target' && target) {
+    const counter = ability.counter || { p: 1, t: 1 }
+    for (const [tpid, tps] of Object.entries(s.players)) {
+      const tIdx = tps.battlefield.findIndex(p => p.instance_id === target.id)
+      if (tIdx === -1) continue
+      const tp = tps.battlefield[tIdx]
+      const newBf = tps.battlefield.map((p, i) => i === tIdx
+        ? { ...p, power: (p.power ?? 0) + counter.p, toughness: (p.toughness ?? 0) + counter.t, counters_p1p1: (p.counters_p1p1 || 0) + 1 }
+        : p)
+      s = log(
+        { ...s, players: { ...s.players, [tpid]: { ...tps, battlefield: newBf } } },
+        `${card.name} 起動型能力 → ${cardData[tp.card_id]?.name || 'クリーチャー'} に+${counter.p}/+${counter.t}カウンター`
+      )
+      break
+    }
   }
   return s
 }
