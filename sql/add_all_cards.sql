@@ -25,8 +25,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"lifelink"}]', 400),
 
 ('アジャニの群れ仲間', 'creature', 'white', '{1}{W}',   2, 2,
- 'あなたがライフを得るたび、アジャニの群れ仲間の上に＋１/＋１カウンターを１個置く。（カウンター効果は現在未実装）',
- '[]', 800),
+ 'あなたがライフを得るたび、アジャニの群れ仲間の上に＋１/＋１カウンターを１個置く。',
+ '[{"type":"gain_life_trigger","effect":"counter_p1p1","value":1}]', 800),
 
 ('お手伝いする狩人', 'creature', 'white', '{1}{W}',    1, 1,
  '警戒を持つ。お手伝いする狩人が戦場に出たとき、カードを1枚引く。（ETB効果は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行のアジャニの群れ仲間を更新（gain_life_trigger追加）
+UPDATE cards SET
+  effect_text = 'あなたがライフを得るたび、アジャニの群れ仲間の上に＋１/＋１カウンターを１個置く。',
+  keywords = '[{"type":"gain_life_trigger","effect":"counter_p1p1","value":1}]'::jsonb
+WHERE name = 'アジャニの群れ仲間';
 
 -- 既存行のブランチウッドの鎧を更新（オーラ実装）
 UPDATE cards SET

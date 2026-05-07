@@ -280,6 +280,30 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
   return applyOnCastTriggers(afterCast, pid, card, cardData)
 }
 
+// ライフを得たとき誘発する能力を処理する
+function applyLifeGainTriggers(state, gainerId, cardData) {
+  let s = state
+  for (const perm of s.players[gainerId].battlefield) {
+    const card = cardData[perm.card_id] || {}
+    for (const kw of (card.keywords || [])) {
+      if (kw.type !== 'gain_life_trigger') continue
+      if (kw.effect === 'counter_p1p1') {
+        const count = kw.value ?? 1
+        const newBf = s.players[gainerId].battlefield.map(p =>
+          p.instance_id === perm.instance_id
+            ? { ...p, counters: { ...(p.counters || {}), p1p1: ((p.counters?.p1p1) ?? 0) + count } }
+            : p
+        )
+        s = log(
+          { ...s, players: { ...s.players, [gainerId]: { ...s.players[gainerId], battlefield: newBf } } },
+          `${card.name} 誘発 → +1/+1カウンターを${count}個置いた`
+        )
+      }
+    }
+  }
+  return s
+}
+
 // 土地が戦場に出たとき誘発する上陸能力を処理する
 function applyLandfallTriggers(state, pid, cardData) {
   let s = state
@@ -732,7 +756,11 @@ function _resolveStrike(state, cardData, firstStrikePhase) {
     },
   }
   const label = firstStrikePhase ? '先制ダメージ' : '戦闘ダメージ'
-  return log(s, `${label}: ${apDead.length + dpDead.length} 体が破壊された`)
+  let result = log(s, `${label}: ${apDead.length + dpDead.length} 体が破壊された`)
+  // ライフリンクによるライフ獲得でトリガー発火
+  const lifelinkGained = apLife - aps.life
+  if (lifelinkGained > 0) result = applyLifeGainTriggers(result, ap, cardData)
+  return result
 }
 
 // 先制攻撃フェーズのダメージ解決
@@ -771,6 +799,10 @@ export function checkStateBasedActions(state) {
 export function getEffectivePT(perm, card, battlefield, cardData) {
   let power = perm.power ?? card?.power ?? 0
   let toughness = perm.toughness ?? card?.toughness ?? 1
+  // +1/+1 カウンター
+  const p1p1 = perm.counters?.p1p1 ?? 0
+  power += p1p1
+  toughness += p1p1
   for (const attached of battlefield) {
     if (attached.attached_to !== perm.instance_id) continue
     const aCard = cardData[attached.card_id] || {}
@@ -1025,10 +1057,11 @@ function applySpellEffect(state, controllerId, effect, target, kicked, cardData)
     case 'gain_life': {
       const amount = effect.value || 0
       const ps = state.players[controllerId]
-      return log({
+      const s = log({
         ...state,
         players: { ...state.players, [controllerId]: { ...ps, life: ps.life + amount } },
       }, `ライフを${amount}点得た`)
+      return applyLifeGainTriggers(s, controllerId, cardData)
     }
 
     case 'deal_damage': {
