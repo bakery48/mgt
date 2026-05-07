@@ -115,11 +115,14 @@ function MiniCard({ card, perm, selected, onClick, onDetail, onHover, disabled, 
 
 function HandCard({ card, onClick, onDetail, onHover, disabled, highlight }) {
   return (
+    <div
+      onMouseEnter={onHover ? () => onHover(card, null) : undefined}
+      onMouseLeave={onHover ? () => onHover(null, null) : undefined}
+      className="shrink-0"
+    >
     <button
       onClick={onClick}
       onContextMenu={onDetail ? (e) => { e.preventDefault(); onDetail() } : undefined}
-      onMouseEnter={onHover ? () => onHover(card, null) : undefined}
-      onMouseLeave={onHover ? () => onHover(null, null) : undefined}
       disabled={disabled}
       className={`
         border-2 rounded-lg p-2 transition-all shrink-0 w-20 h-28 flex flex-col text-left
@@ -142,6 +145,7 @@ function HandCard({ card, onClick, onDetail, onHover, disabled, highlight }) {
         )}
       </div>
     </button>
+    </div>
   )
 }
 
