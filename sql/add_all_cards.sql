@@ -65,8 +65,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"lifelink"},{"type":"attack_trigger","effect":"gain_life","value":2}]', 1200),
 
 ('光の模範',         'creature', 'white', '{2}{W}{W}', 3, 3,
- '飛行を持つ。ライフを得るたびこのクリーチャーの上に＋１/＋１カウンターを置く。このクリーチャーにカウンターが置かれるたびカードを引く。（カウンター/ドロー効果は現在未実装）',
- '[{"type":"flying"}]', 1100),
+ '飛行を持つ。ライフを得るたびこのクリーチャーの上に＋１/＋１カウンターを置く。このクリーチャーにカウンターが置かれるたびカードを引く。',
+ '[{"type":"flying"},{"type":"gain_life_trigger","effect":"counter_p1p1","value":1},{"type":"on_counter_trigger","effect":"draw_cards","value":1}]', 1100),
 
 ('黎明をもたらす者ライラ', 'creature', 'white', '{3}{W}{W}', 5, 5,
  '伝説のクリーチャー。飛行、先制攻撃、絆魂を持つ。あなたのコントロールする他の天使は＋１/＋１の修整を受けるとともに絆魂を持つ。（ロード効果は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行の光の模範を更新
+UPDATE cards SET
+  effect_text = '飛行を持つ。ライフを得るたびこのクリーチャーの上に＋１/＋１カウンターを置く。このクリーチャーにカウンターが置かれるたびカードを引く。',
+  keywords = '[{"type":"flying"},{"type":"gain_life_trigger","effect":"counter_p1p1","value":1},{"type":"on_counter_trigger","effect":"draw_cards","value":1}]'::jsonb
+WHERE name = '光の模範';
 
 -- 既存行のオドリックの十字軍を更新（動的P/T追加）
 UPDATE cards SET

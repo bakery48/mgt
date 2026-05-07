@@ -390,7 +390,27 @@ function applyLifeGainTriggers(state, gainerId, cardData) {
           { ...s, players: { ...s.players, [gainerId]: { ...s.players[gainerId], battlefield: newBf } } },
           `${card.name} 誘発 → +1/+1カウンターを${count}個置いた`
         )
+        // カウンターが置かれたとき誘発する能力をチェック
+        s = applyOnCounterTriggers(s, gainerId, perm.instance_id, card, cardData)
       }
+    }
+  }
+  return s
+}
+
+// カウンターが置かれたとき誘発する能力を処理する
+function applyOnCounterTriggers(state, pid, permInstanceId, card, cardData) {
+  let s = state
+  for (const kw of (card.keywords || [])) {
+    if (kw.type !== 'on_counter_trigger') continue
+    if (kw.effect === 'draw_cards') {
+      const count = kw.value ?? 1
+      const ps = s.players[pid]
+      const drawn = ps.deck.slice(0, count)
+      s = log({
+        ...s,
+        players: { ...s.players, [pid]: { ...ps, hand: [...ps.hand, ...drawn], deck: ps.deck.slice(count) } },
+      }, `${card.name} 誘発 → カードを${count}枚引いた`)
     }
   }
   return s
