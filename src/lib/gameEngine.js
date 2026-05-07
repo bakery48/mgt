@@ -349,6 +349,11 @@ function resolveStack(state, cardData) {
   if (['creature', 'enchantment', 'artifact'].includes(card?.card_type)) {
     const perm = mkPermanent(top.card_id, card)
     if (top.kicked) perm.kicked = true
+    // オーラ：対象クリーチャーに attached_to をセット
+    const isAura = card?.card_type === 'enchantment' && (card?.keywords || []).some(k => k.type === 'aura')
+    if (isAura && top.target?.type === 'creature') {
+      perm.attached_to = top.target.id
+    }
     newState.players = {
       ...newState.players,
       [top.controller]: {
@@ -356,7 +361,7 @@ function resolveStack(state, cardData) {
         battlefield: [...ps.battlefield, perm],
       },
     }
-    newState = log(newState, `${card?.name} が戦場に出た${top.kicked ? '（キッカー済）' : ''}`)
+    newState = log(newState, `${card?.name} が戦場に出た${top.kicked ? '（キッカー済）' : ''}${isAura && top.target ? '（エンチャント）' : ''}`)
   } else {
     // instant/sorcery: 呪文効果を適用
     for (const effect of (card?.keywords || [])) {
@@ -762,17 +767,31 @@ export function checkStateBasedActions(state) {
   return state
 }
 
-// 装備品の有効P/T計算（同一プレイヤーの戦場の装備を参照）
+// 装備品・オーラの有効P/T計算（同一プレイヤーの戦場を参照）
 export function getEffectivePT(perm, card, battlefield, cardData) {
   let power = perm.power ?? card?.power ?? 0
   let toughness = perm.toughness ?? card?.toughness ?? 1
-  for (const eq of battlefield) {
-    if (eq.attached_to !== perm.instance_id) continue
-    const eqCard = cardData[eq.card_id] || {}
-    const eqKw = (eqCard.keywords || []).find(k => k.type === 'equip')
+  for (const attached of battlefield) {
+    if (attached.attached_to !== perm.instance_id) continue
+    const aCard = cardData[attached.card_id] || {}
+    // 装備品
+    const eqKw = (aCard.keywords || []).find(k => k.type === 'equip')
     if (eqKw) {
       power += eqKw.power_bonus ?? 0
       toughness += eqKw.toughness_bonus ?? 0
+    }
+    // オーラ（pump_per_count）
+    const pumpKw = (aCard.keywords || []).find(k => k.type === 'pump_per_count')
+    if (pumpKw) {
+      let count = 0
+      if (pumpKw.effect === 'forest_count') {
+        count = battlefield.filter(p => {
+          const c = cardData[p.card_id] || {}
+          return c.card_type === 'land' && c.color === 'green'
+        }).length
+      }
+      power += (pumpKw.power ?? 0) * count
+      toughness += (pumpKw.toughness ?? 0) * count
     }
   }
   for (const te of (perm.temp_effects || [])) {
@@ -965,7 +984,10 @@ const TARGETED_EFFECTS = [
 ]
 
 export function spellNeedsTarget(card) {
-  return (card?.keywords || []).some(k => TARGETED_EFFECTS.includes(k.type))
+  if ((card?.keywords || []).some(k => TARGETED_EFFECTS.includes(k.type))) return true
+  // オーラ（エンチャント呪文でクリーチャーを対象にとる）
+  if (card?.card_type === 'enchantment' && (card?.keywords || []).some(k => k.type === 'aura')) return true
+  return false
 }
 
 export function getSpellTargetingType(card) {
@@ -977,6 +999,7 @@ export function getSpellTargetingType(card) {
     if (kw.type === 'bounce_permanent') return 'any_permanent'
     if (kw.type === 'pump_creature') return (kw.power ?? 0) < 0 ? 'opp_creature' : 'own_creature'
     if (kw.type === 'reanimate') return 'own_graveyard_creature'
+    if (kw.type === 'aura' && kw.enchant === 'creature') return 'own_creature'
   }
   return null
 }

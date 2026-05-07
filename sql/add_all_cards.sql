@@ -435,8 +435,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 緑エンチャント ───────────────────────────────────────────
 ('ブランチウッドの鎧',     'enchantment', 'green', '{2}{G}',     null, null,
- 'エンチャント（クリーチャー）。エンチャントされているクリーチャーは、あなたがコントロールする森１枚につき＋１/＋１の修整を受ける。（エンチャント/修整は現在未実装）',
- '[]', 400),
+ 'エンチャント（クリーチャー）。エンチャントされているクリーチャーは、あなたがコントロールする森１枚につき＋１/＋１の修整を受ける。',
+ '[{"type":"aura","enchant":"creature"},{"type":"pump_per_count","effect":"forest_count","power":1,"toughness":1}]', 400),
 
 -- ════════════════════════════════════════════════════════════════
 -- 追加カードプール v2
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行のブランチウッドの鎧を更新（オーラ実装）
+UPDATE cards SET
+  effect_text = 'エンチャント（クリーチャー）。エンチャントされているクリーチャーは、あなたがコントロールする森１枚につき＋１/＋１の修整を受ける。',
+  keywords = '[{"type":"aura","enchant":"creature"},{"type":"pump_per_count","effect":"forest_count","power":1,"toughness":1}]'::jsonb
+WHERE name = 'ブランチウッドの鎧';
 
 -- 既存行のシヴ山のドラゴンを更新（起動型能力を追加）
 UPDATE cards SET
