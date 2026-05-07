@@ -404,8 +404,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"etb_trigger","effect":"grant_haste_if_power_gte","threshold":8}]', 800),
 
 ('優しいインドリク',       'creature', 'green', '{5}{G}',        6, 6,
- '優しいインドリクが戦場に出たとき、対戦相手がコントロールするクリーチャー1体を対象とするファイトを選んでもよい。（ETB格闘は現在未実装）',
- '[]', 700),
+ '優しいインドリクが戦場に出たとき、対戦相手がコントロールするクリーチャー1体を対象とするファイトを選んでもよい。',
+ '[{"type":"etb_trigger","effect":"pending_etb_fight","optional":true}]', 700),
 
 ('生類の侍臣',             'creature', 'green', '{3}{G}',        3, 4,
  'あなたはいつでもあなたのライブラリーの一番上のカードを見ることができる。あなたはあなたのライブラリーの一番上からクリーチャー呪文を唱えてもよい。あなたはクリーチャー呪文を唱えるために任意の色のマナを使用できる。（起動型能力は現在未実装）',
@@ -956,3 +956,4 @@ UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM json
 UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_elf"},{"type":"subtype_archer"}]'::jsonb WHERE name = 'ソーンウィールドの射手';
 UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_snake"},{"type":"subtype_cleric"}]'::jsonb WHERE name = '生類の侍臣';
 UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_warrior"}]'::jsonb WHERE name = '狩猟の統率者、スーラク';
+UPDATE cards SET effect_text='優しいインドリクが戦場に出たとき、対戦相手がコントロールするクリーチャー1体を対象とするファイトを選んでもよい。', keywords='[{"type":"subtype_beast"},{"type":"etb_trigger","effect":"pending_etb_fight","optional":true}]'::jsonb WHERE name='優しいインドリク';

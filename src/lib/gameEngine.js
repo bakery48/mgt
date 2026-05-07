@@ -548,6 +548,12 @@ function applyEtbTriggers(state, pid, card, cardData, kicked = false) {
     if (kw.effect === 'pending_bounce_opp_creature') {
       s = { ...s, pending_etb_bounce_opp: { pid, cardName: card.name } }
     }
+    if (kw.effect === 'pending_etb_fight') {
+      // ETB格闘：自身のinstance_idを探して保存
+      const selfPerm = s.players[pid].battlefield.find(p => p.card_id === card.id)
+      const sourceIid = selfPerm?.instance_id ?? null
+      s = { ...s, pending_etb_fight: { pid, sourceIid, cardName: card.name, optional: kw.optional !== false } }
+    }
     if (kw.effect === 'pending_return_hand_from_gy') {
       s = { ...s, pending_etb_return_hand: { pid, cardName: card.name, restriction: kw.restriction ?? 'any' } }
     }
@@ -1691,6 +1697,27 @@ export function resolveForcedSacrifice(state, pid, instanceId, cardData) {
   }, `${psc.triggerName} 誘発 → ${card.name} を生け贄に捧げた`)
   if (card.card_type === 'creature') s = checkVampireDeathTriggers(s, pid, [perm.card_id], cardData)
   return s
+}
+
+export function resolveEtbFight(state, pid, targetInstanceId, cardData) {
+  const pf = state.pending_etb_fight
+  if (!pf || pf.pid !== pid) return state
+  const opp = getOpponent(state, pid)
+  const sourcePerm = state.players[pid].battlefield.find(p => p.instance_id === pf.sourceIid)
+  const targetPerm = state.players[opp].battlefield.find(p => p.instance_id === targetInstanceId)
+  if (!sourcePerm || !targetPerm) return { ...state, pending_etb_fight: null }
+  const sourceCard = cardData[sourcePerm.card_id] || {}
+  const targetCard = cardData[targetPerm.card_id] || {}
+  const { power: srcPow } = getEffectivePT(sourcePerm, sourceCard, state.players[pid].battlefield, cardData)
+  const { power: tgtPow } = getEffectivePT(targetPerm, targetCard, state.players[opp].battlefield, cardData)
+  let s = log({ ...state, pending_etb_fight: null }, `${pf.cardName} が ${targetCard.name} とファイト`)
+  s = _damageCreature(s, targetInstanceId, srcPow ?? 0, cardData)
+  s = _damageCreature(s, pf.sourceIid, tgtPow ?? 0, cardData)
+  return s
+}
+
+export function declineEtbFight(state) {
+  return log({ ...state, pending_etb_fight: null }, `ファイトを選ばなかった`)
 }
 
 export function resolveOptionalDiscardToDraw(state, pid, cardId) {

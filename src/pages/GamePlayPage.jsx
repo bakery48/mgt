@@ -20,6 +20,7 @@ import {
   resolveVampireDrain, declineVampireDrain,
   resolveForcedSacrifice,
   resolveOptionalDiscardToDraw, declineOptionalDiscardToDraw,
+  resolveEtbFight, declineEtbFight,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -1483,6 +1484,50 @@ export default function GamePlayPage() {
             >
               捨てない
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ETBファイトモーダル（優しいインドリクなど）─── */}
+      {gs.pending_etb_fight?.pid === myId && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-green-500 rounded-xl p-5 w-full max-w-lg">
+            <p className="text-green-300 font-bold text-center mb-1">
+              {gs.pending_etb_fight.cardName} — ファイト
+            </p>
+            <p className="text-gray-400 text-xs text-center mb-4">
+              対戦相手のクリーチャーを選んでファイトを行う（任意）
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center mb-4">
+              {(oppPs?.battlefield || []).filter(p => {
+                const c = cardData[p.card_id]
+                return c?.card_type === 'creature'
+              }).map(perm => {
+                const card = cardData[perm.card_id]
+                const { power, toughness } = getEffectivePT(perm, card, oppPs.battlefield, cardData)
+                return (
+                  <button
+                    key={perm.instance_id}
+                    onClick={() => {
+                      const newGs = resolveEtbFight(gs, myId, perm.instance_id, cardData)
+                      if (newGs !== gs) dispatch(newGs)
+                    }}
+                    className="bg-gray-700 hover:bg-red-900 border border-green-600 hover:border-red-400 rounded-lg p-3 text-left transition-colors"
+                  >
+                    <p className="text-white text-sm font-bold">{card?.name}</p>
+                    <p className="text-gray-400 text-xs">{power}/{toughness}</p>
+                  </button>
+                )
+              })}
+            </div>
+            {gs.pending_etb_fight.optional && (
+              <button
+                onClick={() => dispatch(declineEtbFight(gs))}
+                className="w-full py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm"
+              >
+                ファイトしない
+              </button>
+            )}
           </div>
         </div>
       )}
