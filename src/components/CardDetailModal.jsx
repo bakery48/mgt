@@ -100,6 +100,7 @@ const SUBTYPE_LABELS = {
   subtype_spider: '蜘蛛',
   subtype_treefolk: 'ツリーフォーク',
   subtype_ninja: '忍者',
+  subtype_demon: '悪魔',
 }
 
 function getSubtypeLabel(keywords) {

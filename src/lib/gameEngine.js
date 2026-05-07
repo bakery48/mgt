@@ -251,13 +251,22 @@ export function activateAbilityTargeted(state, pid, instanceId, cardData, target
     newPool = spendMana(newPool, costStr)
   }
 
-  // 生け贄コスト：自身を墓地へ
-  let newBf = ps.battlefield.filter(p => p.instance_id !== instanceId)
-  let newGy = [...ps.graveyard, perm.card_id]
-  let s = log(
-    { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy, mana_pool: newPool } } },
-    `${card.name} を生け贄に捧げた`
-  )
+  // 生け贄コスト（sacrifice_self が true の場合のみ）
+  let newBf = ability.sacrifice_self
+    ? ps.battlefield.filter(p => p.instance_id !== instanceId)
+    : ps.battlefield
+  let newGy = ability.sacrifice_self
+    ? [...ps.graveyard, perm.card_id]
+    : ps.graveyard
+  let s = ability.sacrifice_self
+    ? log(
+        { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy, mana_pool: newPool } } },
+        `${card.name} を生け贄に捧げた`
+      )
+    : log(
+        { ...state, players: { ...state.players, [pid]: { ...ps, mana_pool: newPool } } },
+        `${card.name} 起動型能力を使用`
+      )
 
   // 対象への効果
   if (ability.effect === 'destroy_artifact_or_enchantment' && target) {
@@ -569,6 +578,19 @@ function applyEtbTriggers(state, pid, card, cardData, kicked = false) {
     }
     if (kw.effect === 'pending_bounce_opp_creature') {
       s = { ...s, pending_etb_bounce_opp: { pid, cardName: card.name } }
+    }
+    if (kw.effect === 'pump_all_own') {
+      const te = { power: kw.power ?? 1, toughness: kw.toughness ?? 1 }
+      const kws = kw.grant_keywords || []
+      const newBf = s.players[pid].battlefield.map(p => ({
+        ...p,
+        temp_effects: [...(p.temp_effects || []), te],
+        temp_keywords: [...(p.temp_keywords || []), ...kws],
+      }))
+      s = log(
+        { ...s, players: { ...s.players, [pid]: { ...s.players[pid], battlefield: newBf } } },
+        `${card.name} ETB → 全クリーチャー+${te.power}/+${te.toughness}`
+      )
     }
     if (kw.effect === 'pending_etb_fight') {
       // ETB格闘：自身のinstance_idを探して保存
@@ -972,7 +994,25 @@ export function advancePhase(state, cardData = {}) {
     const oppStartLife = (s.life_at_turn_start || {})[opp] ?? oppCurrentLife
     const oppLostLife = oppCurrentLife < oppStartLife
     // エンドステップ誘発チェック
-    for (const perm of apPs.battlefield) {
+    // 全プレイヤーの return_self_end_step を処理（アクティブプレイヤーも非アクティブも）
+    for (const pid of Object.keys(s.players)) {
+      const pidPs = s.players[pid]
+      const returners = pidPs.battlefield.filter(p =>
+        (cardData[p.card_id]?.keywords || []).some(k => k.type === 'return_self_end_step')
+      )
+      for (const rPerm of returners) {
+        const rCard = cardData[rPerm.card_id] || {}
+        s = log({
+          ...s,
+          players: { ...s.players, [pid]: {
+            ...s.players[pid],
+            battlefield: s.players[pid].battlefield.filter(p => p.instance_id !== rPerm.instance_id),
+            hand: [...s.players[pid].hand, rPerm.card_id],
+          }},
+        }, `${rCard.name} → エンドステップに手札に戻った`)
+      }
+    }
+    for (const perm of s.players[ap]?.battlefield || []) {
       const permCard = cardData[perm.card_id] || {}
       for (const kw of (permCard.keywords || [])) {
         if (kw.type !== 'end_step_trigger') continue
@@ -1052,7 +1092,7 @@ export function advancePhase(state, cardData = {}) {
       [ap]: {
         ...ps,
         mana_pool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
-        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0, temp_effects: [] })),
+        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0, temp_effects: [], temp_keywords: [] })),
       },
     }
   } else {
@@ -1073,7 +1113,7 @@ export function finishCleanup(state, cardData = {}) {
       [ap]: {
         ...ps,
         mana_pool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
-        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0, temp_effects: [] })),
+        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0, temp_effects: [], temp_keywords: [] })),
       },
     },
   }
@@ -1132,6 +1172,17 @@ function applyAttackTriggers(state, attackingPid, attackerIids, cardData) {
           `${card.name} 攻撃誘発 → ライフを${amount}点得た`
         )
         s = applyLifeGainTriggers(s, attackingPid, cardData)
+      }
+
+      if (kw.effect === 'opp_discard') {
+        const count = kw.count ?? 1
+        const existing = s.pending_discard?.pid === opp ? (s.pending_discard.count || 0) : 0
+        s = log({ ...s, pending_discard: { pid: opp, count: existing + count } },
+          `${card.name} 攻撃誘発 → 対戦相手はカードを${count}枚捨てる`)
+      }
+      if (kw.effect === 'opp_sacrifice_creature') {
+        s = log({ ...s, pending_sacrifice_creature: { pid: opp, triggerName: card.name } },
+          `${card.name} 攻撃誘発 → 対戦相手はクリーチャーを1体生け贄に捧げる`)
       }
 
       // 任意生け贄 → カードを引く ＋ ブロックされない（吸血鬼の大食家など）
@@ -1509,6 +1560,28 @@ export function getEffectivePT(perm, card, battlefield, cardData) {
         power += kw.power_bonus ?? 0
         toughness += kw.toughness_bonus ?? 0
       }
+    }
+  }
+  // anthem: 全味方クリーチャーへの静的P/T修整（増幅の宝珠など）
+  for (const ally of battlefield) {
+    if (ally.instance_id === perm.instance_id) continue
+    const allyCard = cardData[ally.card_id] || {}
+    for (const kw of (allyCard.keywords || [])) {
+      if (kw.type !== 'anthem') continue
+      power += kw.power_bonus ?? 0
+      toughness += kw.toughness_bonus ?? 0
+    }
+  }
+  // 自身のanthemも自分自身には適用しない（ally側で処理）
+  // ただし戦場上の全パーマネント（アーティファクトも含む）からanthemを収集
+  for (const ally of battlefield) {
+    if (ally.card_id === undefined) continue
+    const allyCard = cardData[ally.card_id] || {}
+    if (allyCard.card_type === 'creature') continue // クリーチャーは上で処理済み
+    for (const kw of (allyCard.keywords || [])) {
+      if (kw.type !== 'anthem') continue
+      power += kw.power_bonus ?? 0
+      toughness += kw.toughness_bonus ?? 0
     }
   }
   for (const te of (perm.temp_effects || [])) {
@@ -1936,7 +2009,7 @@ export const SPELL_EFFECT_TYPES = [
   'destroy_creature', 'destroy_permanent',
   'bounce_creature', 'bounce_permanent', 'bounce_all_attackers',
   'pump_creature', 'reanimate', 'counter_spell', 'draw_then_discard', 'exile_creature',
-  'return_from_gy', 'optional_discard_to_draw',
+  'return_from_gy', 'optional_discard_to_draw', 'pump_all_own', 'discard_self',
 ]
 
 const TARGETED_EFFECTS = [
@@ -2209,6 +2282,27 @@ function applySpellEffect(state, controllerId, effect, target, kicked, cardData)
         ...state,
         pending_optional_discard_to_draw: { pid: controllerId, count },
       }, `カードを${count}枚捨ててもよい。そうしたなら${count}枚引く`)
+    }
+
+    case 'pump_all_own': {
+      const te = { power: effect.power ?? 1, toughness: effect.toughness ?? 1 }
+      const kws = effect.grant_keywords || []
+      const ps = state.players[controllerId]
+      const newBf = ps.battlefield.map(p => ({
+        ...p,
+        temp_effects: [...(p.temp_effects || []), te],
+        temp_keywords: [...(p.temp_keywords || []), ...kws],
+      }))
+      return log(
+        { ...state, players: { ...state.players, [controllerId]: { ...ps, battlefield: newBf } } },
+        `全クリーチャーがターン終了時まで+${te.power}/+${te.toughness}${kws.length ? `と${kws.join('/')}` : ''}を得た`
+      )
+    }
+
+    case 'discard_self': {
+      const count = effect.count ?? 1
+      return log({ ...state, pending_discard: { pid: controllerId, count: (state.pending_discard?.count || 0) + count } },
+        `カードを${count}枚捨てる`)
     }
 
     default:

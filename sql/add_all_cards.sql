@@ -958,3 +958,148 @@ UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM json
 UPDATE cards SET keywords = (SELECT COALESCE(jsonb_agg(e),'[]'::jsonb) FROM jsonb_array_elements(keywords) e WHERE e->>'type' NOT LIKE 'subtype_%') || '[{"type":"subtype_human"},{"type":"subtype_warrior"}]'::jsonb WHERE name = '狩猟の統率者、スーラク';
 UPDATE cards SET effect_text='優しいインドリクが戦場に出たとき、対戦相手がコントロールするクリーチャー1体を対象とするファイトを選んでもよい。', keywords='[{"type":"subtype_beast"},{"type":"etb_trigger","effect":"pending_etb_fight","optional":true}]'::jsonb WHERE name='優しいインドリク';
 UPDATE cards SET effect_text='到達、接死を持つ。（2）（緑）：あなたのコントロールするクリーチャー1体の上に＋1/＋1カウンターを1個置く。この能力はソーサリーとしてのみ起動できる。', keywords='[{"type":"subtype_spider"},{"type":"reach"},{"type":"deathtouch"},{"type":"activated_ability","cost_str":"{2}{G}","effect":"put_counter_target","counter":{"p":1,"t":1},"targeting":"own_creature","sorcery_speed":true}]'::jsonb WHERE name='樹上の罠紡ぎ';
+
+-- ════════════════════════════════════════════════════════════════
+-- 新カード30種（各色＋アーティファクト＋多色）
+-- ════════════════════════════════════════════════════════════════
+
+INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price) VALUES
+
+-- ── 白 (5枚) ──────────────────────────────────────────────────
+('奮起の号令', 'sorcery', 'white', '{1}{W}', NULL, NULL,
+ 'あなたがコントロールするすべてのクリーチャーはターン終了時まで+1/+1の修整を受ける。',
+ '[{"type":"pump_all_own","power":1,"toughness":1}]', 3),
+
+('守護の天使', 'creature', 'white', '{3}{W}{W}', 3, 4,
+ '飛行、警戒、絆魂を持つ。',
+ '[{"type":"subtype_angel"},{"type":"flying"},{"type":"vigilance"},{"type":"lifelink"}]', 7),
+
+('聖戦の旗手', 'creature', 'white', '{2}{W}', 2, 2,
+ '聖戦の旗手が戦場に出たとき、あなたがコントロールするすべてのクリーチャーはターン終了時まで+1/+1の修整を受ける。',
+ '[{"type":"subtype_human"},{"type":"subtype_soldier"},{"type":"etb_trigger","effect":"pump_all_own","power":1,"toughness":1}]', 4),
+
+('光の奉仕者', 'instant', 'white', '{W}', NULL, NULL,
+ 'あなたは5点のライフを得る。',
+ '[{"type":"gain_life","value":5}]', 2),
+
+('輝く槍騎士', 'creature', 'white', '{2}{W}', 2, 3,
+ '先制攻撃を持つ。輝く槍騎士が戦場に出たとき、あなたは2点のライフを得る。',
+ '[{"type":"subtype_human"},{"type":"subtype_knight"},{"type":"first_strike"},{"type":"etb_trigger","effect":"gain_life","value":2}]', 4),
+
+-- ── 青 (5枚) ──────────────────────────────────────────────────
+('霊体の駿馬', 'creature', 'blue', '{2}{U}', 3, 2,
+ '飛行を持つ。霊体の駿馬はブロックに参加できない。各終了ステップの開始時に、霊体の駿馬をオーナーの手札に戻す。',
+ '[{"type":"subtype_spirit"},{"type":"flying"},{"type":"cant_block"},{"type":"return_self_end_step"}]', 4),
+
+('時の逆流', 'instant', 'blue', '{2}{U}', NULL, NULL,
+ 'パーマネント1つを対象とし、それをオーナーの手札に戻す。',
+ '[{"type":"bounce_permanent"}]', 3),
+
+('知識の波涛', 'sorcery', 'blue', '{3}{U}', NULL, NULL,
+ 'カードを3枚引き、その後カードを1枚捨てる。',
+ '[{"type":"draw_cards","value":3},{"type":"discard_self","count":1}]', 4),
+
+('海の賢者', 'creature', 'blue', '{1}{U}', 1, 3,
+ '瞬速を持つ。海の賢者が戦場に出たとき、カードを1枚引く。',
+ '[{"type":"subtype_merfolk"},{"type":"subtype_wizard"},{"type":"flash"},{"type":"etb_trigger","effect":"draw_cards","value":1}]', 4),
+
+('反響の呪文師', 'creature', 'blue', '{3}{U}', 2, 2,
+ '反響の呪文師が戦場に出たとき、カードを2枚引き、その後カードを2枚捨てる。',
+ '[{"type":"subtype_human"},{"type":"subtype_wizard"},{"type":"etb_trigger","effect":"draw_then_discard","value":2}]', 5),
+
+-- ── 黒 (5枚) ──────────────────────────────────────────────────
+('夜の使者', 'creature', 'black', '{1}{B}', 1, 1,
+ '絆魂を持つ。夜の使者が攻撃するたび、防御プレイヤーはカードを1枚捨てる。',
+ '[{"type":"subtype_vampire"},{"type":"subtype_noble"},{"type":"lifelink"},{"type":"attack_trigger","effect":"opp_discard","count":1}]', 4),
+
+('影の処刑人', 'creature', 'black', '{2}{B}', 2, 2,
+ '威迫、接死を持つ。',
+ '[{"type":"subtype_skeleton"},{"type":"subtype_rogue"},{"type":"menace"},{"type":"deathtouch"}]', 4),
+
+('腐敗の嵐', 'sorcery', 'black', '{3}{B}', NULL, NULL,
+ '腐敗の嵐は対戦相手と、対戦相手がコントロールするすべてのクリーチャーにそれぞれ2点のダメージを与える。',
+ '[{"type":"deal_damage_all","value":2}]', 5),
+
+('死の契約', 'sorcery', 'black', '{2}{B}', NULL, NULL,
+ 'カードを3枚引き、その後カードを2枚捨てる。',
+ '[{"type":"draw_cards","value":3},{"type":"discard_self","count":2}]', 4),
+
+('骸骨の傭兵', 'creature', 'black', '{1}{B}', 1, 1,
+ '発掘{B}（{B}を支払い、このカードを墓地から戦場に戻す。次の終了ステップに追放する。）',
+ '[{"type":"subtype_skeleton"},{"type":"subtype_warrior"},{"type":"unearth","value":1}]', 2),
+
+-- ── 赤 (5枚) ──────────────────────────────────────────────────
+('爆発する溶岩', 'instant', 'red', '{1}{R}', NULL, NULL,
+ '爆発する溶岩はクリーチャー1体かプレイヤー1人に2点のダメージを与える。カードを1枚引く。',
+ '[{"type":"deal_damage","value":2},{"type":"draw_cards","value":1}]', 4),
+
+('狂乱の突撃', 'sorcery', 'red', '{1}{R}', NULL, NULL,
+ 'あなたがコントロールするすべてのクリーチャーはターン終了時まで+2/+0の修整を受けるとともに速攻を得る。',
+ '[{"type":"pump_all_own","power":2,"toughness":0,"grant_keywords":["haste"]}]', 4),
+
+('炎の儀式', 'instant', 'red', '{R}', NULL, NULL,
+ '炎の儀式はクリーチャー1体かプレイヤー1人に3点のダメージを与える。',
+ '[{"type":"deal_damage","value":3}]', 2),
+
+('炎の伝令', 'creature', 'red', '{2}{R}', 2, 2,
+ '速攻を持つ。炎の伝令が攻撃するたび、防御プレイヤーに1点のダメージを与える。',
+ '[{"type":"subtype_goblin"},{"type":"subtype_shaman"},{"type":"haste"},{"type":"attack_trigger","effect":"deal_each_opp","value":1}]', 3),
+
+('大洪水の溶岩', 'sorcery', 'red', '{4}{R}', NULL, NULL,
+ '大洪水の溶岩は対戦相手と、対戦相手がコントロールするすべてのクリーチャーにそれぞれ4点のダメージを与える。',
+ '[{"type":"deal_damage_all","value":4}]', 6),
+
+-- ── 緑 (5枚) ──────────────────────────────────────────────────
+('大自然の咆哮', 'sorcery', 'green', '{1}{G}{G}', NULL, NULL,
+ 'あなたがコントロールするすべてのクリーチャーはターン終了時まで+2/+2の修整を受けるとともにトランプルを得る。',
+ '[{"type":"pump_all_own","power":2,"toughness":2,"grant_keywords":["trample"]}]', 5),
+
+('根の巨人', 'creature', 'green', '{5}{G}{G}', 8, 8,
+ 'トランプルを持つ。根の巨人が攻撃するたび、防御プレイヤーはクリーチャーを1体生け贄に捧げる。',
+ '[{"type":"subtype_treefolk"},{"type":"trample"},{"type":"attack_trigger","effect":"opp_sacrifice_creature"}]', 8),
+
+('毒の蜘蛛', 'creature', 'green', '{1}{G}', 1, 3,
+ '到達、接死を持つ。',
+ '[{"type":"subtype_spider"},{"type":"reach"},{"type":"deathtouch"}]', 3),
+
+('古代の守護者', 'creature', 'green', '{3}{G}', 2, 5,
+ '到達を持つ。古代の守護者が戦場に出たとき、あなたは3点のライフを得る。',
+ '[{"type":"subtype_elemental"},{"type":"reach"},{"type":"etb_trigger","effect":"gain_life","value":3}]', 4),
+
+('豊穣の大蛇', 'creature', 'green', '{4}{G}', 5, 5,
+ 'トランプル、絆魂を持つ。',
+ '[{"type":"subtype_snake"},{"type":"trample"},{"type":"lifelink"}]', 5),
+
+-- ── アーティファクト (3枚) ────────────────────────────────────
+('増幅の宝珠', 'artifact', 'colorless', '{3}', NULL, NULL,
+ 'あなたがコントロールするすべてのクリーチャーは+1/+1の修整を受ける。',
+ '[{"type":"anthem","power_bonus":1,"toughness_bonus":1}]', 5),
+
+('記憶の書架', 'artifact', 'colorless', '{3}', NULL, NULL,
+ '{3}、タップ：カードを1枚引く。',
+ '[{"type":"activated_ability","cost":3,"tap_self":true,"effect":"draw_cards","value":1}]', 4),
+
+('強化の錬成機', 'artifact', 'colorless', '{4}', NULL, NULL,
+ '{2}：あなたがコントロールするクリーチャー1体の上に+1/+1カウンターを1個置く。この能力はソーサリーとしてのみ起動できる。',
+ '[{"type":"activated_ability","cost_str":"{2}","effect":"put_counter_target","counter":{"p":1,"t":1},"targeting":"own_creature","sorcery_speed":true}]', 5),
+
+-- ── 多色 (2枚) ────────────────────────────────────────────────
+('双刃の英雄', 'creature', 'multicolor', '{2}{R}{W}', 3, 3,
+ '先制攻撃、警戒を持つ。',
+ '[{"type":"subtype_human"},{"type":"subtype_warrior"},{"type":"first_strike"},{"type":"vigilance"}]', 5),
+
+('死と再生の悪魔', 'creature', 'multicolor', '{3}{B}{R}', 5, 4,
+ 'トランプル、速攻を持つ。死と再生の悪魔が戦場に出たとき、カードを2枚捨てる。',
+ '[{"type":"subtype_demon"},{"type":"trample"},{"type":"haste"},{"type":"etb_trigger","effect":"draw_then_discard","value":2}]', 7)
+
+ON CONFLICT (name) DO UPDATE SET
+  card_type  = EXCLUDED.card_type,
+  color      = EXCLUDED.color,
+  mana_cost  = EXCLUDED.mana_cost,
+  power      = EXCLUDED.power,
+  toughness  = EXCLUDED.toughness,
+  effect_text = EXCLUDED.effect_text,
+  keywords   = EXCLUDED.keywords,
+  price      = EXCLUDED.price;
+
+ALTER TABLE cards ENABLE TRIGGER USER;
