@@ -13,6 +13,7 @@ import {
   activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor,
   resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand, respondToCounter, resolvePendingDiscard,
   hasAdditionalCost, castSpellSacrificeAndExile, castSpellPayExtraAndExile,
+  resolveReturnFromGy, finishReturnFromGy,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -235,6 +236,7 @@ export default function GamePlayPage() {
   const [counterResponseMode, setCounterResponseMode] = useState(null) // pending_counter_response for myId
   const [additionalCostModal, setAdditionalCostModal] = useState(null) // { cardId, card, extraCost }
   const [sacrificeForSpellMode, setSacrificeForSpellMode] = useState(null) // { cardId, card } — 生け贄選択中
+  const [returnFromGyMode, setReturnFromGyMode] = useState(null) // pending_return_from_gy for myId
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -477,6 +479,12 @@ export default function GamePlayPage() {
       setCounterResponseMode(gs.pending_counter_response)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_counter_response])
+
+  useEffect(() => {
+    if (!gs?.pending_return_from_gy) { setReturnFromGyMode(null); return }
+    if (gs.pending_return_from_gy.pid === myId) setReturnFromGyMode(gs.pending_return_from_gy)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_return_from_gy])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -1582,6 +1590,52 @@ export default function GamePlayPage() {
             : false
         }
       />
+
+      {/* ─── 墓地回収モーダル（死の円舞曲など）─── */}
+      {returnFromGyMode && (
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-emerald-600 rounded-xl p-5 w-full max-w-2xl mx-4 shadow-2xl">
+            <p className="text-emerald-300 font-bold text-center text-lg mb-1">墓地から手札に戻す</p>
+            <p className="text-gray-400 text-sm text-center mb-4">
+              あと {returnFromGyMode.remaining} 枚選べます
+              {returnFromGyMode.then_discard > 0 && `（その後 ${returnFromGyMode.then_discard} 枚捨てる）`}
+            </p>
+            <div className="flex gap-2 overflow-x-auto justify-center pb-1 mb-4">
+              {(myPs?.graveyard || []).filter(cid => {
+                const c = cardData[cid]
+                if (returnFromGyMode.restriction === 'creature') return c?.card_type === 'creature'
+                return true
+              }).map(cid => {
+                const c = cardData[cid]
+                return (
+                  <button
+                    key={cid}
+                    onClick={() => {
+                      const newGs = resolveReturnFromGy(gs, myId, cid, cardData)
+                      if (newGs !== gs) dispatch(newGs)
+                    }}
+                    className={`shrink-0 w-20 h-28 rounded-lg p-1.5 border-2 border-emerald-500 hover:border-emerald-300 text-left text-xs flex flex-col ${COLOR_BG[c?.color] || 'bg-gray-700 text-white'}`}
+                  >
+                    {c?.art_url && <img src={c.art_url} alt="" className="w-full h-12 object-cover rounded mb-1" />}
+                    <p className="font-bold leading-tight line-clamp-2">{c?.name || '?'}</p>
+                    <p className="text-xs opacity-70 mt-auto">{c?.mana_cost || ''}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              onClick={() => {
+                const newGs = finishReturnFromGy(gs, myId)
+                if (newGs !== gs) dispatch(newGs)
+                setReturnFromGyMode(null)
+              }}
+              className="w-full py-2 rounded-lg text-sm text-gray-300 hover:text-white bg-gray-800 hover:bg-gray-700 transition-colors"
+            >
+              完了（これ以上選ばない）
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ─── 追加コスト選択モーダル（踊り食いなど）─── */}
       {additionalCostModal && (

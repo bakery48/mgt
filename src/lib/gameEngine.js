@@ -612,6 +612,39 @@ export function resolveEtbReturnHand(state, pid, cardId, cardData) {
   )
 }
 
+// 墓地回収スペル：カードを1枚ずつ選択して手札に戻す
+export function resolveReturnFromGy(state, pid, cardId, cardData) {
+  const prfg = state.pending_return_from_gy
+  if (!prfg || prfg.pid !== pid) return state
+  const ps = state.players[pid]
+  if (!ps.graveyard.includes(cardId)) return state
+  const returnCard = cardData[cardId] || {}
+  const newGy = ps.graveyard.filter(id => id !== cardId)
+  const newHand = [...ps.hand, cardId]
+  const remaining = prfg.remaining - 1
+  let s = log({
+    ...state,
+    players: { ...state.players, [pid]: { ...ps, graveyard: newGy, hand: newHand } },
+    pending_return_from_gy: remaining > 0 ? { ...prfg, remaining } : null,
+  }, `${returnCard.name || 'カード'} を墓地から手札に戻した`)
+  // 選択完了または残り0枚になったら捨てフェーズへ
+  if (remaining <= 0 && prfg.then_discard > 0) {
+    s = { ...s, pending_discard: { pid, count: prfg.then_discard } }
+  }
+  return s
+}
+
+// 墓地回収スペル：選択を早期終了（対象なし or スキップ）
+export function finishReturnFromGy(state, pid) {
+  const prfg = state.pending_return_from_gy
+  if (!prfg || prfg.pid !== pid) return state
+  let s = { ...state, pending_return_from_gy: null }
+  if (prfg.then_discard > 0) {
+    s = { ...s, pending_discard: { pid, count: prfg.then_discard } }
+  }
+  return s
+}
+
 // ライフを得たとき誘発する能力を処理する
 function applyLifeGainTriggers(state, gainerId, cardData) {
   let s = state
@@ -1587,6 +1620,7 @@ export const SPELL_EFFECT_TYPES = [
   'destroy_creature', 'destroy_permanent',
   'bounce_creature', 'bounce_permanent', 'bounce_all_attackers',
   'pump_creature', 'reanimate', 'counter_spell', 'draw_then_discard', 'exile_creature',
+  'return_from_gy',
 ]
 
 const TARGETED_EFFECTS = [
@@ -1838,6 +1872,19 @@ function applySpellEffect(state, controllerId, effect, target, kicked, cardData)
         players: { ...state.players, [controllerId]: { ...ps, hand: [...ps.hand, ...drawn], library: ps.library.slice(count) } },
         pending_discard: { pid: controllerId, count: (state.pending_discard?.count || 0) + count },
       }, `カードを${count}枚引き、その後${count}枚捨てる`)
+    }
+
+    case 'return_from_gy': {
+      // 墓地から最大 count 枚をUIで選んで手札に戻す → その後 then_discard 枚捨てる
+      return log({
+        ...state,
+        pending_return_from_gy: {
+          pid: controllerId,
+          remaining: effect.count ?? 1,
+          restriction: effect.restriction ?? 'creature',
+          then_discard: effect.then_discard ?? 0,
+        },
+      }, `墓地から最大${effect.count ?? 1}枚選んで手札に戻す`)
     }
 
     default:

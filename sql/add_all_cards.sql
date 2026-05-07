@@ -278,8 +278,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"reanimate"}]', 800),
 
 ('死の円舞曲',         'sorcery',  'black', '{1}{B}',       null, null,
- 'あなたの墓地にあるクリーチャー・カードを最大2枚まで対象とし、それらをオーナーの手札に戻す。その後、カードを1枚捨てる。（墓地回収は現在未実装）',
- '[]', 500),
+ 'あなたの墓地にあるクリーチャー・カードを最大2枚まで対象とし、それらをオーナーの手札に戻す。その後、カードを1枚捨てる。',
+ '[{"type":"return_from_gy","count":2,"restriction":"creature","then_discard":1}]', 500),
 
 -- ── 土地 ─────────────────────────────────────────────────────
 ('ならず者の道',       'land', 'colorless', null, null, null,
@@ -786,3 +786,4 @@ UPDATE cards SET effect_text='呪文1つを対象とし、そのコントロー�
 UPDATE cards SET effect_text='呪文1つを対象とし、それを打ち消す。カードを1枚引き、その後カードを1枚捨てる。', keywords='[{"type":"counter_spell"},{"type":"draw_then_discard","value":1}]'::jsonb WHERE name='論破';
 UPDATE cards SET effect_text='エンチャント（クリーチャー）。星明かりの罠が戦場に出たとき、エンチャントされているクリーチャーをタップする。エンチャントされているクリーチャーはそのコントローラーのアンタップ・ステップにアンタップしない。', keywords='[{"type":"aura","enchant":"opp_creature"},{"type":"etb_trigger","effect":"tap_attached"},{"type":"prevent_untap"}]'::jsonb WHERE name='星明かりの罠';
 UPDATE cards SET effect_text='追加コストとして、クリーチャー1体を生け贄に捧げるか{3}{B}を支払う。クリーチャー1体を対象とし、それを追放する。', keywords='[{"type":"additional_cost","pay_mana":"{3}{B}"},{"type":"exile_creature"}]'::jsonb WHERE name='踊り食い';
+UPDATE cards SET effect_text='あなたの墓地にあるクリーチャー・カードを最大2枚まで対象とし、それらをオーナーの手札に戻す。その後、カードを1枚捨てる。', keywords='[{"type":"return_from_gy","count":2,"restriction":"creature","then_discard":1}]'::jsonb WHERE name='死の円舞曲';
