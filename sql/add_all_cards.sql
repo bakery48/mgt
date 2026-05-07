@@ -5,9 +5,9 @@ ALTER TABLE cards DISABLE TRIGGER USER;
 
 -- name カラムに UNIQUE 制約がなければ追加（DO ブロックで既存時はスキップ）
 DO $$BEGIN
-  -- 重複行を先に削除（id が小さい方を残す）
+  -- 重複行を先に削除（name ごとに1行残す）
   DELETE FROM cards WHERE id NOT IN (
-    SELECT MIN(id) FROM cards GROUP BY name
+    SELECT DISTINCT ON (name) id FROM cards ORDER BY name
   );
   ALTER TABLE cards ADD CONSTRAINT cards_name_key UNIQUE (name);
 EXCEPTION WHEN duplicate_object THEN NULL;
