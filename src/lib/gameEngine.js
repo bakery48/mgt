@@ -99,6 +99,7 @@ function mkPermanent(cardId, card) {
     counters: {},
     power: card?.power ?? null,
     toughness: card?.toughness ?? null,
+    temp_effects: [],
   }
 }
 
@@ -268,17 +269,24 @@ function resolveStack(state, cardData) {
     }
     newState = log(newState, `${card?.name} が戦場に出た${top.kicked ? '（キッカー済）' : ''}`)
   } else {
-    // instant/sorcery → フラッシュバックなら追放、それ以外は墓地
+    // instant/sorcery: 呪文効果を適用
+    for (const effect of (card?.keywords || [])) {
+      if (SPELL_EFFECT_TYPES.includes(effect.type)) {
+        newState = applySpellEffect(newState, top.controller, effect, top.target, top.kicked, cardData)
+      }
+    }
+    // フラッシュバックなら追放、それ以外は墓地
+    const ctrl = newState.players[top.controller]
     if (top.flashback) {
       newState.players = {
         ...newState.players,
-        [top.controller]: { ...ps, exile: [...(ps.exile || []), top.card_id] },
+        [top.controller]: { ...ctrl, exile: [...(ctrl.exile || []), top.card_id] },
       }
       newState = log(newState, `${card?.name} 解決 → 追放`)
     } else {
       newState.players = {
         ...newState.players,
-        [top.controller]: { ...ps, graveyard: [...ps.graveyard, top.card_id] },
+        [top.controller]: { ...ctrl, graveyard: [...ctrl.graveyard, top.card_id] },
       }
       newState = log(newState, `${card?.name} 解決 → 墓地へ`)
     }
@@ -376,7 +384,7 @@ export function advancePhase(state) {
       [ap]: {
         ...ps,
         mana_pool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
-        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0 })),
+        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0, temp_effects: [] })),
       },
     }
   } else {
@@ -397,7 +405,7 @@ export function finishCleanup(state) {
       [ap]: {
         ...ps,
         mana_pool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
-        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0 })),
+        battlefield: ps.battlefield.map(p => ({ ...p, damage: 0, temp_effects: [] })),
       },
     },
   }
@@ -475,7 +483,10 @@ function _resolveStrike(state, cardData, firstStrikePhase) {
     if (!attPerm) continue
     const attCard = cardData[attPerm.card_id] || {}
     const attKws  = attCard.keywords || []
-    const attKw   = attKws.map(k => k.type)
+    const attKw   = [
+      ...attKws.map(k => k.type),
+      ...(attPerm.temp_effects || []).flatMap(te => te.grant_keywords || []),
+    ]
     const hasFS   = attKw.includes('first_strike')
     const hasDS   = attKw.includes('double_strike')
 
@@ -496,7 +507,10 @@ function _resolveStrike(state, cardData, firstStrikePhase) {
       for (const blk of blockers) {
         const blkCard = cardData[blk.card_id] || {}
         const blkKws  = blkCard.keywords || []
-        const blkKw   = blkKws.map(k => k.type)
+        const blkKw   = [
+          ...blkKws.map(k => k.type),
+          ...(blk.temp_effects || []).flatMap(te => te.grant_keywords || []),
+        ]
         const blkFS   = blkKw.includes('first_strike') || blkKw.includes('double_strike')
         const blkProt = blkKws.find(k => k.type === 'protection')?.value ?? null
         const blkImmuneToAtt = blkProt && attCard.color === blkProt
@@ -627,6 +641,10 @@ export function getEffectivePT(perm, card, battlefield, cardData) {
       toughness += eqKw.toughness_bonus ?? 0
     }
   }
+  for (const te of (perm.temp_effects || [])) {
+    power += te.power ?? 0
+    toughness += te.toughness ?? 0
+  }
   return { power, toughness }
 }
 
@@ -756,7 +774,10 @@ export function getValidBlockers(state, defId, cardData) {
   for (const att of attackerPerms) {
     const attCard = cardData[att.card_id] || {}
     const attKws = attCard.keywords || []
-    const attKwTypes = attKws.map(k => k.type)
+    const attKwTypes = [
+      ...attKws.map(k => k.type),
+      ...(att.temp_effects || []).flatMap(te => te.grant_keywords || []),
+    ]
     const attFlying = attKwTypes.includes('flying')
     // protection from X: attacker cannot be blocked by X-colored creatures
     const attProtection = attKws.find(k => k.type === 'protection')?.value ?? null
@@ -764,7 +785,10 @@ export function getValidBlockers(state, defId, cardData) {
     result[att.instance_id] = defenderPerms
       .filter(blk => {
         const blkCard = cardData[blk.card_id] || {}
-        const blkKwTypes = (blkCard.keywords || []).map(k => k.type)
+        const blkKwTypes = [
+          ...(blkCard.keywords || []).map(k => k.type),
+          ...(blk.temp_effects || []).flatMap(te => te.grant_keywords || []),
+        ]
         if (attFlying && !blkKwTypes.includes('flying') && !blkKwTypes.includes('reach')) return false
         if (attProtection && blkCard.color === attProtection) return false
         return true
@@ -772,6 +796,296 @@ export function getValidBlockers(state, defId, cardData) {
       .map(p => p.instance_id)
   }
   return result
+}
+
+// ─── 呪文効果システム ─────────────────────────────────────────────
+
+export const SPELL_EFFECT_TYPES = [
+  'draw_cards', 'gain_life', 'deal_damage', 'deal_damage_all',
+  'destroy_creature', 'destroy_permanent',
+  'bounce_creature', 'bounce_permanent', 'bounce_all_attackers',
+  'pump_creature', 'reanimate',
+]
+
+const TARGETED_EFFECTS = [
+  'deal_damage', 'destroy_creature', 'destroy_permanent',
+  'bounce_creature', 'bounce_permanent', 'pump_creature', 'reanimate',
+]
+
+export function spellNeedsTarget(card) {
+  return (card?.keywords || []).some(k => TARGETED_EFFECTS.includes(k.type))
+}
+
+export function getSpellTargetingType(card) {
+  for (const kw of (card?.keywords || [])) {
+    if (kw.type === 'deal_damage') return 'opp_creature_or_player'
+    if (kw.type === 'destroy_creature') return 'opp_creature'
+    if (kw.type === 'destroy_permanent') return 'any_permanent'
+    if (kw.type === 'bounce_creature') return 'opp_creature'
+    if (kw.type === 'bounce_permanent') return 'any_permanent'
+    if (kw.type === 'pump_creature') return (kw.power ?? 0) < 0 ? 'opp_creature' : 'own_creature'
+    if (kw.type === 'reanimate') return 'own_graveyard_creature'
+  }
+  return null
+}
+
+// target: { type: 'player'|'creature'|'graveyard_card', id: string }
+function applySpellEffect(state, controllerId, effect, target, kicked, cardData) {
+  const opp = getOpponent(state, controllerId)
+
+  switch (effect.type) {
+    case 'draw_cards': {
+      const count = (kicked && effect.kicked_value != null) ? effect.kicked_value : (effect.value || 1)
+      const ps = state.players[controllerId]
+      const drawn = ps.library.slice(0, count)
+      return log({
+        ...state,
+        players: {
+          ...state.players,
+          [controllerId]: { ...ps, hand: [...ps.hand, ...drawn], library: ps.library.slice(count) },
+        },
+      }, `カードを${count}枚引いた`)
+    }
+
+    case 'gain_life': {
+      const amount = effect.value || 0
+      const ps = state.players[controllerId]
+      return log({
+        ...state,
+        players: { ...state.players, [controllerId]: { ...ps, life: ps.life + amount } },
+      }, `ライフを${amount}点得た`)
+    }
+
+    case 'deal_damage': {
+      if (!target) return state
+      const dmg = (kicked && effect.kicked_value != null) ? effect.kicked_value : (effect.value || 1)
+      if (target.type === 'player') {
+        const tPs = state.players[target.id]
+        if (!tPs) return state
+        return log({
+          ...state,
+          players: { ...state.players, [target.id]: { ...tPs, life: tPs.life - dmg } },
+        }, `プレイヤーに${dmg}点のダメージ`)
+      }
+      if (target.type === 'creature') {
+        return _damageCreature(state, target.id, dmg, cardData)
+      }
+      return state
+    }
+
+    case 'deal_damage_all': {
+      const dmg = effect.value || 2
+      let s = { ...state }
+      // 相手プレイヤーへのダメージ
+      const oppPs = s.players[opp]
+      s = { ...s, players: { ...s.players, [opp]: { ...oppPs, life: oppPs.life - dmg } } }
+      // 相手のクリーチャーへのダメージ
+      const newOppPs = s.players[opp]
+      const alive = []
+      const dead = []
+      for (const perm of newOppPs.battlefield) {
+        const card = cardData[perm.card_id] || {}
+        if (card.card_type !== 'creature') { alive.push(perm); continue }
+        const kw = (card.keywords || []).map(k => k.type)
+        if (kw.includes('indestructible')) { alive.push(perm); continue }
+        const newDmg = perm.damage + dmg
+        const { toughness } = getEffectivePT(perm, card, newOppPs.battlefield, cardData)
+        if (newDmg >= toughness) { dead.push(perm.card_id) }
+        else { alive.push({ ...perm, damage: newDmg }) }
+      }
+      return log({
+        ...s,
+        players: { ...s.players, [opp]: { ...newOppPs, battlefield: alive, graveyard: [...newOppPs.graveyard, ...dead] } },
+      }, `全体に${dmg}点ダメージ（${dead.length}体破壊）`)
+    }
+
+    case 'destroy_creature': {
+      if (!target || target.type !== 'creature') return state
+      return _destroyPermanent(state, target.id, cardData, effect.restriction)
+    }
+
+    case 'destroy_permanent': {
+      if (!target) return state
+      return _destroyPermanent(state, target.id, cardData, effect.restriction)
+    }
+
+    case 'bounce_creature':
+    case 'bounce_permanent': {
+      if (!target) return state
+      const tid = target.type === 'creature' || target.type === 'permanent' ? target.id : target.id
+      return _bouncePermanent(state, tid, cardData)
+    }
+
+    case 'bounce_all_attackers': {
+      const ap = state.active_player
+      const apPs = state.players[ap]
+      const attackers = apPs.battlefield.filter(p => p.attacking)
+      if (attackers.length === 0) return log(state, '攻撃クリーチャーなし')
+      const returnedIds = attackers.map(p => p.card_id)
+      return log({
+        ...state,
+        combat: { attackers: [], blockers: {} },
+        players: {
+          ...state.players,
+          [ap]: {
+            ...apPs,
+            battlefield: apPs.battlefield.filter(p => !p.attacking),
+            hand: [...apPs.hand, ...returnedIds],
+          },
+        },
+      }, `攻撃クリーチャー${attackers.length}体を手札に戻した`)
+    }
+
+    case 'pump_creature': {
+      if (!target || target.type !== 'creature') return state
+      const tid = target.id
+      for (const [pid, ps] of Object.entries(state.players)) {
+        const idx = ps.battlefield.findIndex(p => p.instance_id === tid)
+        if (idx === -1) continue
+        const perm = ps.battlefield[idx]
+        const card = cardData[perm.card_id] || {}
+        const te = {
+          power: effect.power ?? 0,
+          toughness: effect.toughness ?? 0,
+          grant_keywords: effect.grant_keywords || [],
+        }
+        const grantsHaste = te.grant_keywords.includes('haste')
+        const newBf = ps.battlefield.map((p, i) =>
+          i === idx ? {
+            ...p,
+            temp_effects: [...(p.temp_effects || []), te],
+            summoning_sick: grantsHaste ? false : p.summoning_sick,
+          } : p
+        )
+        const sign = v => v >= 0 ? `+${v}` : `${v}`
+        return log({
+          ...state,
+          players: { ...state.players, [pid]: { ...ps, battlefield: newBf } },
+        }, `${card.name} は${sign(te.power)}/${sign(te.toughness)}の修整を受けた`)
+      }
+      return state
+    }
+
+    case 'reanimate': {
+      if (!target || target.type !== 'graveyard_card') return state
+      const ps = state.players[controllerId]
+      const cardId = target.id
+      if (!ps.graveyard.includes(cardId)) return state
+      const card = cardData[cardId] || {}
+      if (card.card_type !== 'creature') return state
+      const perm = mkPermanent(cardId, card)
+      perm.summoning_sick = true
+      return log({
+        ...state,
+        players: {
+          ...state.players,
+          [controllerId]: {
+            ...ps,
+            graveyard: removeOne(ps.graveyard, cardId),
+            battlefield: [...ps.battlefield, perm],
+          },
+        },
+      }, `${card.name} を墓地から戦場に戻した`)
+    }
+
+    default:
+      return state
+  }
+}
+
+function _damageCreature(state, instanceId, dmg, cardData) {
+  for (const [pid, ps] of Object.entries(state.players)) {
+    const idx = ps.battlefield.findIndex(p => p.instance_id === instanceId)
+    if (idx === -1) continue
+    const perm = ps.battlefield[idx]
+    const card = cardData[perm.card_id] || {}
+    const kw = (card.keywords || []).map(k => k.type)
+    if (kw.includes('indestructible')) return log(state, `${card.name} は破壊不能`)
+    const newDmg = perm.damage + dmg
+    const { toughness: effTough } = getEffectivePT(perm, card, ps.battlefield, cardData)
+    let newBf = ps.battlefield.map((p, i) => i === idx ? { ...p, damage: newDmg } : p)
+    let newGy = [...ps.graveyard]
+    if (newDmg >= effTough) {
+      newBf = newBf.filter(p => p.instance_id !== instanceId)
+        .map(p => p.attached_to === instanceId ? { ...p, attached_to: null } : p)
+      newGy = [...newGy, perm.card_id]
+      return log({ ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy } } },
+        `${card.name} に${dmg}点ダメージ → 破壊`)
+    }
+    return log({ ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf } } },
+      `${card.name} に${dmg}点ダメージ`)
+  }
+  return state
+}
+
+function _destroyPermanent(state, instanceId, cardData, restriction) {
+  for (const [pid, ps] of Object.entries(state.players)) {
+    const idx = ps.battlefield.findIndex(p => p.instance_id === instanceId)
+    if (idx === -1) continue
+    const perm = ps.battlefield[idx]
+    const card = cardData[perm.card_id] || {}
+    const kw = (card.keywords || []).map(k => k.type)
+    if (kw.includes('indestructible')) return log(state, `${card.name} は破壊不能`)
+    if (restriction === 'non_black' && card.color === 'black') return log(state, `${card.name} は黒のためターゲット不可`)
+    const newBf = ps.battlefield.filter((p, i) => i !== idx)
+      .map(p => p.attached_to === instanceId ? { ...p, attached_to: null } : p)
+    return log({
+      ...state,
+      players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: [...ps.graveyard, perm.card_id] } },
+    }, `${card.name} を破壊した`)
+  }
+  return state
+}
+
+function _bouncePermanent(state, instanceId, cardData) {
+  for (const [pid, ps] of Object.entries(state.players)) {
+    const idx = ps.battlefield.findIndex(p => p.instance_id === instanceId)
+    if (idx === -1) continue
+    const perm = ps.battlefield[idx]
+    const card = cardData[perm.card_id] || {}
+    const newBf = ps.battlefield.filter((p, i) => i !== idx)
+      .map(p => p.attached_to === instanceId ? { ...p, attached_to: null } : p)
+    return log({
+      ...state,
+      players: { ...state.players, [pid]: { ...ps, battlefield: newBf, hand: [...ps.hand, perm.card_id] } },
+    }, `${card.name} を手札に戻した`)
+  }
+  return state
+}
+
+// 目標付き呪文詠唱
+export function castSpellTargeted(state, pid, cardId, card, target, kicker = false, delveCount = 0) {
+  const ps = state.players[pid]
+  if (!ps.hand.includes(cardId)) return state
+  const isFlash = (card.keywords || []).some(k => k.type === 'flash')
+  const instant = card.card_type === 'instant' || isFlash
+  if (instant ? !canPlayInstantSpeed(state, pid) : !canPlaySorcerySpeed(state, pid)) return state
+
+  let newPool = { ...ps.mana_pool }
+  if (card.mana_cost) {
+    const cost = parseMana(card.mana_cost)
+    if (!hasMana(newPool, cost)) return state
+    newPool = spendMana(newPool, cost)
+  }
+  if (kicker) {
+    const kickerKw = (card.keywords || []).find(k => k.type === 'kicker')
+    if (kickerKw) {
+      const kickerCostStr = `{${kickerKw.value || 1}}`
+      if (!hasMana(newPool, kickerCostStr)) return state
+      newPool = spendMana(newPool, kickerCostStr)
+    }
+  }
+
+  const entry = { id: uuidv4(), type: 'spell', card_id: cardId, card, controller: pid, kicked: kicker, target }
+  return log({
+    ...state,
+    priority_passed: [],
+    stack: [...state.stack, entry],
+    players: {
+      ...state.players,
+      [pid]: { ...ps, hand: removeOne(ps.hand, cardId), mana_pool: newPool },
+    },
+  }, `${card.name} をスタックに積んだ（目標: ${target?.type}）`)
 }
 
 // 威迫（menace）チェック: 威迫クリーチャーは2体未満でブロックできない

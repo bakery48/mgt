@@ -4,12 +4,12 @@ import { supabase } from '../lib/supabase'
 import { usePlayer } from '../contexts/PlayerContext'
 import {
   PHASES, PHASE_LABELS,
-  initGameState, tapForMana, playLand, castSpell, cycleCard, passPriority,
+  initGameState, tapForMana, playLand, castSpell, castSpellTargeted, cycleCard, passPriority,
   advancePhase, declareAttackers, declareBlockers,
   resolveFirstStrikeDamage, resolveCombatDamage,
-  canPlaySorcerySpeed, hasMana, getOpponent, getValidBlockers,
+  canPlaySorcerySpeed, canPlayInstantSpeed, hasMana, getOpponent, getValidBlockers,
   castFlashback, unearthCreature, equipArtifact, getEffectivePT,
-  discardCard, finishCleanup,
+  discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -213,6 +213,10 @@ export default function GamePlayPage() {
   const [hoverCard, setHoverCard] = useState(null)
   const [hoverPerm, setHoverPerm] = useState(null)
   const [surrendering, setSurrendering] = useState(false)
+  const [targetingMode, setTargetingMode] = useState(null)
+  // { cardId, card, kickerPaid, targetingType }
+  const [reanimateMode, setReanimateMode] = useState(null)
+  // { cardId, card }
 
   const myId = player?.id
   const isActive = gs?.active_player === myId
@@ -426,6 +430,8 @@ export default function GamePlayPage() {
     setSelectedAttackers([])
     setPendingBlocker(null)
     setBlockingAssignments({})
+    setTargetingMode(null)
+    setReanimateMode(null)
   }, [saveGs])
 
   const handleHandCardClick = (cardId) => {
@@ -437,6 +443,27 @@ export default function GamePlayPage() {
       if (newGs !== gs) dispatch(newGs)
       return
     }
+
+    // 目標が必要な呪文はターゲットモードに入る
+    if (spellNeedsTarget(card) && hasPrio) {
+      const isFlash = (card.keywords || []).some(k => k.type === 'flash')
+      const canPlay = card.card_type === 'instant' || isFlash
+        ? canPlayInstantSpeed(gs, myId)
+        : canPlaySorcerySpeed(gs, myId)
+      if (!canPlay) return
+      if (card.mana_cost && !hasMana(myPs.mana_pool, card.mana_cost)) return
+
+      const targetingType = getSpellTargetingType(card)
+      if (targetingType === 'own_graveyard_creature') {
+        setReanimateMode({ cardId, card })
+        setSelectedHandCard(null)
+        return
+      }
+      setTargetingMode({ cardId, card, kickerPaid: false, targetingType })
+      setSelectedHandCard(null)
+      return
+    }
+
     if (selectedHandCard === cardId) {
       setSelectedHandCard(null)
       setKickerPaid(false)
@@ -444,6 +471,36 @@ export default function GamePlayPage() {
       setSelectedHandCard(cardId)
       setKickerPaid(false)
     }
+  }
+
+  // 目標選択（クリーチャー）
+  const handleTargetCreature = (instanceId) => {
+    if (!targetingMode) return
+    const { cardId, card, kickerPaid } = targetingMode
+    const target = { type: 'creature', id: instanceId }
+    const newGs = castSpellTargeted(gs, myId, cardId, card, target, kickerPaid)
+    if (newGs !== gs) dispatch(newGs)
+    else setTargetingMode(null)
+  }
+
+  // 目標選択（プレイヤー）
+  const handleTargetPlayer = (playerId) => {
+    if (!targetingMode) return
+    const { cardId, card, kickerPaid } = targetingMode
+    const target = { type: 'player', id: playerId }
+    const newGs = castSpellTargeted(gs, myId, cardId, card, target, kickerPaid)
+    if (newGs !== gs) dispatch(newGs)
+    else setTargetingMode(null)
+  }
+
+  // 再アニメイト：墓地クリーチャー選択
+  const handleReanimateSelect = (graveyardCardId) => {
+    if (!reanimateMode) return
+    const { cardId, card } = reanimateMode
+    const target = { type: 'graveyard_card', id: graveyardCardId }
+    const newGs = castSpellTargeted(gs, myId, cardId, card, target, false)
+    if (newGs !== gs) dispatch(newGs)
+    else setReanimateMode(null)
   }
 
   const handleCastSpell = () => {
@@ -748,9 +805,11 @@ export default function GamePlayPage() {
                       ...perm,
                       blocking: isAssigned ? assignedBlocker : perm.blocking,
                     }}
-                    selected={canAssign || isAssigned}
+                    selected={canAssign || isAssigned || (targetingMode && ['opp_creature','opp_creature_or_player','any_creature','any_permanent'].includes(targetingMode.targetingType))}
                     onClick={() => {
                       if (canAssign) handleAssignBlocker(perm.instance_id)
+                      else if (targetingMode && ['opp_creature','opp_creature_or_player','any_creature'].includes(targetingMode.targetingType) && card?.card_type === 'creature') handleTargetCreature(perm.instance_id)
+                      else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
                     }}
                     onDetail={() => { setDetailCard(card); setDetailPerm(perm) }}
                     onHover={handleHover}
@@ -801,7 +860,10 @@ export default function GamePlayPage() {
                         selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip)}
                         dimmed={inAttackPhase && !canAtt && !isSelAtt}
                         onClick={() => {
-                          if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
+                          if (targetingMode?.targetingType === 'own_creature' && isCrea) handleTargetCreature(perm.instance_id)
+                          else if (targetingMode?.targetingType === 'any_creature' && isCrea) handleTargetCreature(perm.instance_id)
+                          else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
+                          else if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
                           else if (canAtt || inAttackPhase) handleToggleAttacker(perm.instance_id)
                           else if (canBlk) handleSelectBlocker(perm.instance_id)
                           else if (isEquipTarget && !isEquip) handleEquipTarget(perm.instance_id)
@@ -1007,6 +1069,42 @@ export default function GamePlayPage() {
             </div>
           )}
 
+          {/* ターゲットモード */}
+          {targetingMode && (
+            <div className="bg-red-950/60 border border-red-500 rounded-lg px-2 py-2 text-red-300 text-xs">
+              <p className="font-bold mb-1 text-center">🎯 {targetingMode.card?.name}</p>
+              <p className="text-red-400 text-center mb-2">
+                {targetingMode.targetingType === 'own_creature' && '自分のクリーチャーを選択'}
+                {targetingMode.targetingType === 'opp_creature' && '相手のクリーチャーを選択'}
+                {targetingMode.targetingType === 'opp_creature_or_player' && '相手のクリーチャーまたは'}
+                {targetingMode.targetingType === 'any_creature' && '任意のクリーチャーを選択'}
+                {targetingMode.targetingType === 'any_permanent' && 'パーマネントを選択'}
+              </p>
+              {/* キッカートグル */}
+              {(targetingMode.card?.keywords || []).find(k => k.type === 'kicker') && (
+                <label className="flex items-center gap-2 mb-2 cursor-pointer">
+                  <input type="checkbox" checked={targetingMode.kickerPaid}
+                    onChange={e => setTargetingMode(prev => ({ ...prev, kickerPaid: e.target.checked }))}
+                    className="accent-yellow-400" />
+                  <span className="text-yellow-400 text-xs">
+                    キッカー ({`{${(targetingMode.card.keywords.find(k => k.type === 'kicker'))?.value ?? 1}}`})
+                  </span>
+                </label>
+              )}
+              {targetingMode.targetingType === 'opp_creature_or_player' && (
+                <button
+                  onClick={() => handleTargetPlayer(oppId)}
+                  className="w-full bg-red-800 hover:bg-red-700 text-white text-xs py-1.5 rounded mb-1"
+                >
+                  プレイヤーを目標にする
+                </button>
+              )}
+              <button onClick={() => setTargetingMode(null)} className="block w-full text-red-500 hover:text-red-300 text-xs py-1">
+                キャンセル
+              </button>
+            </div>
+          )}
+
           {/* ログ */}
           <div className="flex-1 bg-gray-950 rounded-lg p-2 overflow-y-auto max-h-48">
             <p className="text-gray-600 text-xs mb-1">ログ</p>
@@ -1113,6 +1211,36 @@ export default function GamePlayPage() {
                 )
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 再アニメイト：墓地選択モーダル ─── */}
+      {reanimateMode && (
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-40 pb-4">
+          <div className="bg-gray-800 border border-purple-600 rounded-xl p-4 w-full max-w-2xl mx-4">
+            <p className="text-purple-300 font-bold text-center mb-1">{reanimateMode.card?.name}</p>
+            <p className="text-gray-400 text-xs text-center mb-3">墓地から戦場に戻すクリーチャーを選択</p>
+            <div className="flex gap-2 overflow-x-auto justify-center pb-1">
+              {(myPs.graveyard || []).map((cid, i) => {
+                const c = cardData[cid]
+                if (c?.card_type !== 'creature') return null
+                return (
+                  <button
+                    key={`${cid}-${i}`}
+                    onClick={() => handleReanimateSelect(cid)}
+                    className={`shrink-0 w-20 h-28 rounded-lg p-1.5 border-2 border-purple-500 hover:border-purple-300 text-left text-xs flex flex-col ${COLOR_BG[c?.color] || 'bg-gray-700 text-white'}`}
+                  >
+                    {c?.art_url && <img src={c.art_url} alt="" className="w-full h-12 object-cover rounded mb-1" />}
+                    <p className="font-bold leading-tight line-clamp-2">{c?.name || '?'}</p>
+                    <p className="text-xs mt-auto font-mono">{c?.power}/{c?.toughness}</p>
+                  </button>
+                )
+              }).filter(Boolean)}
+            </div>
+            <button onClick={() => setReanimateMode(null)} className="block w-full text-gray-500 hover:text-gray-300 text-xs py-2 mt-2">
+              キャンセル
+            </button>
           </div>
         </div>
       )}
