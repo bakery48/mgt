@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { STARTER_DECKS } from '../data/starterDecks'
 
-const PlayerContext = createContext(null)
+const PlayerContext = createContext({ player: null, loading: true, createPlayer: async () => {}, refreshPlayer: async () => {}, clearPlayer: () => {} })
 
 const STORAGE_KEY = 'mtg_player_id'
 
