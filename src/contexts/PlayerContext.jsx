@@ -35,16 +35,12 @@ async function ensureStarterDecks(playerId) {
   // 既存デッキを名前で取得
   const { data: existingDecks } = await supabase
     .from('decks')
-    .select('id, name, format')
+    .select('id, name')
     .eq('player_id', playerId)
     .in('name', STARTER_DECKS.map(d => d.name))
   const existingByName = {}
   for (const d of (existingDecks || [])) {
     existingByName[d.name] = d.id
-    // format が magic_league 以外なら更新
-    if (d.format !== 'magic_league') {
-      await supabase.from('decks').update({ format: 'magic_league' }).eq('id', d.id)
-    }
   }
 
   for (const template of STARTER_DECKS) {
@@ -54,7 +50,7 @@ async function ensureStarterDecks(playerId) {
     if (!deckId) {
       const { data: newDeck, error: deckErr } = await supabase
         .from('decks')
-        .insert({ name: template.name, player_id: playerId, format: 'magic_league' })
+        .insert({ name: template.name, player_id: playerId })
         .select('id')
         .single()
       if (deckErr) { console.error('deck insert failed:', template.name, deckErr); continue }
