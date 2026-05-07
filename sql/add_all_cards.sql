@@ -300,8 +300,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"conditional_keyword","condition":"controls_dragon","grant":"flying"}]', 500),
 
 ('炎の大口、ドラクセス', 'creature', 'red', '{4}{R}{R}{R}', 7, 7,
- '伝説のクリーチャー。飛行を持つ。炎の大口、ドラクセスが攻撃するたび、それは任意の対象１つに４点のダメージを与え、他の最大２つの対象にそれぞれ３点のダメージを与える。（攻撃誘発は現在未実装）',
- '[{"type":"flying"}]', 1500),
+ '伝説のクリーチャー。飛行を持つ。炎の大口、ドラクセスが攻撃するたび、それは相手プレイヤーに４点のダメージを与え、相手クリーチャー最大２体にそれぞれ３点のダメージを与える。',
+ '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"attack_trigger","effect":"drakuseth_damage","primary_dmg":4,"secondary_dmg":3,"secondary_count":2}]', 1500),
 
 ('火吹きラガーク',     'creature', 'red', '{3}{R}',       3, 4,
  '上陸 ― あなたのコントロール下で土地が戦場に出るたび、火吹きラガークは各対戦相手に１点のダメージを与える。（上陸は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行の炎の大口、ドラクセスを更新（攻撃誘発を追加）
+UPDATE cards SET
+  effect_text = '伝説のクリーチャー。飛行を持つ。炎の大口、ドラクセスが攻撃するたび、それは相手プレイヤーに４点のダメージを与え、相手クリーチャー最大２体にそれぞれ３点のダメージを与える。',
+  keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"attack_trigger","effect":"drakuseth_damage","primary_dmg":4,"secondary_dmg":3,"secondary_count":2}]'::jsonb
+WHERE name = '炎の大口、ドラクセス';
 
 -- 既存行のカルガの竜騎兵を更新（条件付き飛行を追加）
 UPDATE cards SET

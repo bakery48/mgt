@@ -449,6 +449,54 @@ export function finishCleanup(state) {
 }
 
 // 攻撃宣言（防衛クリーチャーを除外）
+// 攻撃誘発能力を処理（攻撃クリーチャー指定直後に発火）
+function applyAttackTriggers(state, attackingPid, attackerIids, cardData) {
+  let s = state
+  const opp = getOpponent(s, attackingPid)
+  const apBf = s.players[attackingPid].battlefield
+
+  for (const iid of attackerIids) {
+    const perm = apBf.find(p => p.instance_id === iid)
+    if (!perm) continue
+    const card = cardData[perm.card_id] || {}
+
+    for (const kw of (card.keywords || [])) {
+      if (kw.type !== 'attack_trigger') continue
+
+      if (kw.effect === 'drakuseth_damage') {
+        const primaryDmg   = kw.primary_dmg   ?? 4
+        const secondaryDmg = kw.secondary_dmg ?? 3
+        const secondaryMax = kw.secondary_count ?? 2
+
+        // 1) 相手プレイヤーに primary_dmg
+        const oppPs0 = s.players[opp]
+        s = log(
+          { ...s, players: { ...s.players, [opp]: { ...oppPs0, life: oppPs0.life - primaryDmg } } },
+          `${card.name} 攻撃誘発 → 相手プレイヤーに${primaryDmg}点ダメージ`
+        )
+
+        // 2) 相手クリーチャー最大 secondaryMax 体に secondary_dmg（タフネス降順で選択）
+        const oppCreatures = s.players[opp].battlefield
+          .filter(p => (cardData[p.card_id] || {}).card_type === 'creature')
+          .sort((a, b) => {
+            const ta = getEffectivePT(a, cardData[a.card_id] || {}, s.players[opp].battlefield, cardData).toughness
+            const tb = getEffectivePT(b, cardData[b.card_id] || {}, s.players[opp].battlefield, cardData).toughness
+            return tb - ta
+          })
+          .slice(0, secondaryMax)
+
+        for (const target of oppCreatures) {
+          s = _damageCreature(s, target.instance_id, secondaryDmg, cardData)
+        }
+        if (oppCreatures.length > 0) {
+          s = log(s, `${card.name} 攻撃誘発 → 相手クリーチャー${oppCreatures.length}体に${secondaryDmg}点ダメージ`)
+        }
+      }
+    }
+  }
+  return s
+}
+
 export function declareAttackers(state, pid, attackerIids, cardData) {
   if (state.phase !== 'declare_attackers' || state.active_player !== pid) return state
   const ps = state.players[pid]
@@ -472,6 +520,9 @@ export function declareAttackers(state, pid, attackerIids, cardData) {
     priority_passed: [],
     priority: pid,
   }, `${validIids.length} 体で攻撃`)
+
+  // 攻撃誘発能力を処理（ドラクセスなど）
+  next = applyAttackTriggers(next, pid, validIids, cardData)
 
   if (validIids.length === 0) {
     // 攻撃者0体のとき戦闘フェーズ全体をスキップしてメイン2へ
