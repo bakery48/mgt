@@ -518,10 +518,7 @@ function _resolveStrike(state, cardData, firstStrikePhase) {
     if (!attPerm) continue
     const attCard = cardData[attPerm.card_id] || {}
     const attKws  = attCard.keywords || []
-    const attKw   = [
-      ...attKws.map(k => k.type),
-      ...(attPerm.temp_effects || []).flatMap(te => te.grant_keywords || []),
-    ]
+    const attKw   = getEffectiveKeywords(attPerm, attCard, apBf, cardData)
     const hasFS   = attKw.includes('first_strike')
     const hasDS   = attKw.includes('double_strike')
 
@@ -542,10 +539,7 @@ function _resolveStrike(state, cardData, firstStrikePhase) {
       for (const blk of blockers) {
         const blkCard = cardData[blk.card_id] || {}
         const blkKws  = blkCard.keywords || []
-        const blkKw   = [
-          ...blkKws.map(k => k.type),
-          ...(blk.temp_effects || []).flatMap(te => te.grant_keywords || []),
-        ]
+        const blkKw   = getEffectiveKeywords(blk, blkCard, dpBf, cardData)
         const blkFS   = blkKw.includes('first_strike') || blkKw.includes('double_strike')
         const blkProt = blkKws.find(k => k.type === 'protection')?.value ?? null
         const blkImmuneToAtt = blkProt && attCard.color === blkProt
@@ -683,6 +677,30 @@ export function getEffectivePT(perm, card, battlefield, cardData) {
   return { power, toughness }
 }
 
+// クリーチャーの実効キーワード一覧（条件付きキーワード・装備・temp_effects を含む）
+export function getEffectiveKeywords(perm, card, alliedBattlefield, cardData) {
+  const base = (card.keywords || []).map(k => k.type)
+
+  // conditional_keyword: 戦場の状態に応じてキーワードを付与
+  for (const kw of (card.keywords || [])) {
+    if (kw.type !== 'conditional_keyword') continue
+    if (kw.condition === 'controls_dragon') {
+      const hasDragon = alliedBattlefield.some(p => {
+        const c = cardData[p.card_id] || {}
+        return (c.keywords || []).some(k => k.type === 'subtype_dragon')
+      })
+      if (hasDragon) base.push(kw.grant)
+    }
+  }
+
+  // temp_effects で付与されたキーワード
+  for (const te of (perm.temp_effects || [])) {
+    if (te.grant_keywords) base.push(...te.grant_keywords)
+  }
+
+  return base
+}
+
 // 装備（アーティファクトをクリーチャーに付ける）
 export function equipArtifact(state, pid, equipIid, targetIid, cardData) {
   if (!canPlaySorcerySpeed(state, pid)) return state
@@ -809,10 +827,7 @@ export function getValidBlockers(state, defId, cardData) {
   for (const att of attackerPerms) {
     const attCard = cardData[att.card_id] || {}
     const attKws = attCard.keywords || []
-    const attKwTypes = [
-      ...attKws.map(k => k.type),
-      ...(att.temp_effects || []).flatMap(te => te.grant_keywords || []),
-    ]
+    const attKwTypes = getEffectiveKeywords(att, attCard, state.players[ap].battlefield, cardData)
     const attFlying = attKwTypes.includes('flying')
     // protection from X: attacker cannot be blocked by X-colored creatures
     const attProtection = attKws.find(k => k.type === 'protection')?.value ?? null
@@ -820,10 +835,7 @@ export function getValidBlockers(state, defId, cardData) {
     result[att.instance_id] = defenderPerms
       .filter(blk => {
         const blkCard = cardData[blk.card_id] || {}
-        const blkKwTypes = [
-          ...(blkCard.keywords || []).map(k => k.type),
-          ...(blk.temp_effects || []).flatMap(te => te.grant_keywords || []),
-        ]
+        const blkKwTypes = getEffectiveKeywords(blk, blkCard, state.players[defId].battlefield, cardData)
         if (attFlying && !blkKwTypes.includes('flying') && !blkKwTypes.includes('reach')) return false
         if (attProtection && blkCard.color === attProtection) return false
         return true

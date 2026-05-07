@@ -8,7 +8,7 @@ import {
   advancePhase, declareAttackers, declareBlockers,
   resolveFirstStrikeDamage, resolveCombatDamage,
   canPlaySorcerySpeed, canPlayInstantSpeed, hasMana, getOpponent, getValidBlockers,
-  castFlashback, unearthCreature, equipArtifact, getEffectivePT,
+  castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
   discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
 } from '../lib/gameEngine'
 import {
@@ -30,6 +30,11 @@ const KEYWORD_LABELS = {
   flashback: 'フラッシュバック', kicker: 'キッカー', unearth: 'アンアース',
   equip: '装備', delve: '探査',
 }
+// バッジ非表示の内部用キーワードタイプ
+const INTERNAL_KEYWORD_TYPES = new Set([
+  'subtype_dragon', 'on_cast_trigger', 'conditional_keyword',
+  'protection', 'spell_effect', // 効果系は effect_text で説明
+])
 
 const COLOR_BG = {
   white: 'bg-yellow-50 text-gray-900', blue: 'bg-blue-700 text-white',
@@ -56,11 +61,11 @@ function HoverCardTooltip({ card, perm }) {
         )}
       </div>
       <p className="text-gray-400 text-xs">{TYPE_LABELS_JP[card.card_type] || card.card_type}</p>
-      {kws.length > 0 && (
+      {kws.filter(k => !INTERNAL_KEYWORD_TYPES.has(k.type) && KEYWORD_LABELS[k.type]).length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1">
-          {kws.map((k, i) => (
+          {kws.filter(k => !INTERNAL_KEYWORD_TYPES.has(k.type) && KEYWORD_LABELS[k.type]).map((k, i) => (
             <span key={i} className="text-xs bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded">
-              {KEYWORD_LABELS[k.type] || k.type}
+              {KEYWORD_LABELS[k.type]}
             </span>
           ))}
         </div>
@@ -73,8 +78,8 @@ function HoverCardTooltip({ card, perm }) {
   )
 }
 
-function MiniCard({ card, perm, selected, onClick, onDetail, onHover, disabled, dimmed, equipped }) {
-  const kws = (card?.keywords || []).map(k => k.type)
+function MiniCard({ card, perm, selected, onClick, onDetail, onHover, disabled, dimmed, equipped, effectiveKwTypes }) {
+  const kws = effectiveKwTypes ?? (card?.keywords || []).map(k => k.type)
   const isTapped = perm?.tapped
   return (
     <button
@@ -847,6 +852,7 @@ export default function GamePlayPage() {
                     const isSelEquip = pendingEquip === perm.instance_id
                     const isEquipTarget = pendingEquip && isCrea
                     const effPT = isCrea ? getEffectivePT(perm, card, myPs.battlefield, cardData) : null
+                    const effKws = isCrea ? getEffectiveKeywords(perm, card, myPs.battlefield, cardData) : null
                     return (
                       <MiniCard
                         key={perm.instance_id}
@@ -857,6 +863,7 @@ export default function GamePlayPage() {
                           power: effPT?.power ?? perm.power,
                           toughness: effPT?.toughness ?? perm.toughness,
                         }}
+                        effectiveKwTypes={effKws}
                         selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip)}
                         dimmed={inAttackPhase && !canAtt && !isSelAtt}
                         onClick={() => {

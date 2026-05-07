@@ -296,8 +296,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]', 400),
 
 ('カルガの竜騎兵',     'creature', 'red', '{1}{R}',       2, 2,
- 'あなたがドラゴンをコントロールしているかぎり、カルガの竜騎兵は飛行を持つ。（条件付き飛行は現在未実装）',
- '[]', 500),
+ 'あなたがドラゴンをコントロールしているかぎり、カルガの竜騎兵は飛行を持つ。',
+ '[{"type":"conditional_keyword","condition":"controls_dragon","grant":"flying"}]', 500),
 
 ('炎の大口、ドラクセス', 'creature', 'red', '{4}{R}{R}{R}', 7, 7,
  '伝説のクリーチャー。飛行を持つ。炎の大口、ドラクセスが攻撃するたび、それは任意の対象１つに４点のダメージを与え、他の最大２つの対象にそれぞれ３点のダメージを与える。（攻撃誘発は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行のカルガの竜騎兵を更新（条件付き飛行を追加）
+UPDATE cards SET
+  effect_text = 'あなたがドラゴンをコントロールしているかぎり、カルガの竜騎兵は飛行を持つ。',
+  keywords = '[{"type":"conditional_keyword","condition":"controls_dragon","grant":"flying"}]'::jsonb
+WHERE name = 'カルガの竜騎兵';
 
 -- 既存行の炎吐きの仔竜を更新（誘発型能力を追加）
 UPDATE cards SET
