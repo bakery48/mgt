@@ -103,8 +103,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 800),
 
 ('束縛の祈り手',     'enchantment', 'white', '{3}{W}', null, null,
- '瞬速を持つ。戦場に出たとき、対戦相手のパーマネント1つを追放してライフ2点を得る。（追放効果は現在未実装）',
- '[{"type":"flash"}]', 900),
+ '瞬速を持つ。戦場に出たとき、対戦相手のパーマネント1つを追放してライフ2点を得る。',
+ '[{"type":"flash"},{"type":"etb_exile_target","target":"opp_permanent","gain":2}]', 900),
 
 -- ── 土地 ─────────────────────────────────────────────────────
 ('謎めいた洞窟',     'land', 'colorless', null, null, null,
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の束縛の祈り手を更新（ETB追放実装）
+UPDATE cards SET
+  effect_text = '瞬速を持つ。戦場に出たとき、対戦相手のパーマネント1つを追放してライフ2点を得る。',
+  keywords = '[{"type":"flash"},{"type":"etb_exile_target","target":"opp_permanent","gain":2}]'::jsonb
+WHERE name = '束縛の祈り手';
 
 -- 既存行の絢爛たる天使を更新（他クリーチャーETB誘発実装）
 UPDATE cards SET

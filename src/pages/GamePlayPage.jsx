@@ -10,7 +10,7 @@ import {
   canPlaySorcerySpeed, canPlayInstantSpeed, hasMana, getOpponent, getValidBlockers,
   castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
   discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
-  activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor,
+  activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor, resolveEtbExile,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -34,7 +34,7 @@ const KEYWORD_LABELS = {
 // バッジ非表示の内部用キーワードタイプ
 const INTERNAL_KEYWORD_TYPES = new Set([
   'subtype_dragon', 'subtype_angel', 'on_cast_trigger', 'conditional_keyword',
-  'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color', 'ally_etb_trigger', // 効果系は effect_text で説明
+  'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color', 'ally_etb_trigger', 'etb_exile_target', // 効果系は effect_text で説明
 ])
 
 const COLOR_BG = {
@@ -225,6 +225,7 @@ export default function GamePlayPage() {
   const [activatedAbilityMode, setActivatedAbilityMode] = useState(null)
   const [discardForAbilityMode, setDiscardForAbilityMode] = useState(null)
   const [chooseColorMode, setChooseColorMode] = useState(null) // { instanceId, cardName }
+  const [etbExileMode, setEtbExileMode] = useState(false)
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -440,6 +441,13 @@ export default function GamePlayPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.players?.[myId]?.battlefield?.length])
+
+  // pending_etb_exile を検出して追放ターゲット選択モードへ
+  useEffect(() => {
+    if (!gs?.pending_etb_exile) { setEtbExileMode(false); return }
+    if (gs.pending_etb_exile.pid === myId) setEtbExileMode(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_etb_exile])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -841,9 +849,13 @@ export default function GamePlayPage() {
                       ...perm,
                       blocking: isAssigned ? assignedBlocker : perm.blocking,
                     }}
-                    selected={canAssign || isAssigned || (targetingMode && ['opp_creature','opp_creature_or_player','any_creature','any_permanent'].includes(targetingMode.targetingType)) || (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type))}
+                    selected={canAssign || isAssigned || etbExileMode || (targetingMode && ['opp_creature','opp_creature_or_player','any_creature','any_permanent'].includes(targetingMode.targetingType)) || (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type))}
                     onClick={() => {
-                      if (canAssign) handleAssignBlocker(perm.instance_id)
+                      if (etbExileMode) {
+                        const newGs = resolveEtbExile(gs, myId, perm.instance_id, cardData)
+                        if (newGs !== gs) dispatch(newGs)
+                        setEtbExileMode(false)
+                      } else if (canAssign) handleAssignBlocker(perm.instance_id)
                       else if (targetingMode && ['opp_creature','opp_creature_or_player','any_creature'].includes(targetingMode.targetingType) && card?.card_type === 'creature') handleTargetCreature(perm.instance_id)
                       else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
                       else if (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type)) handleActivatedAbilityTarget(perm.instance_id)
@@ -1146,6 +1158,14 @@ export default function GamePlayPage() {
               <button onClick={() => setTargetingMode(null)} className="block w-full text-red-500 hover:text-red-300 text-xs py-1">
                 キャンセル
               </button>
+            </div>
+          )}
+
+          {/* ETB 追放ターゲット選択パネル */}
+          {etbExileMode && (
+            <div className="bg-purple-950/60 border border-purple-500 rounded-lg px-2 py-2 text-purple-300 text-xs">
+              <p className="font-bold mb-1 text-center">🔮 {gs?.pending_etb_exile?.cardName}</p>
+              <p className="text-purple-400 text-center mb-2">相手のパーマネントを選択して追放</p>
             </div>
           )}
 

@@ -349,6 +349,13 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
 function applyEtbTriggers(state, pid, card, cardData) {
   let s = state
   for (const kw of (card?.keywords || [])) {
+    if (kw.type === 'etb_exile_target') {
+      // 追放対象が必要 → pending_etb_exile をセットして UI に委譲
+      const bf = s.players[pid].battlefield
+      const instanceId = bf.length > 0 ? bf[bf.length - 1].instance_id : null
+      s = { ...s, pending_etb_exile: { pid, instanceId, gain: kw.gain ?? 0, cardName: card.name } }
+      continue
+    }
     if (kw.type !== 'etb_trigger') continue
     if (kw.effect === 'draw_cards') {
       const count = kw.value ?? 1
@@ -426,6 +433,32 @@ function applyEtbTriggers(state, pid, card, cardData) {
         }
       }
     }
+  }
+  return s
+}
+
+// ETB 追放効果の解決（束縛の祈り手など）
+export function resolveEtbExile(state, pid, targetInstanceId, cardData) {
+  const opp = getOpponent(state, pid)
+  const oppPs = state.players[opp]
+  const target = oppPs.battlefield.find(p => p.instance_id === targetInstanceId)
+  if (!target) return state
+
+  const newOppBf = oppPs.battlefield.filter(p => p.instance_id !== targetInstanceId)
+  const newOppExile = [...(oppPs.exile || []), target.card_id]
+  let s = log(
+    { ...state, pending_etb_exile: null, players: { ...state.players, [opp]: { ...oppPs, battlefield: newOppBf, exile: newOppExile } } },
+    `${state.pending_etb_exile?.cardName || '呪文'} ETB → ${(cardData[target.card_id] || {}).name || 'パーマネント'} を追放した`
+  )
+
+  const gain = state.pending_etb_exile?.gain ?? 0
+  if (gain > 0) {
+    const myPs = s.players[pid]
+    s = log(
+      { ...s, players: { ...s.players, [pid]: { ...myPs, life: myPs.life + gain } } },
+      `${state.pending_etb_exile?.cardName || '呪文'} → ライフを${gain}点得た`
+    )
+    s = applyLifeGainTriggers(s, pid, cardData)
   }
   return s
 }
