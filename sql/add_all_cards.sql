@@ -108,8 +108,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 土地 ─────────────────────────────────────────────────────
 ('謎めいた洞窟',     'land', 'colorless', null, null, null,
- 'タップ：無色マナ（{C}）を1点加える。{1}、タップ、謎めいた洞窟を生け贄に捧げる：カードを1枚引く。この能力は土地を5枚以上コントロールしている場合にのみ起動できる。（サクリファイス能力は現在未実装）',
- '[]', 300),
+ 'タップ：無色マナ（{C}）を1点加える。{1}、タップ、謎めいた洞窟を生け贄に捧げる：カードを1枚引く。この能力は土地を5枚以上コントロールしている場合にのみ起動できる。',
+ '[{"type":"activated_ability","cost":"1","tap_self":true,"sacrifice_self":true,"effect":"draw_cards","value":1,"condition":"controls_5_lands"}]', 300),
 
 -- ════════════════════════════════════════════════════════════════
 -- 青単デッキ
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の謎めいた洞窟を更新（起動型能力実装）
+UPDATE cards SET
+  effect_text = 'タップ：無色マナ（{C}）を1点加える。{1}、タップ、謎めいた洞窟を生け贄に捧げる：カードを1枚引く。この能力は土地を5枚以上コントロールしている場合にのみ起動できる。',
+  keywords = '[{"type":"activated_ability","cost":"1","tap_self":true,"sacrifice_self":true,"effect":"draw_cards","value":1,"condition":"controls_5_lands"}]'::jsonb
+WHERE name = '謎めいた洞窟';
 
 -- 既存行の平和な心を更新（攻撃・ブロック禁止実装）
 UPDATE cards SET

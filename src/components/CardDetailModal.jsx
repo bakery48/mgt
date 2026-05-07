@@ -189,7 +189,16 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
           {onActivateAbility && (() => {
             const ability = keywords.find(k => k.type === 'activated_ability')
             if (!ability) return null
-            const label = `{${ability.cost}}：+${ability.power ?? 0}/+${ability.toughness ?? 0}（ターン終了時まで）`
+            let label = `{${ability.cost}}：+${ability.power ?? 0}/+${ability.toughness ?? 0}（ターン終了時まで）`
+            if (ability.effect === 'draw_cards') {
+              const costs = [`{${ability.cost}}`]
+              if (ability.tap_self) costs.push('タップ')
+              if (ability.sacrifice_self) costs.push('生け贄')
+              label = `${costs.join('、')}：カードを${ability.value ?? 1}枚引く`
+            }
+            if (ability.cost === 'discard_card') {
+              label = `カードを1枚捨てる：タップして破壊不能（ターン終了時まで）`
+            }
             return (
               <button
                 onClick={() => { onActivateAbility(); }}

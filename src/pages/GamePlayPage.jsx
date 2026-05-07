@@ -1417,8 +1417,13 @@ export default function GamePlayPage() {
                 if (!ability) return false
                 if (ability.cost === 'discard_card')
                   return (myPs?.hand?.length ?? 0) > 0 && canPlayInstantSpeed(gs, myId)
-                return hasMana(myPs?.mana_pool || {}, `{${ability.cost}}`) &&
-                  canPlayInstantSpeed(gs, myId)
+                if (!hasMana(myPs?.mana_pool || {}, `{${ability.cost}}`) || !canPlayInstantSpeed(gs, myId)) return false
+                if (ability.tap_self && detailPerm?.tapped) return false
+                if (ability.condition === 'controls_5_lands') {
+                  const landCount = (myPs?.battlefield || []).filter(p => (cardData[p.card_id] || {}).card_type === 'land').length
+                  if (landCount < 5) return false
+                }
+                return true
               })()
             : false
         }

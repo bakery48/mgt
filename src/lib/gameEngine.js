@@ -175,6 +175,34 @@ export function activateAbility(state, pid, instanceId, cardData) {
       `${card.name} 起動型能力 → +${te.power}/+${te.toughness}`
     )
   }
+
+  if (ability.effect === 'draw_cards') {
+    // 条件チェック
+    if (ability.condition === 'controls_5_lands') {
+      const landCount = ps.battlefield.filter(p => (cardData[p.card_id] || {}).card_type === 'land').length
+      if (landCount < 5) return state
+    }
+    // タップコスト
+    if (ability.tap_self && perm.tapped) return state
+    let newBf = ps.battlefield.map(p =>
+      p.instance_id === instanceId ? { ...p, tapped: true } : p
+    )
+    // 生け贄コスト
+    let newGy = [...ps.graveyard]
+    if (ability.sacrifice_self) {
+      newBf = newBf.filter(p => p.instance_id !== instanceId)
+      newGy = [...newGy, perm.card_id]
+    }
+    // カードを引く
+    const count = ability.value ?? 1
+    const drawn = ps.deck.slice(0, count)
+    const newDeck = ps.deck.slice(count)
+    const newHand = [...ps.hand, ...drawn]
+    return log(
+      { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy, hand: newHand, deck: newDeck, mana_pool: newPool } } },
+      `${card.name} 起動型能力 → カードを${count}枚引いた`
+    )
+  }
   return state
 }
 
