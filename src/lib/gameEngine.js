@@ -159,9 +159,10 @@ export function activateAbility(state, pid, instanceId, cardData) {
   const ability = (card.keywords || []).find(k => k.type === 'activated_ability')
   if (!ability) return state
 
-  const costStr = `{${ability.cost}}`
-  if (!hasMana(ps.mana_pool, costStr)) return state
-  const newPool = spendMana(ps.mana_pool, costStr)
+  if (ability.tap_self && perm.tapped) return state
+  const costStr = ability.cost_str || (ability.cost != null ? `{${ability.cost}}` : null)
+  if (costStr && !hasMana(ps.mana_pool, costStr)) return state
+  const newPool = costStr ? spendMana(ps.mana_pool, costStr) : { ...ps.mana_pool }
 
   if (ability.effect === 'pump_self') {
     const te = { power: ability.power ?? 0, toughness: ability.toughness ?? 0 }
@@ -195,13 +196,33 @@ export function activateAbility(state, pid, instanceId, cardData) {
     }
     // カードを引く
     const count = ability.value ?? 1
-    const drawn = ps.deck.slice(0, count)
-    const newDeck = ps.deck.slice(count)
+    const drawn = ps.library.slice(0, count)
+    const newLibrary = ps.library.slice(count)
     const newHand = [...ps.hand, ...drawn]
     return log(
-      { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy, hand: newHand, deck: newDeck, mana_pool: newPool } } },
+      { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy, hand: newHand, library: newLibrary, mana_pool: newPool } } },
       `${card.name} 起動型能力 → カードを${count}枚引いた`
     )
+  }
+  if (ability.effect === 'drain_each_opp') {
+    const dmg = ability.damage ?? 1
+    const gain = ability.gain ?? 1
+    const opponents = Object.keys(state.players).filter(id => id !== pid)
+    let newBf = ps.battlefield.map(p => p.instance_id === instanceId ? { ...p, tapped: true } : p)
+    let s = { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, mana_pool: newPool } } }
+    for (const oppId of opponents) {
+      const oppPs = s.players[oppId]
+      s = log(
+        { ...s, players: { ...s.players, [oppId]: { ...oppPs, life: oppPs.life - dmg } } },
+        `${card.name} 起動型能力 → 相手${dmg}点ライフ失う`
+      )
+    }
+    const myPs2 = s.players[pid]
+    s = log(
+      { ...s, players: { ...s.players, [pid]: { ...myPs2, life: myPs2.life + gain } } },
+      `${card.name} 起動型能力 → ライフを${gain}点得た`
+    )
+    return applyLifeGainTriggers(s, pid, cardData)
   }
   return state
 }
@@ -388,12 +409,12 @@ function applyEtbTriggers(state, pid, card, cardData) {
     if (kw.effect === 'draw_cards') {
       const count = kw.value ?? 1
       const ps = s.players[pid]
-      const drawn = ps.deck.slice(0, count)
+      const drawn = ps.library.slice(0, count)
       s = log({
         ...s,
         players: {
           ...s.players,
-          [pid]: { ...ps, hand: [...ps.hand, ...drawn], deck: ps.deck.slice(count) },
+          [pid]: { ...ps, hand: [...ps.hand, ...drawn], library: ps.library.slice(count) },
         },
       }, `${card.name} ETB → カードを${count}枚引いた`)
     }
@@ -410,8 +431,8 @@ function applyEtbTriggers(state, pid, card, cardData) {
     if (kw.effect === 'draw_then_discard') {
       const count = kw.value ?? 1
       const ps = s.players[pid]
-      const drawn = ps.deck.slice(0, count)
-      s = { ...s, players: { ...s.players, [pid]: { ...ps, hand: [...ps.hand, ...drawn], deck: ps.deck.slice(count) } } }
+      const drawn = ps.library.slice(0, count)
+      s = { ...s, players: { ...s.players, [pid]: { ...ps, hand: [...ps.hand, ...drawn], library: ps.library.slice(count) } } }
       s = log(s, `${card.name} ETB → カードを${count}枚引いた`)
       // cleanup_discard と同様の仕組みで手札捨てを要求
       s = { ...s, cleanup_discard: (s.cleanup_discard || 0) + count }
@@ -434,6 +455,61 @@ function applyEtbTriggers(state, pid, card, cardData) {
         `${card.name} ETB → ライフを${gain}点得た`
       )
       s = applyLifeGainTriggers(s, pid, cardData)
+    }
+    if (kw.effect === 'grant_all_allies_keyword_eot') {
+      const keyword = kw.keyword
+      const newBf = s.players[pid].battlefield.map(p => ({
+        ...p,
+        temp_effects: [...(p.temp_effects || []), { grant_keywords: [keyword] }],
+      }))
+      s = log(
+        { ...s, players: { ...s.players, [pid]: { ...s.players[pid], battlefield: newBf } } },
+        `${card.name} ETB → 全クリーチャーがターン終了時まで${keyword}を得た`
+      )
+    }
+    if (kw.effect === 'minus_all_opp_creatures_eot') {
+      const pw = kw.power ?? 0
+      const tg = kw.toughness ?? 0
+      const opp = getOpponent(s, pid)
+      const newOppBf = s.players[opp].battlefield.map(p => {
+        const c = cardData[p.card_id] || {}
+        if (c.card_type !== 'creature') return p
+        return { ...p, temp_effects: [...(p.temp_effects || []), { power: pw, toughness: tg }] }
+      }).filter(p => {
+        const c = cardData[p.card_id] || {}
+        if (c.card_type !== 'creature') return true
+        const { toughness: effT } = getEffectivePT(p, c, s.players[opp].battlefield, cardData)
+        return effT > 0
+      })
+      s = log(
+        { ...s, players: { ...s.players, [opp]: { ...s.players[opp], battlefield: newOppBf } } },
+        `${card.name} ETB → 相手クリーチャー全体に${pw}/${tg}修整`
+      )
+    }
+    if (kw.effect === 'grant_haste_if_power_gte') {
+      const threshold = kw.threshold ?? 8
+      const totalPower = s.players[pid].battlefield.reduce((sum, p) => {
+        const c = cardData[p.card_id] || {}
+        if (c.card_type !== 'creature') return sum
+        return sum + getEffectivePT(p, c, s.players[pid].battlefield, cardData).power
+      }, 0)
+      if (totalPower >= threshold) {
+        const newBf = s.players[pid].battlefield.map(p => ({
+          ...p,
+          temp_effects: [...(p.temp_effects || []), { grant_keywords: ['haste'] }],
+          summoning_sick: false,
+        }))
+        s = log(
+          { ...s, players: { ...s.players, [pid]: { ...s.players[pid], battlefield: newBf } } },
+          `${card.name} ETB → 全クリーチャーがターン終了時まで速攻を得た`
+        )
+      }
+    }
+    if (kw.effect === 'pending_bounce_opp_creature') {
+      s = { ...s, pending_etb_bounce_opp: { pid, cardName: card.name } }
+    }
+    if (kw.effect === 'pending_return_hand_from_gy') {
+      s = { ...s, pending_etb_return_hand: { pid, cardName: card.name, restriction: kw.restriction ?? 'any' } }
     }
   }
 
@@ -491,6 +567,34 @@ export function resolveEtbExile(state, pid, targetInstanceId, cardData) {
   return s
 }
 
+// ETB バウンス（相手クリーチャーを手札に戻す）
+export function resolveEtbBounce(state, pid, targetInstanceId, cardData) {
+  const opp = getOpponent(state, pid)
+  const oppPs = state.players[opp]
+  const target = oppPs.battlefield.find(p => p.instance_id === targetInstanceId)
+  if (!target) return state
+  const targetCard = cardData[target.card_id] || {}
+  const newOppBf = oppPs.battlefield.filter(p => p.instance_id !== targetInstanceId)
+  const newOppHand = [...oppPs.hand, target.card_id]
+  return log(
+    { ...state, pending_etb_bounce_opp: null, players: { ...state.players, [opp]: { ...oppPs, battlefield: newOppBf, hand: newOppHand } } },
+    `${state.pending_etb_bounce_opp?.cardName} ETB → ${targetCard.name || 'クリーチャー'} を手札に戻した`
+  )
+}
+
+// ETB 墓地から手札へ（エルフの再生家、吸血鬼の魂呼びなど）
+export function resolveEtbReturnHand(state, pid, cardId, cardData) {
+  const ps = state.players[pid]
+  if (!ps.graveyard.includes(cardId)) return state
+  const returnCard = cardData[cardId] || {}
+  const newGy = ps.graveyard.filter(id => id !== cardId)
+  const newHand = [...ps.hand, cardId]
+  return log(
+    { ...state, pending_etb_return_hand: null, players: { ...state.players, [pid]: { ...ps, graveyard: newGy, hand: newHand } } },
+    `${state.pending_etb_return_hand?.cardName} ETB → ${returnCard.name || 'カード'} を手札に戻した`
+  )
+}
+
 // ライフを得たとき誘発する能力を処理する
 function applyLifeGainTriggers(state, gainerId, cardData) {
   let s = state
@@ -525,10 +629,10 @@ function applyOnCounterTriggers(state, pid, permInstanceId, card, cardData) {
     if (kw.effect === 'draw_cards') {
       const count = kw.value ?? 1
       const ps = s.players[pid]
-      const drawn = ps.deck.slice(0, count)
+      const drawn = ps.library.slice(0, count)
       s = log({
         ...s,
-        players: { ...s.players, [pid]: { ...ps, hand: [...ps.hand, ...drawn], deck: ps.deck.slice(count) } },
+        players: { ...s.players, [pid]: { ...ps, hand: [...ps.hand, ...drawn], library: ps.library.slice(count) } },
       }, `${card.name} 誘発 → カードを${count}枚引いた`)
     }
   }
@@ -805,6 +909,34 @@ function applyAttackTriggers(state, attackingPid, attackerIids, cardData) {
     for (const kw of (card.keywords || [])) {
       if (kw.type !== 'attack_trigger') continue
 
+      if (kw.effect === 'deal_each_opp') {
+        const dmg = kw.value ?? 1
+        const opponents = Object.keys(s.players).filter(id => id !== attackingPid)
+        for (const oppId of opponents) {
+          const oppPs = s.players[oppId]
+          s = log(
+            { ...s, players: { ...s.players, [oppId]: { ...oppPs, life: oppPs.life - dmg } } },
+            `${card.name} 攻撃誘発 → 相手に${dmg}点ダメージ`
+          )
+        }
+      }
+      if (kw.effect === 'drain_each_opp') {
+        const dmg = kw.value ?? 1
+        const opponents = Object.keys(s.players).filter(id => id !== attackingPid)
+        for (const oppId of opponents) {
+          const oppPs = s.players[oppId]
+          s = log(
+            { ...s, players: { ...s.players, [oppId]: { ...oppPs, life: oppPs.life - dmg } } },
+            `${card.name} 攻撃誘発 → 相手${dmg}点ライフ失う`
+          )
+        }
+        const myPs = s.players[attackingPid]
+        s = log(
+          { ...s, players: { ...s.players, [attackingPid]: { ...myPs, life: myPs.life + dmg } } },
+          `${card.name} 攻撃誘発 → ライフを${dmg}点得た`
+        )
+        s = applyLifeGainTriggers(s, attackingPid, cardData)
+      }
       if (kw.effect === 'gain_life') {
         const amount = kw.value ?? 2
         const myPs = s.players[attackingPid]
@@ -1117,6 +1249,16 @@ export function getEffectivePT(perm, card, battlefield, cardData) {
     toughness = count
   }
 
+  // power_per_count：特定の土地枚数分パワーが上がる（大嵐のジンなど）
+  const pwCount = (card?.keywords || []).find(k => k.type === 'power_per_count')
+  if (pwCount?.effect === 'basic_island_count') {
+    const count = battlefield.filter(p => {
+      const c = cardData[p.card_id] || {}
+      return c.card_type === 'land' && c.color === 'blue'
+    }).length
+    power += count
+  }
+
   // +1/+1 カウンター
   const p1p1 = perm.counters?.p1p1 ?? 0
   power += p1p1
@@ -1329,6 +1471,7 @@ export function getValidBlockers(state, defId, cardData) {
     const card = cardData[p.card_id] || {}
     if (card.card_type !== 'creature' || p.tapped || p.summoning_sick) return false
     if (hasPacifism(p, defBf, cardData)) return false
+    if ((card.keywords || []).some(k => k.type === 'cant_block')) return false
     return true
   })
 

@@ -10,7 +10,8 @@ import {
   canPlaySorcerySpeed, canPlayInstantSpeed, hasMana, getOpponent, getValidBlockers,
   castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
   discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
-  activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor, resolveEtbExile,
+  activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor,
+  resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -34,7 +35,9 @@ const KEYWORD_LABELS = {
 // バッジ非表示の内部用キーワードタイプ
 const INTERNAL_KEYWORD_TYPES = new Set([
   'subtype_dragon', 'subtype_angel', 'on_cast_trigger', 'conditional_keyword',
-  'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color', 'ally_etb_trigger', 'etb_exile_target', 'prevent_combat', // 効果系は effect_text で説明
+  'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color',
+  'ally_etb_trigger', 'etb_exile_target', 'prevent_combat', 'cant_block',
+  'power_per_count', 'etb_trigger', // 効果系は effect_text で説明
 ])
 
 const COLOR_BG = {
@@ -226,6 +229,8 @@ export default function GamePlayPage() {
   const [discardForAbilityMode, setDiscardForAbilityMode] = useState(null)
   const [chooseColorMode, setChooseColorMode] = useState(null) // { instanceId, cardName }
   const [etbExileMode, setEtbExileMode] = useState(false)
+  const [etbBounceOppMode, setEtbBounceOppMode] = useState(false)
+  const [etbReturnHandMode, setEtbReturnHandMode] = useState(null)
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -448,6 +453,19 @@ export default function GamePlayPage() {
     if (gs.pending_etb_exile.pid === myId) setEtbExileMode(true)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_etb_exile])
+
+  useEffect(() => {
+    if (!gs?.pending_etb_bounce_opp) { setEtbBounceOppMode(false); return }
+    if (gs.pending_etb_bounce_opp.pid === myId) setEtbBounceOppMode(true)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_etb_bounce_opp])
+
+  useEffect(() => {
+    if (!gs?.pending_etb_return_hand) { setEtbReturnHandMode(null); return }
+    if (gs.pending_etb_return_hand.pid === myId)
+      setEtbReturnHandMode({ restriction: gs.pending_etb_return_hand.restriction })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_etb_return_hand])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -849,12 +867,16 @@ export default function GamePlayPage() {
                       ...perm,
                       blocking: isAssigned ? assignedBlocker : perm.blocking,
                     }}
-                    selected={canAssign || isAssigned || etbExileMode || (targetingMode && ['opp_creature','opp_creature_or_player','any_creature','any_permanent'].includes(targetingMode.targetingType)) || (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type))}
+                    selected={canAssign || isAssigned || etbExileMode || (etbBounceOppMode && card?.card_type === 'creature') || (targetingMode && ['opp_creature','opp_creature_or_player','any_creature','any_permanent'].includes(targetingMode.targetingType)) || (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type))}
                     onClick={() => {
                       if (etbExileMode) {
                         const newGs = resolveEtbExile(gs, myId, perm.instance_id, cardData)
                         if (newGs !== gs) dispatch(newGs)
                         setEtbExileMode(false)
+                      } else if (etbBounceOppMode && card?.card_type === 'creature') {
+                        const newGs = resolveEtbBounce(gs, myId, perm.instance_id, cardData)
+                        if (newGs !== gs) dispatch(newGs)
+                        setEtbBounceOppMode(false)
                       } else if (canAssign) handleAssignBlocker(perm.instance_id)
                       else if (targetingMode && ['opp_creature','opp_creature_or_player','any_creature'].includes(targetingMode.targetingType) && card?.card_type === 'creature') handleTargetCreature(perm.instance_id)
                       else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
@@ -1169,6 +1191,14 @@ export default function GamePlayPage() {
             </div>
           )}
 
+          {/* ETB バウンス選択パネル */}
+          {etbBounceOppMode && (
+            <div className="bg-blue-950/60 border border-blue-500 rounded-lg px-2 py-2 text-blue-300 text-xs">
+              <p className="font-bold mb-1 text-center">🌊 {gs?.pending_etb_bounce_opp?.cardName}</p>
+              <p className="text-blue-400 text-center mb-2">手札に戻す相手クリーチャーを選択</p>
+            </div>
+          )}
+
           {/* 起動型能力ターゲット選択パネル */}
           {activatedAbilityMode && (
             <div className="bg-orange-950/60 border border-orange-500 rounded-lg px-2 py-2 text-orange-300 text-xs">
@@ -1286,6 +1316,46 @@ export default function GamePlayPage() {
                 )
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ETB 墓地→手札 選択モーダル ─── */}
+      {etbReturnHandMode && (
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-40 pb-4">
+          <div className="bg-gray-800 border border-green-600 rounded-xl p-4 w-full max-w-2xl mx-4">
+            <p className="text-green-300 font-bold text-center mb-1">🌿 {gs?.pending_etb_return_hand?.cardName}</p>
+            <p className="text-gray-400 text-xs text-center mb-3">墓地からカードを選択して手札に戻す</p>
+            <div className="flex gap-2 overflow-x-auto justify-center pb-1">
+              {[...new Set(myPs?.graveyard || [])].filter(cid => {
+                const c = cardData[cid]
+                if (!c) return false
+                if (etbReturnHandMode.restriction === 'creature') return c.card_type === 'creature'
+                return true
+              }).map((cid, i) => {
+                const c = cardData[cid]
+                return (
+                  <button
+                    key={`${cid}-${i}`}
+                    onClick={() => {
+                      const newGs = resolveEtbReturnHand(gs, myId, cid, cardData)
+                      if (newGs !== gs) dispatch(newGs)
+                      setEtbReturnHandMode(null)
+                    }}
+                    className={`shrink-0 w-20 h-28 rounded-lg p-1.5 border-2 border-green-500 hover:border-green-300 text-left text-xs flex flex-col ${COLOR_BG[c?.color] || 'bg-gray-700 text-white'}`}
+                  >
+                    {c?.art_url && <img src={c.art_url} alt="" className="w-full h-12 object-cover rounded mb-1" />}
+                    <p className="font-bold leading-tight line-clamp-2">{c?.name || '?'}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <button onClick={() => {
+              dispatch({ ...gs, pending_etb_return_hand: null })
+              setEtbReturnHandMode(null)
+            }} className="block w-full mt-2 text-gray-500 hover:text-gray-300 text-xs py-1">
+              キャンセル
+            </button>
           </div>
         </div>
       )}
@@ -1417,7 +1487,9 @@ export default function GamePlayPage() {
                 if (!ability) return false
                 if (ability.cost === 'discard_card')
                   return (myPs?.hand?.length ?? 0) > 0 && canPlayInstantSpeed(gs, myId)
-                if (!hasMana(myPs?.mana_pool || {}, `{${ability.cost}}`) || !canPlayInstantSpeed(gs, myId)) return false
+                const cs = ability.cost_str || (ability.cost != null ? `{${ability.cost}}` : null)
+                if (cs && !hasMana(myPs?.mana_pool || {}, cs)) return false
+                if (!canPlayInstantSpeed(gs, myId)) return false
                 if (ability.tap_self && detailPerm?.tapped) return false
                 if (ability.condition === 'controls_5_lands') {
                   const landCount = (myPs?.battlefield || []).filter(p => (cardData[p.card_id] || {}).card_type === 'land').length

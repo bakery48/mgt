@@ -99,8 +99,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"aura","enchant":"creature"},{"type":"prevent_combat"}]', 500),
 
 ('払拭の光',         'enchantment', 'white', '{2}{W}', null, null,
- '払拭の光が戦場に出たとき、対戦相手のコントロールする土地でないパーマネント1つを追放する。払拭の光が戦場を離れたとき、そのカードを戦場に戻す。（追放効果は現在未実装）',
- '[]', 800),
+ '瞬速を持つ。戦場に出たとき、対戦相手のコントロールする土地でないパーマネント1つを追放する。',
+ '[{"type":"flash"},{"type":"etb_exile_target","target":"opp_permanent","gain":0}]', 800),
 
 ('束縛の祈り手',     'enchantment', 'white', '{3}{W}', null, null,
  '瞬速を持つ。戦場に出たとき、対戦相手のパーマネント1つを追放してライフ2点を得る。',
@@ -121,8 +121,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"conditional_keyword","condition":"self_attacking","grant":"flying"}]', 400),
 
 ('幽体の船乗り',     'creature', 'blue', '{U}',           1, 1,
- '瞬速、飛行を持つ。（４）（青）：カードを１枚引く。（起動型能力は現在未実装）',
- '[{"type":"flash"},{"type":"flying"}]', 500),
+ '瞬速、飛行を持つ。（４）（青）：カードを１枚引く。',
+ '[{"type":"flash"},{"type":"flying"},{"type":"activated_ability","cost_str":"{4}{U}","effect":"draw_cards","value":1}]', 500),
 
 ('終止符のスフィンクス', 'creature', 'blue', '{5}{U}{U}', 5, 5,
  '終止符のスフィンクスは打ち消されない。飛行、呪禁を持つ。あなたがコントロールするインスタントとソーサリーは打ち消されない。（呪文保護は現在未実装）',
@@ -137,28 +137,28 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 400),
 
 ('大ヒレの用心棒',   'creature', 'blue', '{3}{U}',       3, 2,
- '大ヒレの用心棒が戦場に出たとき、対戦相手がコントロールするクリーチャー１体を対象とし、それをオーナーの手札に戻す。（ETB効果は現在未実装）',
- '[]', 600),
+ '大ヒレの用心棒が戦場に出たとき、対戦相手がコントロールするクリーチャー１体を対象とし、それをオーナーの手札に戻す。',
+ '[{"type":"etb_trigger","effect":"pending_bounce_opp_creature"}]', 600),
 
 ('ルーン封じの壁',   'creature', 'blue', '{2}{U}',       0, 6,
  'アーティファクト・クリーチャー。防衛を持つ。タップ：諜報１を行う。（諜報は現在未実装）',
  '[{"type":"defender"}]', 400),
 
 ('大嵐のジン',       'creature', 'blue', '{U}{U}{U}',    0, 4,
- '飛行を持つ。大嵐のジンはあなたがコントロールする基本島１枚につき＋１/＋０の修整を受ける。（動的パワー修整は現在未実装）',
- '[{"type":"flying"}]', 1000),
+ '飛行を持つ。大嵐のジンはあなたがコントロールする基本島１枚につき＋１/＋０の修整を受ける。',
+ '[{"type":"flying"},{"type":"power_per_count","effect":"basic_island_count"}]', 1000),
 
 ('全能なる者アルカニス', 'creature', 'blue', '{3}{U}{U}{U}', 3, 4,
- '伝説のクリーチャー。タップ：カードを３枚引く。（２）（青）（青）：全能なる者アルカニスをオーナーの手札に戻す。（起動型能力は現在未実装）',
- '[]', 2500),
+ '伝説のクリーチャー。タップ：カードを３枚引く。',
+ '[{"type":"activated_ability","cost":null,"tap_self":true,"effect":"draw_cards","value":3}]', 2500),
 
 ('嘲笑するスプライト', 'creature', 'blue', '{2}{U}',     2, 2,
  '飛行を持つ。あなたがインスタントやソーサリーである呪文を唱えるためのコストは（１）少なくなる。（コスト軽減は現在未実装）',
  '[{"type":"flying"}]', 500),
 
 ('大梟の見張り',     'creature', 'blue', '{1}{U}',       1, 2,
- '飛行、警戒を持つ。（１）（青）、タップ：カードを１枚引き、その後カードを１枚捨てる。（起動型能力は現在未実装）',
- '[{"type":"flying"},{"type":"vigilance"}]', 400),
+ '飛行、警戒を持つ。（１）（青）、タップ：カードを１枚引き、その後カードを１枚捨てる。',
+ '[{"type":"flying"},{"type":"vigilance"},{"type":"activated_ability","cost_str":"{1}{U}","tap_self":true,"effect":"draw_then_discard","value":1}]', 400),
 
 ('神盾の海亀',       'creature', 'blue', '{U}',           0, 5,
  '',
@@ -200,16 +200,16 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 黒クリーチャー ───────────────────────────────────────────
 ('吸血鬼の侵入者',     'creature', 'black', '{1}{B}',       2, 1,
- '飛行を持つ。吸血鬼の侵入者はブロックに参加できない。（ブロック制限は現在未実装）',
- '[{"type":"flying"}]', 400),
+ '飛行を持つ。吸血鬼の侵入者はブロックに参加できない。',
+ '[{"type":"flying"},{"type":"cant_block"}]', 400),
 
 ('腑抜けの略奪者',     'creature', 'black', '{2}{B}',       2, 2,
  '接死を持つ。強襲 ― 腑抜けの略奪者が戦場に出たとき、あなたがこのターンに攻撃していた場合、あなたのライブラリーの上から３枚を見る。そのうち１枚をライブラリーの一番上に置き、残りを墓地に置く。（ETB効果は現在未実装）',
  '[{"type":"deathtouch"}]', 400),
 
 ('吸血鬼の新生子',     'creature', 'black', '{B}',           0, 3,
- '（２）、タップ：各対戦相手は１点のライフを失い、あなたは１点のライフを得る。（起動型能力は現在未実装）',
- '[]', 300),
+ '（２）、タップ：各対戦相手は１点のライフを失い、あなたは１点のライフを得る。',
+ '[{"type":"activated_ability","cost":"2","tap_self":true,"effect":"drain_each_opp","damage":1,"gain":1}]', 300),
 
 ('吸血鬼の大食家',     'creature', 'black', '{1}{B}',       2, 2,
  '吸血鬼の大食家が攻撃するたび、あなたは他のクリーチャー１体を生け贄に捧げてもよい。そうしたなら、カードを１枚引き、吸血鬼の大食家はこのターンブロックされない。（攻撃誘発は現在未実装）',
@@ -220,8 +220,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 500),
 
 ('吸血鬼の魂呼び',     'creature', 'black', '{4}{B}',       3, 2,
- '飛行を持つ。吸血鬼の魂呼びはブロックに参加できない。吸血鬼の魂呼びが戦場に出たとき、あなたの墓地にあるクリーチャー・カード１枚を対象とし、それをオーナーの手札に戻す。（ETB効果は現在未実装）',
- '[{"type":"flying"}]', 600),
+ '飛行を持つ。吸血鬼の魂呼びはブロックに参加できない。吸血鬼の魂呼びが戦場に出たとき、あなたの墓地にあるクリーチャー・カード１枚を対象とし、それをオーナーの手札に戻す。',
+ '[{"type":"flying"},{"type":"cant_block"},{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"creature"}]', 600),
 
 ('交叉路の騒動屋',     'creature', 'black', '{5}{B}',       5, 5,
  'あなたがコントロールする攻撃している吸血鬼はすべて接死と絆魂を持つ。あなたがコントロールする吸血鬼１体が死亡するたび、あなたは２点のライフを支払ってもよい。そうしたなら、カードを１枚引く。（ロード/誘発型能力は現在未実装）',
@@ -244,8 +244,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"etb_trigger","effect":"drain_each_opp","damage":2,"life":2}]', 600),
 
 ('虐殺のワーム',       'creature', 'black', '{3}{B}{B}{B}', 6, 5,
- '虐殺のワームが戦場に出たとき、ターン終了時まで、対戦相手がコントロールするすべてのクリーチャーは－２/－２の修整を受ける。対戦相手がコントロールするクリーチャー１体が死亡するたび、そのプレイヤーは２点のライフを失う。（ETB/誘発型能力は現在未実装）',
- '[]', 2000),
+ '虐殺のワームが戦場に出たとき、ターン終了時まで、対戦相手がコントロールするすべてのクリーチャーは－２/－２の修整を受ける。',
+ '[{"type":"etb_trigger","effect":"minus_all_opp_creatures_eot","power":-2,"toughness":-2}]', 2000),
 
 ('税血の徴収者',       'creature', 'black', '{4}{B}',       3, 4,
  '飛行を持つ。税血の徴収者が戦場に出たとき、このターンに対戦相手がライフを失っていた場合、各対戦相手はカードを１枚捨てる。（ETB効果は現在未実装）',
@@ -256,12 +256,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 800),
 
 ('血なまぐさい吸血者', 'creature', 'black', '{1}{B}',       1, 3,
- '血なまぐさい吸血者が攻撃するたび、各対戦相手は１点のライフを失い、あなたは１点のライフを得る。（攻撃誘発は現在未実装）',
- '[]', 400),
+ '血なまぐさい吸血者が攻撃するたび、各対戦相手は１点のライフを失い、あなたは１点のライフを得る。',
+ '[{"type":"attack_trigger","effect":"drain_each_opp","value":1}]', 400),
 
 ('鼓動の追跡者',       'creature', 'black', '{B}',           1, 1,
- '鼓動の追跡者が攻撃するたび、各対戦相手は１点のライフを失う。（攻撃誘発は現在未実装）',
- '[]', 300),
+ '鼓動の追跡者が攻撃するたび、各対戦相手は１点のライフを失う。',
+ '[{"type":"attack_trigger","effect":"deal_each_opp","value":1}]', 300),
 
 -- ── 黒インスタント ───────────────────────────────────────────
 ('英雄の破滅',         'instant',  'black', '{1}{B}{B}',   null, null,
@@ -316,8 +316,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 400),
 
 ('ヴェリュス山の恐怖', 'creature', 'red', '{5}{R}{R}',   5, 5,
- '飛行、二段攻撃を持つ。ヴェリュス山の恐怖が戦場に出たとき、あなたがコントロールするクリーチャーはターン終了時まで二段攻撃を得る。（ETB効果は現在未実装）',
- '[{"type":"flying"},{"type":"double_strike"}]', 1500),
+ '飛行、二段攻撃を持つ。ヴェリュス山の恐怖が戦場に出たとき、あなたがコントロールするクリーチャーはターン終了時まで二段攻撃を得る。',
+ '[{"type":"flying"},{"type":"double_strike"},{"type":"etb_trigger","effect":"grant_all_allies_keyword_eot","keyword":"double_strike"}]', 1500),
 
 ('真鎖の炎い魔',       'creature', 'red', '{1}{R}{R}',   3, 3,
  '速攻を持つ。',
@@ -368,8 +368,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"tap_for_mana","mana":"G"}]', 300),
 
 ('打ち壊すブロントドン',   'creature', 'green', '{1}{G}{G}',     3, 4,
- '（１）、打ち壊すブロントドンを生け贄に捧げる：アーティファクト１つかエンチャント１つを対象とし、それを破壊する。（起動型能力は現在未実装）',
- '[]', 500),
+ '（１）、打ち壊すブロントドンを生け贄に捧げる：アーティファクト１つかエンチャント１つを対象とし、それを破壊する。',
+ '[{"type":"activated_ability","cost":"1","sacrifice_self":true,"effect":"destroy_artifact_or_enchantment","targeting":"any_artifact_or_enchantment"}]', 500),
 
 ('温厚な司書',             'creature', 'green', '{G}',           1, 1,
  '夜明け（あなたのターンに呪文を唱えなかった場合、次のターンに夜になる）。（２）：あなたのライブラリーの上から３枚を見る。そのうち１枚を手札に加え、残りを好きな順でライブラリーの一番下に置く。（昼夜変身・起動型能力は現在未実装）',
@@ -396,12 +396,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[]', 400),
 
 ('エルフの再生家',         'creature', 'green', '{2}{G}{G}',     4, 3,
- 'エルフの再生家が戦場に出たとき、あなたの墓地にあるパーマネント・カード１枚を対象とし、それをオーナーの手札に戻す。（ETB効果は現在未実装）',
- '[]', 600),
+ 'エルフの再生家が戦場に出たとき、あなたの墓地にあるパーマネント・カード１枚を対象とし、それをオーナーの手札に戻す。',
+ '[{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"any"}]', 600),
 
 ('狩猟の統率者、スーラク', 'creature', 'green', '{2}{G}{G}',     5, 4,
- '伝説のクリーチャー。狩猟の統率者、スーラクが戦場に出たとき、あなたのコントロールするクリーチャーのパワーの合計が８以上であれば、あなたのコントロールするクリーチャーはターン終了時まで速攻を得る。（ETB効果は現在未実装）',
- '[]', 800),
+ '伝説のクリーチャー。狩猟の統率者、スーラクが戦場に出たとき、あなたのコントロールするクリーチャーのパワーの合計が８以上であれば、あなたのコントロールするクリーチャーはターン終了時まで速攻を得る。',
+ '[{"type":"etb_trigger","effect":"grant_haste_if_power_gte","threshold":8}]', 800),
 
 ('優しいインドリク',       'creature', 'green', '{5}{G}',        6, 6,
  '優しいインドリクが戦場に出たとき、対戦相手がコントロールするクリーチャー１体を対象とするファイトを選んでもよい。（ETB格闘は現在未実装）',
@@ -761,5 +761,23 @@ UPDATE cards SET
   effect_text = '伝説のクリーチャー。飛行、先制攻撃、絆魂を持つ。あなたのコントロールする他の天使は＋１/＋１の修整を受けるとともに絆魂を持つ。',
   keywords = '[{"type":"flying"},{"type":"first_strike"},{"type":"lifelink"},{"type":"subtype_angel"},{"type":"lord_effect","subtype":"angel","power_bonus":1,"toughness_bonus":1,"grant_keywords":["lifelink"]}]'::jsonb
 WHERE name = '黎明をもたらす者ライラ';
+
+-- 一括未実装対応
+UPDATE cards SET effect_text='瞬速、飛行を持つ。（４）（青）：カードを１枚引く。', keywords='[{"type":"flash"},{"type":"flying"},{"type":"activated_ability","cost_str":"{4}{U}","effect":"draw_cards","value":1}]'::jsonb WHERE name='幽体の船乗り';
+UPDATE cards SET effect_text='飛行を持つ。大嵐のジンはあなたがコントロールする基本島１枚につき＋１/＋０の修整を受ける。', keywords='[{"type":"flying"},{"type":"power_per_count","effect":"basic_island_count"}]'::jsonb WHERE name='大嵐のジン';
+UPDATE cards SET effect_text='伝説のクリーチャー。タップ：カードを３枚引く。', keywords='[{"type":"activated_ability","cost":null,"tap_self":true,"effect":"draw_cards","value":3}]'::jsonb WHERE name='全能なる者アルカニス';
+UPDATE cards SET effect_text='飛行、警戒を持つ。（１）（青）、タップ：カードを１枚引き、その後カードを１枚捨てる。', keywords='[{"type":"flying"},{"type":"vigilance"},{"type":"activated_ability","cost_str":"{1}{U}","tap_self":true,"effect":"draw_then_discard","value":1}]'::jsonb WHERE name='大梟の見張り';
+UPDATE cards SET effect_text='大ヒレの用心棒が戦場に出たとき、対戦相手がコントロールするクリーチャー１体を対象とし、それをオーナーの手札に戻す。', keywords='[{"type":"etb_trigger","effect":"pending_bounce_opp_creature"}]'::jsonb WHERE name='大ヒレの用心棒';
+UPDATE cards SET effect_text='飛行を持つ。吸血鬼の侵入者はブロックに参加できない。', keywords='[{"type":"flying"},{"type":"cant_block"}]'::jsonb WHERE name='吸血鬼の侵入者';
+UPDATE cards SET effect_text='（２）、タップ：各対戦相手は１点のライフを失い、あなたは１点のライフを得る。', keywords='[{"type":"activated_ability","cost":"2","tap_self":true,"effect":"drain_each_opp","damage":1,"gain":1}]'::jsonb WHERE name='吸血鬼の新生子';
+UPDATE cards SET effect_text='飛行を持つ。吸血鬼の魂呼びはブロックに参加できない。吸血鬼の魂呼びが戦場に出たとき、あなたの墓地にあるクリーチャー・カード１枚を対象とし、それをオーナーの手札に戻す。', keywords='[{"type":"flying"},{"type":"cant_block"},{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"creature"}]'::jsonb WHERE name='吸血鬼の魂呼び';
+UPDATE cards SET effect_text='虐殺のワームが戦場に出たとき、ターン終了時まで、対戦相手がコントロールするすべてのクリーチャーは－２/－２の修整を受ける。', keywords='[{"type":"etb_trigger","effect":"minus_all_opp_creatures_eot","power":-2,"toughness":-2}]'::jsonb WHERE name='虐殺のワーム';
+UPDATE cards SET effect_text='血なまぐさい吸血者が攻撃するたび、各対戦相手は１点のライフを失い、あなたは１点のライフを得る。', keywords='[{"type":"attack_trigger","effect":"drain_each_opp","value":1}]'::jsonb WHERE name='血なまぐさい吸血者';
+UPDATE cards SET effect_text='鼓動の追跡者が攻撃するたび、各対戦相手は１点のライフを失う。', keywords='[{"type":"attack_trigger","effect":"deal_each_opp","value":1}]'::jsonb WHERE name='鼓動の追跡者';
+UPDATE cards SET effect_text='飛行、二段攻撃を持つ。ヴェリュス山の恐怖が戦場に出たとき、あなたがコントロールするクリーチャーはターン終了時まで二段攻撃を得る。', keywords='[{"type":"flying"},{"type":"double_strike"},{"type":"etb_trigger","effect":"grant_all_allies_keyword_eot","keyword":"double_strike"}]'::jsonb WHERE name='ヴェリュス山の恐怖';
+UPDATE cards SET effect_text='（１）、打ち壊すブロントドンを生け贄に捧げる：アーティファクト１つかエンチャント１つを対象とし、それを破壊する。', keywords='[{"type":"activated_ability","cost":"1","sacrifice_self":true,"effect":"destroy_artifact_or_enchantment","targeting":"any_artifact_or_enchantment"}]'::jsonb WHERE name='打ち壊すブロントドン';
+UPDATE cards SET effect_text='エルフの再生家が戦場に出たとき、あなたの墓地にあるパーマネント・カード１枚を対象とし、それをオーナーの手札に戻す。', keywords='[{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"any"}]'::jsonb WHERE name='エルフの再生家';
+UPDATE cards SET effect_text='伝説のクリーチャー。狩猟の統率者、スーラクが戦場に出たとき、あなたのコントロールするクリーチャーのパワーの合計が８以上であれば、あなたのコントロールするクリーチャーはターン終了時まで速攻を得る。', keywords='[{"type":"etb_trigger","effect":"grant_haste_if_power_gte","threshold":8}]'::jsonb WHERE name='狩猟の統率者、スーラク';
+UPDATE cards SET effect_text='瞬速を持つ。戦場に出たとき、対戦相手のコントロールする土地でないパーマネント1つを追放する。', keywords='[{"type":"flash"},{"type":"etb_exile_target","target":"opp_permanent","gain":0}]'::jsonb WHERE name='払拭の光';
 
 ALTER TABLE cards ENABLE TRIGGER USER;
