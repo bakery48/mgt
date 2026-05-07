@@ -1693,6 +1693,29 @@ export function resolveForcedSacrifice(state, pid, instanceId, cardData) {
   return s
 }
 
+export function resolveOptionalDiscardToDraw(state, pid, cardId) {
+  const pd = state.pending_optional_discard_to_draw
+  if (!pd || pd.pid !== pid) return state
+  const ps = state.players[pid]
+  if (!(ps.hand || []).includes(cardId)) return state
+  const newHand = removeOne(ps.hand, cardId)
+  const drawn = ps.library.slice(0, pd.count)
+  return log({
+    ...state,
+    pending_optional_discard_to_draw: null,
+    players: { ...state.players, [pid]: {
+      ...ps,
+      hand: [...newHand, ...drawn],
+      library: ps.library.slice(pd.count),
+      graveyard: [...ps.graveyard, cardId],
+    }},
+  }, `カードを1枚捨て、${pd.count}枚引いた`)
+}
+
+export function declineOptionalDiscardToDraw(state) {
+  return log({ ...state, pending_optional_discard_to_draw: null }, `捨てない選択`)
+}
+
 export function hasAdditionalCost(card) {
   return (card?.keywords || []).some(k => k.type === 'additional_cost')
 }
@@ -1864,7 +1887,7 @@ export const SPELL_EFFECT_TYPES = [
   'destroy_creature', 'destroy_permanent',
   'bounce_creature', 'bounce_permanent', 'bounce_all_attackers',
   'pump_creature', 'reanimate', 'counter_spell', 'draw_then_discard', 'exile_creature',
-  'return_from_gy',
+  'return_from_gy', 'optional_discard_to_draw',
 ]
 
 const TARGETED_EFFECTS = [
@@ -2129,6 +2152,14 @@ function applySpellEffect(state, controllerId, effect, target, kicked, cardData)
           then_discard: effect.then_discard ?? 0,
         },
       }, `墓地から最大${effect.count ?? 1}枚選んで手札に戻す`)
+    }
+
+    case 'optional_discard_to_draw': {
+      const count = effect.count ?? 1
+      return log({
+        ...state,
+        pending_optional_discard_to_draw: { pid: controllerId, count },
+      }, `カードを${count}枚捨ててもよい。そうしたなら${count}枚引く`)
     }
 
     default:

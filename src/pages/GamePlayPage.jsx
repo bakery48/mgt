@@ -19,6 +19,7 @@ import {
   resolveVampireDeathPay, declineVampireDeathPay,
   resolveVampireDrain, declineVampireDrain,
   resolveForcedSacrifice,
+  resolveOptionalDiscardToDraw, declineOptionalDiscardToDraw,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -1445,6 +1446,43 @@ export default function GamePlayPage() {
                 )
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 任意捨て→ドローモーダル（焼却破など）─── */}
+      {gs.pending_optional_discard_to_draw?.pid === myId && (
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-50 pb-4">
+          <div className="bg-gray-800 border border-orange-500 rounded-xl p-4 w-full max-w-2xl mx-4">
+            <p className="text-orange-300 font-bold text-center mb-1">
+              カードを1枚捨ててもよい
+            </p>
+            <p className="text-gray-400 text-xs text-center mb-3">そうしたなら、カードを1枚引く</p>
+            <div className="flex gap-2 overflow-x-auto justify-center pb-2">
+              {(myPs?.hand || []).map(cardId => {
+                const card = cardData[cardId]
+                return (
+                  <button
+                    key={cardId}
+                    onClick={() => {
+                      const newGs = resolveOptionalDiscardToDraw(gs, myId, cardId)
+                      if (newGs !== gs) dispatch(newGs)
+                    }}
+                    className={`shrink-0 w-20 h-28 rounded-lg p-1.5 border-2 border-orange-400 hover:border-orange-200 text-left text-xs flex flex-col ${COLOR_BG[card?.color] || 'bg-gray-700 text-white'}`}
+                  >
+                    {card?.art_url && <img src={card.art_url} alt="" className="w-full h-12 object-cover rounded mb-1" />}
+                    <p className="font-bold leading-tight line-clamp-2">{card?.name || '?'}</p>
+                    <p className="text-xs opacity-70 mt-auto">{card?.mana_cost || ''}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <button
+              onClick={() => dispatch(declineOptionalDiscardToDraw(gs))}
+              className="w-full mt-1 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-gray-300 text-sm"
+            >
+              捨てない
+            </button>
           </div>
         </div>
       )}

@@ -355,8 +355,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 赤ソーサリー ─────────────────────────────────────────────
 ('焼却破',             'sorcery',  'red', '{4}{R}',       null, null,
- 'クリーチャー1体を対象とし、それに6点のダメージを与える。あなたはカードを1枚捨ててもよい。そうしたなら、カードを1枚引く。（ドロー効果は現在未実装）',
- '[{"type":"deal_damage","value":6}]', 400),
+ 'クリーチャー1体を対象とし、それに6点のダメージを与える。あなたはカードを1枚捨ててもよい。そうしたなら、カードを1枚引く。',
+ '[{"type":"deal_damage","value":6},{"type":"optional_discard_to_draw","count":1}]', 400),
 
 -- ════════════════════════════════════════════════════════════════
 -- 緑単デッキ
@@ -796,3 +796,4 @@ UPDATE cards SET effect_text='このクリーチャーか他のクリーチャ�
 UPDATE cards SET effect_text='飛行を持つ。税血の徴収者が戦場に出たとき、このターンに対戦相手がライフを失っていた場合、各対戦相手はカードを1枚捨てる。', keywords='[{"type":"flying"},{"type":"etb_trigger","condition":"opp_lost_life","effect":"opponent_discard","count":1}]'::jsonb WHERE name='\''税血の徴収者'\'';
 UPDATE cards SET effect_text='キッカー{B}。マラキールの門番が戦場に出たとき、それがキッカーされていた場合、対戦相手はクリーチャーを1体生け贄に捧げる。', keywords='[{"type":"kicker","value":"B"},{"type":"etb_trigger","condition":"kicked","effect":"opponent_sacrifice_creature"}]'::jsonb WHERE name='マラキールの門番';
 UPDATE cards SET effect_text='クリーチャー1体を対象とし、それを破壊する。', keywords='[{"type":"destroy_creature"}]'::jsonb WHERE name='英雄の破滅';
+UPDATE cards SET effect_text='クリーチャー1体を対象とし、それに6点のダメージを与える。あなたはカードを1枚捨ててもよい。そうしたなら、カードを1枚引く。', keywords='[{"type":"deal_damage","value":6},{"type":"optional_discard_to_draw","count":1}]'::jsonb WHERE name='焼却破';
