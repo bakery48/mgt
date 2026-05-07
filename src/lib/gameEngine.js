@@ -97,12 +97,12 @@ function mkPermanent(cardId, card) {
 // ─── 初期化 ─────────────────────────────────────────────────────
 // playerOrder: [player_id, ...]
 // deckMap: { player_id: [card_id, ...] }  ← card_idが重複含む配列
-export function initGameState(playerOrder, deckMap) {
+export function initGameState(playerOrder, deckMap, startingLife = 20) {
   const players = {}
   for (const pid of playerOrder) {
     const shuffled = shuffle(deckMap[pid] || [])
     players[pid] = {
-      life: 20,
+      life: startingLife,
       mana_pool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
       hand: shuffled.slice(0, 7),
       library: shuffled.slice(7),

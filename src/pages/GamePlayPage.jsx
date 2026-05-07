@@ -267,7 +267,8 @@ export default function GamePlayPage() {
             }
             deckMap[gp.player_id] = expanded
           }
-          currentGs = initGameState(playerOrder, deckMap)
+          const startingLife = gameData?.game_state?.starting_life ?? gameData?.starting_life ?? 20
+          currentGs = initGameState(playerOrder, deckMap, startingLife)
           await supabase.from('games').update({ game_state: currentGs }).eq('id', gameId)
         } else {
           // 非ホストは少し待って再取得
@@ -804,7 +805,7 @@ export default function GamePlayPage() {
 
             {/* 手札 */}
             <div className="flex gap-1 overflow-x-auto pb-1">
-              {(myPs.hand || []).map(cardId => {
+              {(myPs.hand || []).map((cardId, idx) => {
                 const card = cardData[cardId]
                 const canPlay = card?.card_type === 'land'
                   ? !myPs.land_played && canPlaySorcerySpeed(gs, myId)
@@ -813,7 +814,7 @@ export default function GamePlayPage() {
                     : true)
                 return (
                   <HandCard
-                    key={cardId}
+                    key={`${cardId}-${idx}`}
                     card={card}
                     highlight={selectedHandCard === cardId}
                     disabled={!canPlay}
