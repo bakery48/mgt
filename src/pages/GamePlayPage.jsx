@@ -16,6 +16,7 @@ import {
   resolveReturnFromGy, finishReturnFromGy, resolveRaidLook,
   resolveAttackSacrifice, declineAttackSacrifice,
   resolveVampireCounter,
+  resolveVampireDeathPay, declineVampireDeathPay,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -41,7 +42,7 @@ const INTERNAL_KEYWORD_TYPES = new Set([
   'subtype_dragon', 'subtype_angel', 'on_cast_trigger', 'conditional_keyword',
   'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color',
   'ally_etb_trigger', 'etb_exile_target', 'prevent_combat', 'cant_block',
-  'power_per_count', 'etb_trigger', 'counter_spell', 'subtype_vampire', 'end_step_trigger', // 効果系は effect_text で説明
+  'power_per_count', 'etb_trigger', 'counter_spell', 'subtype_vampire', 'end_step_trigger', 'death_trigger', // 効果系は effect_text で説明
 ])
 
 const COLOR_BG = {
@@ -242,6 +243,7 @@ export default function GamePlayPage() {
   const [raidLookMode, setRaidLookMode] = useState(null) // pending_raid_look for myId
   const [attackSacrificeMode, setAttackSacrificeMode] = useState(null) // pending_attack_sacrifice for myId
   const [vampireCounterMode, setVampireCounterMode] = useState(null) // pending_vampire_counter for myId
+  const [vampireDeathPayMode, setVampireDeathPayMode] = useState(null) // pending_vampire_death_pay for myId
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -508,6 +510,12 @@ export default function GamePlayPage() {
     if (gs.pending_vampire_counter.pid === myId) setVampireCounterMode(gs.pending_vampire_counter)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_vampire_counter])
+
+  useEffect(() => {
+    if (!gs?.pending_vampire_death_pay) { setVampireDeathPayMode(null); return }
+    if (gs.pending_vampire_death_pay.pid === myId) setVampireDeathPayMode(gs.pending_vampire_death_pay)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_vampire_death_pay])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -1767,6 +1775,41 @@ export default function GamePlayPage() {
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900 border border-yellow-500 text-white px-4 py-3 rounded-xl shadow-2xl text-sm max-w-sm text-center">
           <p className="font-bold text-yellow-300">{vampireCounterMode.triggerName} 誘発</p>
           <p className="text-gray-400 text-xs">+1/+1カウンターを乗せる吸血鬼を選択してください</p>
+        </div>
+      )}
+
+      {/* ─── 吸血鬼死亡誘発モーダル ─── */}
+      {vampireDeathPayMode && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-red-700 rounded-xl p-5 w-full max-w-sm mx-4 shadow-2xl text-center">
+            <p className="text-red-300 font-bold text-lg mb-1">吸血鬼死亡誘発</p>
+            <p className="text-gray-300 text-sm mb-1">
+              {vampireDeathPayMode.life_cost ?? 2}点のライフを支払ってカードを{vampireDeathPayMode.draw ?? 1}枚引きますか？
+            </p>
+            {vampireDeathPayMode.count > 1 && (
+              <p className="text-gray-500 text-xs mb-3">（残り {vampireDeathPayMode.count} 回）</p>
+            )}
+            <div className="flex gap-3 justify-center mt-4">
+              <button
+                onClick={() => {
+                  const newGs = resolveVampireDeathPay(gs, myId, cardData)
+                  if (newGs !== gs) dispatch(newGs)
+                }}
+                className="px-4 py-2 rounded-lg bg-red-700 hover:bg-red-600 text-white text-sm font-bold"
+              >
+                支払う
+              </button>
+              <button
+                onClick={() => {
+                  const newGs = declineVampireDeathPay(gs, myId)
+                  if (newGs !== gs) dispatch(newGs)
+                }}
+                className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+              >
+                しない
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

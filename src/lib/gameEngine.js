@@ -1329,6 +1329,9 @@ function _resolveStrike(state, cardData, firstStrikePhase) {
   // ライフリンクによるライフ獲得でトリガー発火
   const lifelinkGained = apLife - aps.life
   if (lifelinkGained > 0) result = applyLifeGainTriggers(result, ap, cardData)
+  // 吸血鬼死亡誘発
+  if (apDead.length > 0) result = checkVampireDeathTriggers(result, ap, apDead, cardData)
+  if (dpDead.length > 0) result = checkVampireDeathTriggers(result, def, dpDead, cardData)
   return result
 }
 
@@ -1490,9 +1493,9 @@ export function getEffectiveKeywords(perm, card, alliedBattlefield, cardData) {
     for (const kw of (allyCard.keywords || [])) {
       if (kw.type !== 'lord_effect') continue
       const targetSubtype = 'subtype_' + kw.subtype
-      if (mySubtypes2.includes(targetSubtype) && kw.grant_keywords) {
-        base.push(...kw.grant_keywords)
-      }
+      if (!mySubtypes2.includes(targetSubtype)) continue
+      if (kw.condition === 'attacking' && !perm.attacking) continue
+      if (kw.grant_keywords) base.push(...kw.grant_keywords)
     }
   }
 
@@ -1550,11 +1553,13 @@ export function resolveAttackSacrifice(state, pid, sacrificeInstanceId, cardData
   // カードを1枚引く
   const drawn = ps.library.slice(0, 1)
   const newLib = ps.library.slice(1)
-  return log({
+  let s = log({
     ...state,
     pending_attack_sacrifice: null,
     players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy, hand: [...ps.hand, ...drawn], library: newLib } },
   }, `${pas.cardName} 攻撃誘発 → ${cardData[sacPerm.card_id]?.name} を生け贄、カード1枚引き、ブロックされない`)
+  s = checkVampireDeathTriggers(s, pid, [sacPerm.card_id], cardData)
+  return s
 }
 
 export function declineAttackSacrifice(state, pid) {
@@ -1586,6 +1591,33 @@ export function resolveVampireCounter(state, pid, instanceId, cardData) {
       },
     },
   }, `${pvc.triggerName} 誘発 → ${permCard.name} に+${counter.p}/+${counter.t}カウンター`)
+}
+
+// 吸血鬼死亡誘発：2点ライフ支払い→カード1枚引き
+export function resolveVampireDeathPay(state, pid, cardData) {
+  const pvdp = state.pending_vampire_death_pay
+  if (!pvdp || pvdp.pid !== pid) return state
+  const ps = state.players[pid]
+  const lifeCost = pvdp.life_cost ?? 2
+  const drawCount = pvdp.draw ?? 1
+  if (ps.life <= lifeCost) return log(state, 'ライフが不足しているため支払えない')
+  const remaining = pvdp.count - 1
+  const drawn = ps.library.slice(0, drawCount)
+  return log({
+    ...state,
+    pending_vampire_death_pay: remaining > 0 ? { ...pvdp, count: remaining } : null,
+    players: {
+      ...state.players,
+      [pid]: { ...ps, life: ps.life - lifeCost, hand: [...ps.hand, ...drawn], library: ps.library.slice(drawCount) },
+    },
+  }, `吸血鬼死亡誘発 → ${lifeCost}点ライフ支払い、カード${drawCount}枚引き`)
+}
+
+export function declineVampireDeathPay(state, pid) {
+  const pvdp = state.pending_vampire_death_pay
+  if (!pvdp || pvdp.pid !== pid) return state
+  const remaining = pvdp.count - 1
+  return log({ ...state, pending_vampire_death_pay: remaining > 0 ? { ...pvdp, count: remaining } : null }, '吸血鬼死亡誘発 → スキップ')
 }
 
 export function hasAdditionalCost(card) {
@@ -2086,6 +2118,25 @@ function _damageCreature(state, instanceId, dmg, cardData) {
   return state
 }
 
+function checkVampireDeathTriggers(state, pid, deadCardIds, cardData) {
+  if (!deadCardIds || deadCardIds.length === 0) return state
+  const vampireDeaths = deadCardIds.filter(cid =>
+    (cardData[cid]?.keywords || []).some(k => k.type === 'subtype_vampire')
+  ).length
+  if (vampireDeaths === 0) return state
+  const ps = state.players[pid]
+  let triggerKw = null
+  for (const p of ps.battlefield) {
+    const kw = (cardData[p.card_id]?.keywords || []).find(k =>
+      k.type === 'death_trigger' && k.subtype === 'vampire' && k.effect === 'pay_life_draw'
+    )
+    if (kw) { triggerKw = kw; break }
+  }
+  if (!triggerKw) return state
+  const existing = state.pending_vampire_death_pay?.count || 0
+  return { ...state, pending_vampire_death_pay: { pid, count: existing + vampireDeaths, life_cost: triggerKw.life_cost ?? 2, draw: triggerKw.draw ?? 1 } }
+}
+
 function _destroyPermanent(state, instanceId, cardData, restriction) {
   for (const [pid, ps] of Object.entries(state.players)) {
     const idx = ps.battlefield.findIndex(p => p.instance_id === instanceId)
@@ -2097,10 +2148,12 @@ function _destroyPermanent(state, instanceId, cardData, restriction) {
     if (restriction === 'non_black' && card.color === 'black') return log(state, `${card.name} は黒のためターゲット不可`)
     const newBf = ps.battlefield.filter((p, i) => i !== idx)
       .map(p => p.attached_to === instanceId ? { ...p, attached_to: null } : p)
-    return log({
+    let s = log({
       ...state,
       players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: [...ps.graveyard, perm.card_id] } },
     }, `${card.name} を破壊した`)
+    if (card.card_type === 'creature') s = checkVampireDeathTriggers(s, pid, [perm.card_id], cardData)
+    return s
   }
   return state
 }

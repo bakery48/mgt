@@ -224,8 +224,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"cant_block"},{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"creature"}]', 600),
 
 ('交叉路の騒動屋',     'creature', 'black', '{5}{B}',       5, 5,
- 'あなたがコントロールする攻撃している吸血鬼はすべて接死と絆魂を持つ。あなたがコントロールする吸血鬼1体が死亡するたび、あなたは2点のライフを支払ってもよい。そうしたなら、カードを1枚引く。（ロード/誘発型能力は現在未実装）',
- '[]', 1500),
+ 'あなたがコントロールする攻撃している吸血鬼はすべて接死と絆魂を持つ。あなたがコントロールする吸血鬼1体が死亡するたび、あなたは2点のライフを支払ってもよい。そうしたなら、カードを1枚引く。',
+ '[{"type":"subtype_vampire"},{"type":"lord_effect","subtype":"vampire","condition":"attacking","grant_keywords":["deathtouch","lifelink"]},{"type":"death_trigger","subtype":"vampire","effect":"pay_life_draw","life_cost":2,"draw":1}]', 1500),
 
 ('吸血鬼の夜鷲',       'creature', 'black', '{1}{B}{B}',   2, 3,
  '飛行、接死、絆魂を持つ。',
@@ -790,3 +790,4 @@ UPDATE cards SET effect_text='あなたの墓地にあるクリーチャー・�
 UPDATE cards SET effect_text='接死を持つ。強襲 ― 腑抜けの略奪者が戦場に出たとき、あなたがこのターンに攻撃していた場合、あなたのライブラリーの上から3枚を見る。そのうち1枚をライブラリーの一番上に置き、残りを墓地に置く。', keywords='[{"type":"deathtouch"},{"type":"etb_trigger","condition":"raid","effect":"raid_look_top","n":3,"keep":1}]'::jsonb WHERE name='腑抜けの略奪者';
 UPDATE cards SET effect_text='吸血鬼の大食家が攻撃するたび、あなたは他のクリーチャー1体を生け贄に捧げてもよい。そうしたなら、カードを1枚引き、吸血鬼の大食家はこのターンブロックされない。', keywords='[{"type":"attack_trigger","effect":"optional_sacrifice_draw_unblockable"}]'::jsonb WHERE name='吸血鬼の大食家';
 UPDATE cards SET effect_text='あなたのエンドステップの開始時に、対戦相手がこのターンにライフを失っていた場合、あなたのコントロールする吸血鬼1体の上に+1/+1カウンターを1個置く。', keywords='[{"type":"subtype_vampire"},{"type":"end_step_trigger","condition":"opp_lost_life","effect":"counter_on_vampire","counter":{"p":1,"t":1}}]'::jsonb WHERE name='流城の血泥棒';
+UPDATE cards SET effect_text='あなたがコントロールする攻撃している吸血鬼はすべて接死と絆魂を持つ。あなたがコントロールする吸血鬼1体が死亡するたび、あなたは2点のライフを支払ってもよい。そうしたなら、カードを1枚引く。', keywords='[{"type":"subtype_vampire"},{"type":"lord_effect","subtype":"vampire","condition":"attacking","grant_keywords":["deathtouch","lifelink"]},{"type":"death_trigger","subtype":"vampire","effect":"pay_life_draw","life_cost":2,"draw":1}]'::jsonb WHERE name='交叉路の騒動屋';
