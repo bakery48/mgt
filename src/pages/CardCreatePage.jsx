@@ -76,6 +76,8 @@ export default function CardCreatePage() {
   )
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(null)
+  const [scryfallArtUrl, setScryfallArtUrl] = useState(null)
+  const [fetchingArt, setFetchingArt] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -106,6 +108,41 @@ export default function CardCreatePage() {
     if (!file) return
     setImageFile(file)
     setImagePreview(URL.createObjectURL(file))
+    setScryfallArtUrl(null)
+  }
+
+  const handleFetchScryfallArt = async () => {
+    const name = watch('name')
+    if (!name?.trim()) return
+    setFetchingArt(true)
+    try {
+      const res = await fetch(
+        `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}&lang=ja`
+      )
+      if (!res.ok) {
+        const enRes = await fetch(
+          `https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`
+        )
+        if (!enRes.ok) { setError('Scryfallに該当カードが見つかりませんでした'); return }
+        const enData = await enRes.json()
+        const artUrl = enData.image_uris?.art_crop ?? null
+        if (!artUrl) { setError('アート画像が取得できませんでした'); return }
+        setScryfallArtUrl(artUrl)
+        setImagePreview(artUrl)
+        setImageFile(null)
+        return
+      }
+      const data = await res.json()
+      const artUrl = data.image_uris?.art_crop ?? null
+      if (!artUrl) { setError('アート画像が取得できませんでした'); return }
+      setScryfallArtUrl(artUrl)
+      setImagePreview(artUrl)
+      setImageFile(null)
+    } catch {
+      setError('Scryfall APIの呼び出しに失敗しました')
+    } finally {
+      setFetchingArt(false)
+    }
   }
 
   const updateHardKw = (kw, field, value) =>
@@ -134,7 +171,7 @@ export default function CardCreatePage() {
     setError('')
 
     try {
-      let artUrl = null
+      let artUrl = scryfallArtUrl ?? null
 
       if (imageFile) {
         const ext = imageFile.name.split('.').pop()
@@ -484,7 +521,7 @@ export default function CardCreatePage() {
                 />
                 <button
                   type="button"
-                  onClick={() => { setImageFile(null); setImagePreview(null) }}
+                  onClick={() => { setImageFile(null); setImagePreview(null); setScryfallArtUrl(null) }}
                   className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 rounded-full text-white text-xs flex items-center justify-center hover:bg-red-700"
                 >
                   ✕
@@ -495,14 +532,25 @@ export default function CardCreatePage() {
                 プレビュー
               </div>
             )}
-            <div className="flex-1">
+            <div className="flex-1 space-y-2">
+              <button
+                type="button"
+                onClick={handleFetchScryfallArt}
+                disabled={fetchingArt || !watch('name')?.trim()}
+                className="w-full bg-blue-700 hover:bg-blue-600 disabled:bg-blue-900 disabled:cursor-not-allowed text-white text-sm font-medium px-4 py-3 rounded-lg transition-colors"
+              >
+                {fetchingArt ? '検索中...' : 'Scryfallから自動取得'}
+              </button>
               <label className="block cursor-pointer">
                 <div className="bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-gray-300 text-sm hover:border-gray-400 transition-colors text-center">
-                  画像を選択
+                  画像を手動選択
                 </div>
                 <input type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
               </label>
-              <p className="text-gray-500 text-xs mt-2">PNG, JPG, GIF（最大 5MB）</p>
+              <p className="text-gray-500 text-xs">PNG, JPG, GIF（最大 5MB）</p>
+              {scryfallArtUrl && (
+                <p className="text-blue-400 text-xs">Scryfall アートを使用中</p>
+              )}
             </div>
           </div>
         </section>
