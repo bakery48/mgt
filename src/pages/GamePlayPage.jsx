@@ -11,7 +11,7 @@ import {
   castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
   discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
   activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor,
-  resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand,
+  resolveEtbExile, resolveEtbBounce, resolveEtbReturnHand, respondToCounter,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -37,7 +37,7 @@ const INTERNAL_KEYWORD_TYPES = new Set([
   'subtype_dragon', 'subtype_angel', 'on_cast_trigger', 'conditional_keyword',
   'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color',
   'ally_etb_trigger', 'etb_exile_target', 'prevent_combat', 'cant_block',
-  'power_per_count', 'etb_trigger', // 効果系は effect_text で説明
+  'power_per_count', 'etb_trigger', 'counter_spell', // 効果系は effect_text で説明
 ])
 
 const COLOR_BG = {
@@ -231,6 +231,7 @@ export default function GamePlayPage() {
   const [etbExileMode, setEtbExileMode] = useState(false)
   const [etbBounceOppMode, setEtbBounceOppMode] = useState(false)
   const [etbReturnHandMode, setEtbReturnHandMode] = useState(null)
+  const [counterResponseMode, setCounterResponseMode] = useState(null) // pending_counter_response for myId
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -467,6 +468,13 @@ export default function GamePlayPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_etb_return_hand])
 
+  useEffect(() => {
+    if (!gs?.pending_counter_response) { setCounterResponseMode(null); return }
+    if (gs.pending_counter_response.affected_player === myId)
+      setCounterResponseMode(gs.pending_counter_response)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_counter_response])
+
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
     setHoverPerm(perm || null)
@@ -508,6 +516,23 @@ export default function GamePlayPage() {
       const targetingType = getSpellTargetingType(card)
       if (targetingType === 'own_graveyard_creature') {
         setReanimateMode({ cardId, card })
+        setSelectedHandCard(null)
+        return
+      }
+      if (targetingType === 'opp_stack_spell') {
+        // スタック上の対戦相手の呪文を対象に選択
+        const oppId = getOpponent(gs, myId)
+        const oppStackSpells = gs.stack.filter(e => e.controller === oppId)
+        if (oppStackSpells.length === 0) return // 対象なし
+        if (oppStackSpells.length === 1) {
+          // 対象が1つなら自動選択
+          const target = { type: 'stack_spell', id: oppStackSpells[0].id }
+          const newGs = castSpellTargeted(gs, myId, cardId, card, target, false, 0, cardData)
+          if (newGs !== gs) dispatch(newGs)
+          setSelectedHandCard(null)
+          return
+        }
+        setTargetingMode({ cardId, card, kickerPaid: false, targetingType })
         setSelectedHandCard(null)
         return
       }
@@ -1500,6 +1525,43 @@ export default function GamePlayPage() {
             : false
         }
       />
+
+      {/* ─── カウンター呪文への応答モーダル ─── */}
+      {counterResponseMode && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-blue-500 rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+            <p className="text-blue-300 font-bold text-center text-lg mb-1">波の消去</p>
+            <p className="text-white text-center mb-1">
+              <span className="font-bold text-yellow-300">{counterResponseMode.spell_name}</span> が対象になっています
+            </p>
+            <p className="text-gray-400 text-sm text-center mb-5">
+              {counterResponseMode.cost} を支払えば打ち消しを回避できます
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  const newGs = respondToCounter(gs, myId, true, cardData)
+                  if (newGs !== gs) dispatch(newGs)
+                  setCounterResponseMode(null)
+                }}
+                className="flex-1 py-2 rounded-lg font-bold bg-green-700 hover:bg-green-600 text-white transition-colors"
+              >
+                {counterResponseMode.cost} を支払う
+              </button>
+              <button
+                onClick={() => {
+                  const newGs = respondToCounter(gs, myId, false, cardData)
+                  if (newGs !== gs) dispatch(newGs)
+                  setCounterResponseMode(null)
+                }}
+                className="flex-1 py-2 rounded-lg font-bold bg-red-800 hover:bg-red-700 text-white transition-colors"
+              >
+                支払わない
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── ラウンド終了モーダル ─── */}
       {roundResult && (

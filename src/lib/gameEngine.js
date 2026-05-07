@@ -1503,7 +1503,7 @@ export const SPELL_EFFECT_TYPES = [
   'draw_cards', 'gain_life', 'deal_damage', 'deal_damage_all',
   'destroy_creature', 'destroy_permanent',
   'bounce_creature', 'bounce_permanent', 'bounce_all_attackers',
-  'pump_creature', 'reanimate',
+  'pump_creature', 'reanimate', 'counter_spell',
 ]
 
 const TARGETED_EFFECTS = [
@@ -1513,6 +1513,7 @@ const TARGETED_EFFECTS = [
 
 export function spellNeedsTarget(card) {
   if ((card?.keywords || []).some(k => TARGETED_EFFECTS.includes(k.type))) return true
+  if ((card?.keywords || []).some(k => k.type === 'counter_spell')) return true
   // オーラ（エンチャント呪文でクリーチャーを対象にとる）
   if (card?.card_type === 'enchantment' && (card?.keywords || []).some(k => k.type === 'aura')) return true
   return false
@@ -1520,6 +1521,7 @@ export function spellNeedsTarget(card) {
 
 export function getSpellTargetingType(card) {
   for (const kw of (card?.keywords || [])) {
+    if (kw.type === 'counter_spell') return 'opp_stack_spell'
     if (kw.type === 'deal_damage') return 'opp_creature_or_player'
     if (kw.type === 'destroy_creature') return 'opp_creature'
     if (kw.type === 'destroy_permanent') return 'any_permanent'
@@ -1692,8 +1694,70 @@ function applySpellEffect(state, controllerId, effect, target, kicked, cardData)
       }, `${card.name} を墓地から戦場に戻した`)
     }
 
+    case 'counter_spell': {
+      // target: { type: 'stack_spell', id: stackEntryId }
+      if (!target || target.type !== 'stack_spell') return state
+      const entry = state.stack.find(e => e.id === target.id)
+      if (!entry) return log(state, '対象の呪文がスタック上にない（立ち消え）')
+      const unlessPay = effect.unless_pay ?? null
+      const affectedPlayer = entry.controller
+      const affectedPs = state.players[affectedPlayer]
+      // unless_pay がなければ無条件カウンター
+      if (!unlessPay || !hasMana(affectedPs.mana_pool, unlessPay)) {
+        const entryCard = entry.card || cardData[entry.card_id] || {}
+        const newStack = state.stack.filter(e => e.id !== entry.id)
+        const newGy = [...affectedPs.graveyard, entry.card_id]
+        return log({
+          ...state,
+          stack: newStack,
+          players: { ...state.players, [affectedPlayer]: { ...affectedPs, graveyard: newGy } },
+        }, `${entryCard.name} を打ち消した`)
+      }
+      // 支払いの選択を要求
+      const entryCard = entry.card || cardData[entry.card_id] || {}
+      return log({
+        ...state,
+        pending_counter_response: {
+          stack_entry_id: entry.id,
+          cost: unlessPay,
+          affected_player: affectedPlayer,
+          spell_name: entryCard.name,
+        },
+      }, `${entryCard.name} を対象に波の消去。${affectedPlayer} は${unlessPay}を支払うか選択`)
+    }
+
     default:
       return state
+  }
+}
+
+// カウンター呪文への応答（支払うか否か）
+export function respondToCounter(state, pid, pay, cardData) {
+  const pcr = state.pending_counter_response
+  if (!pcr || pcr.affected_player !== pid) return state
+  const ps = state.players[pid]
+  if (pay) {
+    if (!hasMana(ps.mana_pool, pcr.cost)) return state
+    const newPool = spendMana(ps.mana_pool, pcr.cost)
+    return log({
+      ...state,
+      pending_counter_response: null,
+      players: { ...state.players, [pid]: { ...ps, mana_pool: newPool } },
+    }, `${pcr.spell_name} → ${pcr.cost} を支払い打ち消しを回避`)
+  } else {
+    const entry = state.stack.find(e => e.id === pcr.stack_entry_id)
+    let s = { ...state, pending_counter_response: null }
+    if (entry) {
+      const newStack = s.stack.filter(e => e.id !== pcr.stack_entry_id)
+      const affectedPs = s.players[pid]
+      const newGy = [...affectedPs.graveyard, entry.card_id]
+      s = log({
+        ...s,
+        stack: newStack,
+        players: { ...s.players, [pid]: { ...affectedPs, graveyard: newGy } },
+      }, `${pcr.spell_name} を打ち消した（支払い拒否）`)
+    }
+    return s
   }
 }
 

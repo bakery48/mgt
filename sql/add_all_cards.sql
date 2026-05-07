@@ -503,8 +503,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"draw_cards","value":3}]', 1000),
 
 ('波の消去',     'instant',  'blue',  '{1}{U}',    null, null,
- '呪文1つを対象とし、そのコントローラーが{3}を支払わないかぎり、それを打ち消す。（打ち消しは現在未実装）',
- '[]', 800),
+ '呪文1つを対象とし、そのコントローラーが{3}を支払わないかぎり、それを打ち消す。',
+ '[{"type":"counter_spell","unless_pay":"{3}"}]', 800),
 
 -- ── 黒クリーチャー ───────────────────────────────────────────
 ('疫病の騎士',   'creature', 'black', '{B}{B}',    2, 2,
@@ -781,3 +781,5 @@ UPDATE cards SET effect_text='伝説のクリーチャー。狩猟の統率者�
 UPDATE cards SET effect_text='瞬速を持つ。戦場に出たとき、対戦相手のコントロールする土地でないパーマネント1つを追放する。', keywords='[{"type":"flash"},{"type":"etb_exile_target","target":"opp_permanent","gain":0}]'::jsonb WHERE name='払拭の光';
 
 ALTER TABLE cards ENABLE TRIGGER USER;
+
+UPDATE cards SET effect_text='呪文1つを対象とし、そのコントローラーが{3}を支払わないかぎり、それを打ち消す。', keywords='[{"type":"counter_spell","unless_pay":"{3}"}]'::jsonb WHERE name='波の消去';
