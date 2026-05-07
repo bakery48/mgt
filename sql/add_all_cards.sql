@@ -658,7 +658,7 @@ UPDATE cards SET effect_text='飛行、絆魂を持つ。鼓舞する監視者�
 UPDATE cards SET effect_text='飛行を持つ。氷嵐の精霊が戦場に出たとき、カードを1枚引き、その後カードを1枚捨てる。',
   keywords='[{"type":"flying"},{"type":"etb_trigger","effect":"draw_then_discard","value":1}]'::jsonb WHERE name='氷嵐の精霊';
 UPDATE cards SET effect_text='吸血鬼の落とし子が戦場に出たとき、各対戦相手は2点のライフを失い、あなたは2点のライフを得る。',
-  keywords='[{"type":"etb_trigger","effect":"drain_each_opp","damage":2,"life":2}]'::jsonb WHERE name='吸血鬼の落とし子';
+  keywords='[{"type":"subtype_vampire"},{"type":"etb_trigger","effect":"drain_each_opp","damage":2,"life":2}]'::jsonb WHERE name='吸血鬼の落とし子';
 
 -- 既存行のアジャニの群れ仲間を更新（gain_life_trigger追加）
 UPDATE cards SET
@@ -772,7 +772,7 @@ UPDATE cards SET effect_text='飛行を持つ。吸血鬼の侵入者はブロ�
 UPDATE cards SET effect_text='（2）、タップ：各対戦相手は1点のライフを失い、あなたは1点のライフを得る。', keywords='[{"type":"activated_ability","cost":"2","tap_self":true,"effect":"drain_each_opp","damage":1,"gain":1}]'::jsonb WHERE name='吸血鬼の新生子';
 UPDATE cards SET effect_text='飛行を持つ。吸血鬼の魂呼びはブロックに参加できない。吸血鬼の魂呼びが戦場に出たとき、あなたの墓地にあるクリーチャー・カード1枚を対象とし、それをオーナーの手札に戻す。', keywords='[{"type":"flying"},{"type":"cant_block"},{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"creature"}]'::jsonb WHERE name='吸血鬼の魂呼び';
 UPDATE cards SET effect_text='虐殺のワームが戦場に出たとき、ターン終了時まで、対戦相手がコントロールするすべてのクリーチャーは－2/－2の修整を受ける。', keywords='[{"type":"etb_trigger","effect":"minus_all_opp_creatures_eot","power":-2,"toughness":-2}]'::jsonb WHERE name='虐殺のワーム';
-UPDATE cards SET effect_text='血なまぐさい吸血者が攻撃するたび、各対戦相手は1点のライフを失い、あなたは1点のライフを得る。', keywords='[{"type":"attack_trigger","effect":"drain_each_opp","value":1}]'::jsonb WHERE name='血なまぐさい吸血者';
+UPDATE cards SET effect_text='血なまぐさい吸血者が攻撃するたび、各対戦相手は1点のライフを失い、あなたは1点のライフを得る。', keywords='[{"type":"subtype_vampire"},{"type":"attack_trigger","effect":"drain_each_opp","value":1}]'::jsonb WHERE name='血なまぐさい吸血者';
 UPDATE cards SET effect_text='鼓動の追跡者が攻撃するたび、各対戦相手は1点のライフを失う。', keywords='[{"type":"attack_trigger","effect":"deal_each_opp","value":1}]'::jsonb WHERE name='鼓動の追跡者';
 UPDATE cards SET effect_text='飛行、二段攻撃を持つ。ヴェリュス山の恐怖が戦場に出たとき、あなたがコントロールするクリーチャーはターン終了時まで二段攻撃を得る。', keywords='[{"type":"flying"},{"type":"double_strike"},{"type":"etb_trigger","effect":"grant_all_allies_keyword_eot","keyword":"double_strike"}]'::jsonb WHERE name='ヴェリュス山の恐怖';
 UPDATE cards SET effect_text='（1）、打ち壊すブロントドンを生け贄に捧げる：アーティファクト1つかエンチャント1つを対象とし、それを破壊する。', keywords='[{"type":"activated_ability","cost":"1","sacrifice_self":true,"effect":"destroy_artifact_or_enchantment","targeting":"any_artifact_or_enchantment"}]'::jsonb WHERE name='打ち壊すブロントドン';
@@ -788,7 +788,7 @@ UPDATE cards SET effect_text='エンチャント（クリーチャー）。星�
 UPDATE cards SET effect_text='追加コストとして、クリーチャー1体を生け贄に捧げるか{3}{B}を支払う。クリーチャー1体を対象とし、それを追放する。', keywords='[{"type":"additional_cost","pay_mana":"{3}{B}"},{"type":"exile_creature"}]'::jsonb WHERE name='踊り食い';
 UPDATE cards SET effect_text='あなたの墓地にあるクリーチャー・カードを最大2枚まで対象とし、それらをオーナーの手札に戻す。その後、カードを1枚捨てる。', keywords='[{"type":"return_from_gy","count":2,"restriction":"creature","then_discard":1}]'::jsonb WHERE name='死の円舞曲';
 UPDATE cards SET effect_text='接死を持つ。強襲 ― 腑抜けの略奪者が戦場に出たとき、あなたがこのターンに攻撃していた場合、あなたのライブラリーの上から3枚を見る。そのうち1枚をライブラリーの一番上に置き、残りを墓地に置く。', keywords='[{"type":"deathtouch"},{"type":"etb_trigger","condition":"raid","effect":"raid_look_top","n":3,"keep":1}]'::jsonb WHERE name='腑抜けの略奪者';
-UPDATE cards SET effect_text='吸血鬼の大食家が攻撃するたび、あなたは他のクリーチャー1体を生け贄に捧げてもよい。そうしたなら、カードを1枚引き、吸血鬼の大食家はこのターンブロックされない。', keywords='[{"type":"attack_trigger","effect":"optional_sacrifice_draw_unblockable"}]'::jsonb WHERE name='吸血鬼の大食家';
+UPDATE cards SET effect_text='吸血鬼の大食家が攻撃するたび、あなたは他のクリーチャー1体を生け贄に捧げてもよい。そうしたなら、カードを1枚引き、吸血鬼の大食家はこのターンブロックされない。', keywords='[{"type":"subtype_vampire"},{"type":"attack_trigger","effect":"optional_sacrifice_draw_unblockable"}]'::jsonb WHERE name='吸血鬼の大食家';
 UPDATE cards SET effect_text='あなたのエンドステップの開始時に、対戦相手がこのターンにライフを失っていた場合、あなたのコントロールする吸血鬼1体の上に+1/+1カウンターを1個置く。', keywords='[{"type":"subtype_vampire"},{"type":"end_step_trigger","condition":"opp_lost_life","effect":"counter_on_vampire","counter":{"p":1,"t":1}}]'::jsonb WHERE name='流城の血泥棒';
 UPDATE cards SET effect_text='あなたがコントロールする攻撃している吸血鬼はすべて接死と絆魂を持つ。あなたがコントロールする吸血鬼1体が死亡するたび、あなたは2点のライフを支払ってもよい。そうしたなら、カードを1枚引く。', keywords='[{"type":"subtype_vampire"},{"type":"lord_effect","subtype":"vampire","condition":"attacking","grant_keywords":["deathtouch","lifelink"]},{"type":"death_trigger","subtype":"vampire","effect":"pay_life_draw","life_cost":2,"draw":1}]'::jsonb WHERE name='交叉路の騒動屋';
 UPDATE cards SET effect_text='このクリーチャーか他の吸血鬼があなたのコントロール下で墓地に置かれるたび、あなたは{B}を支払ってもよい。そうしたなら、対戦相手1人は2点のライフを失い、あなたは2点のライフを得る。', keywords='[{"type":"subtype_vampire"},{"type":"death_trigger","subtype":"vampire","effect":"pay_mana_drain","cost":"{B}","damage":2,"gain":2}]'::jsonb WHERE name='カラストリアの貴人';
@@ -797,3 +797,15 @@ UPDATE cards SET effect_text='飛行を持つ。税血の徴収者が戦場に�
 UPDATE cards SET effect_text='キッカー{B}。マラキールの門番が戦場に出たとき、それがキッカーされていた場合、対戦相手はクリーチャーを1体生け贄に捧げる。', keywords='[{"type":"kicker","value":"B"},{"type":"etb_trigger","condition":"kicked","effect":"opponent_sacrifice_creature"}]'::jsonb WHERE name='マラキールの門番';
 UPDATE cards SET effect_text='クリーチャー1体を対象とし、それを破壊する。', keywords='[{"type":"destroy_creature"}]'::jsonb WHERE name='英雄の破滅';
 UPDATE cards SET effect_text='クリーチャー1体を対象とし、それに6点のダメージを与える。あなたはカードを1枚捨ててもよい。そうしたなら、カードを1枚引く。', keywords='[{"type":"deal_damage","value":6},{"type":"optional_discard_to_draw","count":1}]'::jsonb WHERE name='焼却破';
+
+-- ─── サブタイプキーワード追加（漏れていたカード）───────────────
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_angel"}]'::jsonb WHERE name = 'セラの天使';
+UPDATE cards SET keywords = '[{"type":"subtype_vampire"},{"type":"flying"},{"type":"cant_block"}]'::jsonb WHERE name = '吸血鬼の侵入者';
+UPDATE cards SET keywords = '[{"type":"subtype_vampire"},{"type":"activated_ability","cost":"2","tap_self":true,"effect":"drain_each_opp","damage":1,"gain":1}]'::jsonb WHERE name = '吸血鬼の新生子';
+UPDATE cards SET keywords = '[{"type":"subtype_vampire"},{"type":"flying"},{"type":"cant_block"},{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"creature"}]'::jsonb WHERE name = '吸血鬼の魂呼び';
+UPDATE cards SET keywords = '[{"type":"subtype_vampire"},{"type":"flying"},{"type":"deathtouch"},{"type":"lifelink"}]'::jsonb WHERE name = '吸血鬼の夜鷲';
+UPDATE cards SET keywords = '[{"type":"subtype_vampire"},{"type":"flying"},{"type":"lifelink"}]'::jsonb WHERE name = '暗黒の吸血鬼';
+UPDATE cards SET keywords = '[{"type":"flying"},{"type":"haste"},{"type":"subtype_dragon"}]'::jsonb WHERE name = '炎の竜';
+UPDATE cards SET keywords = '[{"type":"tap_for_mana","mana":"G"},{"type":"subtype_elf"}]'::jsonb WHERE name = 'ラノワールのエルフ';
+UPDATE cards SET keywords = '[{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"any"},{"type":"subtype_elf"}]'::jsonb WHERE name = 'エルフの再生家';
+UPDATE cards SET keywords = '[{"type":"haste"},{"type":"subtype_goblin"}]'::jsonb WHERE name = '爆走のゴブリン';
