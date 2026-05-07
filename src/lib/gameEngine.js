@@ -905,7 +905,55 @@ export function advancePhase(state, cardData = {}) {
         }),
       },
     }
+    // このターンの開始時ライフを記録（エンドステップ誘発の条件チェック用）
+    s.life_at_turn_start = {}
+    for (const [p, pState] of Object.entries(state.players)) {
+      s.life_at_turn_start[p] = pState.life
+    }
     s = log(s, `ターン ${s.turn_number}: ${nextAP} のターン`)
+  } else if (next === 'end_step') {
+    const ap = state.active_player
+    s.priority = ap
+    const apPs = s.players[ap]
+    const opp = getOpponent(state, ap)
+    const oppCurrentLife = s.players[opp].life
+    const oppStartLife = (s.life_at_turn_start || {})[opp] ?? oppCurrentLife
+    const oppLostLife = oppCurrentLife < oppStartLife
+    // エンドステップ誘発チェック
+    for (const perm of apPs.battlefield) {
+      const permCard = cardData[perm.card_id] || {}
+      for (const kw of (permCard.keywords || [])) {
+        if (kw.type !== 'end_step_trigger') continue
+        if (kw.condition === 'opp_lost_life' && !oppLostLife) continue
+        if (kw.effect === 'counter_on_vampire') {
+          const vampires = apPs.battlefield.filter(v =>
+            (cardData[v.card_id]?.keywords || []).some(vk => vk.type === 'subtype_vampire')
+          )
+          if (vampires.length === 0) continue
+          const counter = kw.counter || { p: 1, t: 1 }
+          if (vampires.length === 1) {
+            const target = vampires[0]
+            const targetCard = cardData[target.card_id] || {}
+            s = log({
+              ...s,
+              players: {
+                ...s.players,
+                [ap]: {
+                  ...apPs,
+                  battlefield: apPs.battlefield.map(v =>
+                    v.instance_id === target.instance_id
+                      ? { ...v, power: (v.power ?? targetCard.power ?? 0) + counter.p, toughness: (v.toughness ?? targetCard.toughness ?? 0) + counter.t }
+                      : v
+                  ),
+                },
+              },
+            }, `${permCard.name} 誘発 → ${targetCard.name} に+${counter.p}/+${counter.t}カウンター`)
+          } else {
+            s = { ...s, pending_vampire_counter: { pid: ap, counter, triggerName: permCard.name } }
+          }
+        }
+      }
+    }
   } else if (next === 'draw') {
     const ap = state.active_player
     const ps = state.players[ap]
@@ -1512,6 +1560,32 @@ export function resolveAttackSacrifice(state, pid, sacrificeInstanceId, cardData
 export function declineAttackSacrifice(state, pid) {
   if (!state.pending_attack_sacrifice || state.pending_attack_sacrifice.pid !== pid) return state
   return { ...state, pending_attack_sacrifice: null }
+}
+
+// エンドステップ誘発：吸血鬼にカウンターを乗せる（複数いる場合のみ選択）
+export function resolveVampireCounter(state, pid, instanceId, cardData) {
+  const pvc = state.pending_vampire_counter
+  if (!pvc || pvc.pid !== pid) return state
+  const ps = state.players[pid]
+  const perm = ps.battlefield.find(p => p.instance_id === instanceId)
+  if (!perm) return state
+  const permCard = cardData[perm.card_id] || {}
+  const counter = pvc.counter
+  return log({
+    ...state,
+    pending_vampire_counter: null,
+    players: {
+      ...state.players,
+      [pid]: {
+        ...ps,
+        battlefield: ps.battlefield.map(p =>
+          p.instance_id === instanceId
+            ? { ...p, power: (p.power ?? permCard.power ?? 0) + counter.p, toughness: (p.toughness ?? permCard.toughness ?? 0) + counter.t }
+            : p
+        ),
+      },
+    },
+  }, `${pvc.triggerName} 誘発 → ${permCard.name} に+${counter.p}/+${counter.t}カウンター`)
 }
 
 export function hasAdditionalCost(card) {

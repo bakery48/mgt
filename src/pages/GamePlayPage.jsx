@@ -15,6 +15,7 @@ import {
   hasAdditionalCost, castSpellSacrificeAndExile, castSpellPayExtraAndExile,
   resolveReturnFromGy, finishReturnFromGy, resolveRaidLook,
   resolveAttackSacrifice, declineAttackSacrifice,
+  resolveVampireCounter,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -40,7 +41,7 @@ const INTERNAL_KEYWORD_TYPES = new Set([
   'subtype_dragon', 'subtype_angel', 'on_cast_trigger', 'conditional_keyword',
   'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color',
   'ally_etb_trigger', 'etb_exile_target', 'prevent_combat', 'cant_block',
-  'power_per_count', 'etb_trigger', 'counter_spell', // 効果系は effect_text で説明
+  'power_per_count', 'etb_trigger', 'counter_spell', 'subtype_vampire', 'end_step_trigger', // 効果系は effect_text で説明
 ])
 
 const COLOR_BG = {
@@ -240,6 +241,7 @@ export default function GamePlayPage() {
   const [returnFromGyMode, setReturnFromGyMode] = useState(null) // pending_return_from_gy for myId
   const [raidLookMode, setRaidLookMode] = useState(null) // pending_raid_look for myId
   const [attackSacrificeMode, setAttackSacrificeMode] = useState(null) // pending_attack_sacrifice for myId
+  const [vampireCounterMode, setVampireCounterMode] = useState(null) // pending_vampire_counter for myId
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -500,6 +502,12 @@ export default function GamePlayPage() {
     if (gs.pending_attack_sacrifice.pid === myId) setAttackSacrificeMode(gs.pending_attack_sacrifice)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_attack_sacrifice])
+
+  useEffect(() => {
+    if (!gs?.pending_vampire_counter) { setVampireCounterMode(null); return }
+    if (gs.pending_vampire_counter.pid === myId) setVampireCounterMode(gs.pending_vampire_counter)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_vampire_counter])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -998,9 +1006,15 @@ export default function GamePlayPage() {
                           toughness: effPT?.toughness ?? perm.toughness,
                         }}
                         effectiveKwTypes={effKws}
-                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea) || (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode?.attackerInstanceId)}
+                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea) || (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode?.attackerInstanceId) || (vampireCounterMode && isCrea && (cardData[perm.card_id]?.keywords || []).some(k => k.type === 'subtype_vampire'))}
                         dimmed={inAttackPhase && !canAtt && !isSelAtt}
                         onClick={() => {
+                          if (vampireCounterMode && isCrea && (cardData[perm.card_id]?.keywords || []).some(k => k.type === 'subtype_vampire')) {
+                            const newGs = resolveVampireCounter(gs, myId, perm.instance_id, cardData)
+                            if (newGs !== gs) dispatch(newGs)
+                            setVampireCounterMode(null)
+                            return
+                          }
                           if (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode.attackerInstanceId) {
                             const newGs = resolveAttackSacrifice(gs, myId, perm.instance_id, cardData)
                             if (newGs !== gs) dispatch(newGs)
@@ -1745,6 +1759,14 @@ export default function GamePlayPage() {
           >
             しない
           </button>
+        </div>
+      )}
+
+      {/* ─── 吸血鬼カウンター選択バナー ─── */}
+      {vampireCounterMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900 border border-yellow-500 text-white px-4 py-3 rounded-xl shadow-2xl text-sm max-w-sm text-center">
+          <p className="font-bold text-yellow-300">{vampireCounterMode.triggerName} 誘発</p>
+          <p className="text-gray-400 text-xs">+1/+1カウンターを乗せる吸血鬼を選択してください</p>
         </div>
       )}
 

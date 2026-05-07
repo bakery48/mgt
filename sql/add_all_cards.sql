@@ -216,8 +216,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"attack_trigger","effect":"optional_sacrifice_draw_unblockable"}]', 500),
 
 ('流城の血泥棒',       'creature', 'black', '{2}{B}',       2, 2,
- 'あなたのエンドステップの開始時に、対戦相手がこのターンにライフを失っていた場合、あなたのコントロールする吸血鬼1体の上に＋1/＋1カウンターを1個置く。（誘発型能力は現在未実装）',
- '[]', 500),
+ 'あなたのエンドステップの開始時に、対戦相手がこのターンにライフを失っていた場合、あなたのコントロールする吸血鬼1体の上に+1/+1カウンターを1個置く。',
+ '[{"type":"subtype_vampire"},{"type":"end_step_trigger","condition":"opp_lost_life","effect":"counter_on_vampire","counter":{"p":1,"t":1}}]', 500),
 
 ('吸血鬼の魂呼び',     'creature', 'black', '{4}{B}',       3, 2,
  '飛行を持つ。吸血鬼の魂呼びはブロックに参加できない。吸血鬼の魂呼びが戦場に出たとき、あなたの墓地にあるクリーチャー・カード1枚を対象とし、それをオーナーの手札に戻す。',
@@ -789,3 +789,4 @@ UPDATE cards SET effect_text='追加コストとして、クリーチャー1体�
 UPDATE cards SET effect_text='あなたの墓地にあるクリーチャー・カードを最大2枚まで対象とし、それらをオーナーの手札に戻す。その後、カードを1枚捨てる。', keywords='[{"type":"return_from_gy","count":2,"restriction":"creature","then_discard":1}]'::jsonb WHERE name='死の円舞曲';
 UPDATE cards SET effect_text='接死を持つ。強襲 ― 腑抜けの略奪者が戦場に出たとき、あなたがこのターンに攻撃していた場合、あなたのライブラリーの上から3枚を見る。そのうち1枚をライブラリーの一番上に置き、残りを墓地に置く。', keywords='[{"type":"deathtouch"},{"type":"etb_trigger","condition":"raid","effect":"raid_look_top","n":3,"keep":1}]'::jsonb WHERE name='腑抜けの略奪者';
 UPDATE cards SET effect_text='吸血鬼の大食家が攻撃するたび、あなたは他のクリーチャー1体を生け贄に捧げてもよい。そうしたなら、カードを1枚引き、吸血鬼の大食家はこのターンブロックされない。', keywords='[{"type":"attack_trigger","effect":"optional_sacrifice_draw_unblockable"}]'::jsonb WHERE name='吸血鬼の大食家';
+UPDATE cards SET effect_text='あなたのエンドステップの開始時に、対戦相手がこのターンにライフを失っていた場合、あなたのコントロールする吸血鬼1体の上に+1/+1カウンターを1個置く。', keywords='[{"type":"subtype_vampire"},{"type":"end_step_trigger","condition":"opp_lost_life","effect":"counter_on_vampire","counter":{"p":1,"t":1}}]'::jsonb WHERE name='流城の血泥棒';
