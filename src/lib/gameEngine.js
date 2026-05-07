@@ -22,6 +22,14 @@ const COLOR_TO_MANA = {
 }
 
 // ─── ユーティリティ ─────────────────────────────────────────────
+
+// 配列から指定 id の最初の1件だけ削除（同名カード複数枚対応）
+function removeOne(arr, id) {
+  const idx = arr.indexOf(id)
+  if (idx === -1) return arr
+  return [...arr.slice(0, idx), ...arr.slice(idx + 1)]
+}
+
 function shuffle(arr) {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -175,7 +183,7 @@ export function playLand(state, pid, cardId, card) {
       ...state.players,
       [pid]: {
         ...ps,
-        hand: ps.hand.filter(id => id !== cardId),
+        hand: removeOne(ps.hand, cardId),
         battlefield: [...ps.battlefield, perm],
         land_played: true,
       },
@@ -231,7 +239,7 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
       ...state.players,
       [pid]: {
         ...ps,
-        hand: ps.hand.filter(id => id !== cardId),
+        hand: removeOne(ps.hand, cardId),
         graveyard,
         exile,
         mana_pool: newPool,
@@ -585,7 +593,7 @@ export function resolveCombatDamage(state, cardData) {
 export function discardCard(state, pid, cardId) {
   const ps = state.players[pid]
   if (!(ps.hand || []).includes(cardId)) return state
-  const newHand = ps.hand.filter(id => id !== cardId)
+  const newHand = removeOne(ps.hand, cardId)
   const remaining = Math.max(0, (state.cleanup_discard || 0) - 1)
   let s = {
     ...state,
@@ -711,7 +719,7 @@ export function cycleCard(state, pid, cardId, card) {
   const costStr = `{${cycleKw.value ?? 1}}`
   if (!hasMana(ps.mana_pool, costStr)) return state
   const newPool = spendMana(ps.mana_pool, costStr)
-  const newHand = ps.hand.filter(id => id !== cardId)
+  const newHand = removeOne(ps.hand, cardId)
   const drawn = ps.library[0] ?? null
   return log({
     ...state,
