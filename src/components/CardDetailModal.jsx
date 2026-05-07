@@ -65,7 +65,7 @@ function kwLabel(kw) {
 // card: DBのカードオブジェクト
 // perm: ゲーム中のpermanentオブジェクト（任意）
 // effectivePower / effectiveToughness: 装備込みP/T（任意）
-export default function CardDetailModal({ card, perm, effectivePower, effectiveToughness, onClose }) {
+export default function CardDetailModal({ card, perm, effectivePower, effectiveToughness, onClose, onActivateAbility, canActivateAbility }) {
   useEffect(() => {
     if (!card) return
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -184,6 +184,24 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
           {!card.effect_text && keywords.length === 0 && (
             <p className="text-gray-600 text-sm italic">効果なし</p>
           )}
+
+          {/* 起動型能力ボタン */}
+          {onActivateAbility && (() => {
+            const ability = keywords.find(k => k.type === 'activated_ability')
+            if (!ability) return null
+            const label = `{${ability.cost}}：+${ability.power ?? 0}/+${ability.toughness ?? 0}（ターン終了時まで）`
+            return (
+              <button
+                onClick={() => { onActivateAbility(); }}
+                disabled={!canActivateAbility}
+                className="mt-3 w-full py-2 rounded-lg text-sm font-bold transition-colors
+                  disabled:opacity-40 disabled:cursor-not-allowed
+                  bg-red-700 hover:bg-red-600 text-white"
+              >
+                起動型能力を使う　{label}
+              </button>
+            )
+          })()}
         </div>
       </div>
     </div>

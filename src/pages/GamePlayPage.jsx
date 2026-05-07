@@ -9,7 +9,7 @@ import {
   resolveFirstStrikeDamage, resolveCombatDamage,
   canPlaySorcerySpeed, canPlayInstantSpeed, hasMana, getOpponent, getValidBlockers,
   castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
-  discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
+  discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType, activateAbility,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -1260,6 +1260,25 @@ export default function GamePlayPage() {
         card={detailCard}
         perm={detailPerm}
         onClose={() => { setDetailCard(null); setDetailPerm(null) }}
+        onActivateAbility={
+          detailPerm && gs && myPs?.battlefield.some(p => p.instance_id === detailPerm.instance_id)
+            ? () => {
+                const newGs = activateAbility(gs, myId, detailPerm.instance_id, cardData)
+                if (newGs !== gs) dispatch(newGs)
+              }
+            : undefined
+        }
+        canActivateAbility={
+          detailPerm && gs
+            ? (() => {
+                const c = cardData[detailPerm?.card_id] || {}
+                const ability = (c.keywords || []).find(k => k.type === 'activated_ability')
+                if (!ability) return false
+                return hasMana(myPs?.mana_pool || {}, `{${ability.cost}}`) &&
+                  canPlayInstantSpeed(gs, myId)
+              })()
+            : false
+        }
       />
 
       {/* ─── ラウンド終了モーダル ─── */}

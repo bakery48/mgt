@@ -332,8 +332,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"reach"}]', 500),
 
 ('シヴ山のドラゴン',   'creature', 'red', '{4}{R}{R}',   5, 5,
- '飛行を持つ。（赤）：ターン終了時まで、シヴ山のドラゴンは＋１/＋０の修整を受ける。（起動型能力は現在未実装）',
- '[{"type":"flying"}]', 1000),
+ '飛行を持つ。（赤）：ターン終了時まで、シヴ山のドラゴンは＋１/＋０の修整を受ける。',
+ '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"activated_ability","cost":"R","effect":"pump_self","power":1,"toughness":0}]', 1000),
 
 ('狂信的扇動者',       'creature', 'red', '{R}',           1, 1,
  '速攻を持つ。タップ、狂信的扇動者を生け贄に捧げる：任意の対象１つに１点のダメージを与える。（起動型能力は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行のシヴ山のドラゴンを更新（起動型能力を追加）
+UPDATE cards SET
+  effect_text = '飛行を持つ。（赤）：ターン終了時まで、シヴ山のドラゴンは＋１/＋０の修整を受ける。',
+  keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"activated_ability","cost":"R","effect":"pump_self","power":1,"toughness":0}]'::jsonb
+WHERE name = 'シヴ山のドラゴン';
 
 -- 既存行の火吹きラガークを更新（上陸誘発を追加）
 UPDATE cards SET

@@ -149,6 +149,35 @@ export function canPlayInstantSpeed(state, pid) {
 
 // ─── アクション ─────────────────────────────────────────────────
 
+// 起動型能力（pump_self など）
+export function activateAbility(state, pid, instanceId, cardData) {
+  if (!canPlayInstantSpeed(state, pid)) return state
+  const ps = state.players[pid]
+  const perm = ps.battlefield.find(p => p.instance_id === instanceId)
+  if (!perm) return state
+  const card = cardData[perm.card_id] || {}
+  const ability = (card.keywords || []).find(k => k.type === 'activated_ability')
+  if (!ability) return state
+
+  const costStr = `{${ability.cost}}`
+  if (!hasMana(ps.mana_pool, costStr)) return state
+  const newPool = spendMana(ps.mana_pool, costStr)
+
+  if (ability.effect === 'pump_self') {
+    const te = { power: ability.power ?? 0, toughness: ability.toughness ?? 0 }
+    const newBf = ps.battlefield.map(p =>
+      p.instance_id === instanceId
+        ? { ...p, temp_effects: [...(p.temp_effects || []), te] }
+        : p
+    )
+    return log(
+      { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, mana_pool: newPool } } },
+      `${card.name} 起動型能力 → +${te.power}/+${te.toughness}`
+    )
+  }
+  return state
+}
+
 // 土地タップ（マナ生成）
 export function tapForMana(state, pid, instanceId, card) {
   const ps = state.players[pid]
