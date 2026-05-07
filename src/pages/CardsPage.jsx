@@ -146,10 +146,10 @@ function CardItem({ card, onClick }) {
 
   return (
     <div
-      className={`rounded-xl border-4 ${frame.outer} shadow-lg cursor-pointer hover:scale-[1.02] transition-transform`}
+      className={`rounded-xl border-4 ${frame.outer} shadow-lg cursor-pointer hover:scale-[1.02] transition-transform flex flex-col`}
       onClick={onClick}
     >
-      <div className="p-1.5 flex flex-col gap-1">
+      <div className="p-1.5 flex flex-col gap-1 flex-1">
 
         {/* 名前バー */}
         <div className={`flex items-center justify-between px-2 py-1 rounded-md border border-black/10 ${frame.header}`}>
@@ -160,7 +160,7 @@ function CardItem({ card, onClick }) {
         </div>
 
         {/* アート（MTGのアートボックスは横長：縦横比 約3:2） */}
-        <div className="rounded overflow-hidden border border-black/20 aspect-[3/2]">
+        <div className="rounded overflow-hidden border border-black/20 aspect-[3/2] shrink-0">
           {card.art_url ? (
             <img
               src={card.art_url}
@@ -175,15 +175,15 @@ function CardItem({ card, onClick }) {
         </div>
 
         {/* タイプ行 */}
-        <div className={`flex items-center px-2 py-0.5 rounded-md border border-black/10 text-xs font-semibold ${frame.typebar}`}>
+        <div className={`flex items-center px-2 py-0.5 rounded-md border border-black/10 text-xs font-semibold shrink-0 ${frame.typebar}`}>
           <span className="truncate">
             {TYPE_LABELS[card.card_type] || card.card_type}
             {subtypeLabel && <span className="font-normal"> — {subtypeLabel}</span>}
           </span>
         </div>
 
-        {/* テキストボックス */}
-        <div className={`rounded-md border border-black/10 px-2 py-1.5 min-h-[56px] flex flex-col justify-between ${frame.textbox}`}>
+        {/* テキストボックス：残りスペースをすべて占有 */}
+        <div className={`rounded-md border border-black/10 px-2 py-1.5 flex-1 flex flex-col justify-between ${frame.textbox}`}>
           <div>
             {card.effect_text ? (
               <p className="text-xs leading-snug line-clamp-3 whitespace-pre-wrap">
