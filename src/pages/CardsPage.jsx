@@ -114,12 +114,7 @@ function CardItem({ card, onClick }) {
 
       <div className="p-4">
         <div className="flex items-start justify-between gap-2 mb-2">
-          <div className="flex flex-col gap-1">
-            <h3 className="font-semibold text-white text-sm leading-tight">{card.name}</h3>
-            {card.is_original && (
-              <span className="self-start text-xs bg-teal-900/60 text-teal-300 border border-teal-700 px-1.5 py-0.5 rounded">オリジナル</span>
-            )}
-          </div>
+          <h3 className="font-semibold text-white text-sm leading-tight">{card.name}</h3>
           <div
             className={`w-4 h-4 rounded-full shrink-0 mt-0.5 ${COLOR_DOT[card.color] || 'bg-gray-500'}`}
             title={COLOR_LABELS[card.color]}
@@ -166,7 +161,7 @@ export default function CardsPage() {
   const [cards, setCards] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [filter, setFilter] = useState({ card_type: '', color: '', search: '', origin: '' })
+  const [filter, setFilter] = useState({ card_type: '', color: '', search: '' })
   const [detailCard, setDetailCard] = useState(null)
 
   useEffect(() => {
@@ -176,8 +171,6 @@ export default function CardsPage() {
       if (filter.card_type) query = query.eq('card_type', filter.card_type)
       if (filter.color) query = query.eq('color', filter.color)
       if (filter.search) query = query.ilike('name', `%${filter.search}%`)
-      if (filter.origin === 'original') query = query.eq('is_original', true)
-      if (filter.origin === 'mtg') query = query.eq('is_original', false)
       const { data, error } = await query
       if (error) setError(error.message)
       else setCards(data || [])
@@ -215,15 +208,6 @@ export default function CardsPage() {
           >
             <option value="">すべての色</option>
             {COLORS.map(c => <option key={c} value={c}>{COLOR_LABELS[c]}</option>)}
-          </select>
-          <select
-            value={filter.origin}
-            onChange={(e) => setFilter(f => ({ ...f, origin: e.target.value }))}
-            className="bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500"
-          >
-            <option value="">すべて</option>
-            <option value="original">オリジナルのみ</option>
-            <option value="mtg">MTGのみ</option>
           </select>
         </div>
       </div>

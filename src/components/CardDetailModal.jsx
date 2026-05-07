@@ -129,9 +129,6 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
             </span>
             <span className="text-gray-600">·</span>
             <span className="text-gray-400 text-sm">{COLOR_LABELS[card.color] || card.color}</span>
-            {card.is_original && (
-              <span className="text-xs bg-teal-900/60 text-teal-300 border border-teal-700 px-1.5 py-0.5 rounded">オリジナル</span>
-            )}
             {isCrea && dispPower != null && dispTough != null && (
               <span className="ml-auto text-white font-mono font-bold bg-gray-700 px-3 py-1 rounded-lg text-sm">
                 {dispPower}/{dispTough}
