@@ -4,15 +4,6 @@ const TYPE_LABELS = {
   creature: 'クリーチャー', instant: 'インスタント', sorcery: 'ソーサリー',
   enchantment: 'エンチャント', artifact: 'アーティファクト', land: '土地',
 }
-const COLOR_LABELS = {
-  white: '白', blue: '青', black: '黒', red: '赤', green: '緑', colorless: '無色', multicolor: '多色',
-}
-const COLOR_BG = {
-  white: 'bg-yellow-50 text-gray-900', blue: 'bg-blue-700 text-white',
-  black: 'bg-gray-900 text-white', red: 'bg-red-700 text-white',
-  green: 'bg-green-800 text-white', colorless: 'bg-gray-600 text-white',
-  multicolor: 'bg-gradient-to-br from-yellow-600 to-purple-700 text-white',
-}
 const MTG_KW_LABELS = {
   flying: '飛行', haste: '速攻', vigilance: '警戒', trample: 'トランプル', reach: '到達',
   first_strike: '先制攻撃', double_strike: '二段攻撃', lifelink: '絆魂', deathtouch: '接死', menace: '威迫',
@@ -52,56 +43,36 @@ const ORIG_KW = new Set(['拝金', '徴収', '栄光', '簒奪'])
 const TRIGGER_LABELS = { etb: '戦場に出た時', upkeep: 'アップキープ', attack: '攻撃時', damage: 'ダメージ時' }
 
 const SUBTYPE_LABELS = {
-  subtype_vampire: '吸血鬼',
-  subtype_angel: '天使',
-  subtype_dragon: 'ドラゴン',
-  subtype_elf: 'エルフ',
-  subtype_goblin: 'ゴブリン',
-  subtype_zombie: 'ゾンビ',
-  subtype_human: '人間',
-  subtype_knight: '騎士',
-  subtype_wizard: 'ウィザード',
-  subtype_warrior: '戦士',
-  subtype_merfolk: '人魚',
-  subtype_beast: '野獣',
-  subtype_spirit: '精霊',
-  subtype_bird: '鳥',
-  subtype_cat: '猫',
-  subtype_soldier: '兵士',
-  subtype_noble: '貴族',
-  subtype_rabbit: '兎',
-  subtype_cleric: 'クレリック',
-  subtype_rogue: 'ならず者',
-  subtype_scout: 'スカウト',
-  subtype_shaman: 'シャーマン',
-  subtype_warlock: '邪術師',
-  subtype_skeleton: 'スケルトン',
-  subtype_phyrexian: 'ファイレクシアン',
-  subtype_worm: 'ワーム',
-  subtype_pirate: '海賊',
-  subtype_horse: '馬',
-  subtype_sphinx: 'スフィンクス',
-  subtype_faerie: 'フェアリー',
-  subtype_turtle: '亀',
-  subtype_construct: '構築物',
-  subtype_wall: '壁',
-  subtype_djinn: 'ジン',
-  subtype_shark: 'サメ',
-  subtype_lizard: 'トカゲ',
-  subtype_dwarf: 'ドワーフ',
-  subtype_berserker: '狂戦士',
-  subtype_elder: 'エルダー',
-  subtype_dinosaur: '恐竜',
-  subtype_druid: 'ドルイド',
-  subtype_archer: '射手',
-  subtype_snake: '蛇',
-  subtype_giant: '巨人',
-  subtype_elemental: 'エレメンタル',
-  subtype_spider: '蜘蛛',
-  subtype_treefolk: 'ツリーフォーク',
-  subtype_ninja: '忍者',
+  subtype_vampire: '吸血鬼', subtype_angel: '天使', subtype_dragon: 'ドラゴン',
+  subtype_elf: 'エルフ', subtype_goblin: 'ゴブリン', subtype_zombie: 'ゾンビ',
+  subtype_human: '人間', subtype_knight: '騎士', subtype_wizard: 'ウィザード',
+  subtype_warrior: '戦士', subtype_merfolk: '人魚', subtype_beast: '野獣',
+  subtype_spirit: '精霊', subtype_bird: '鳥', subtype_cat: '猫',
+  subtype_soldier: '兵士', subtype_noble: '貴族', subtype_rabbit: '兎',
+  subtype_cleric: 'クレリック', subtype_rogue: 'ならず者', subtype_scout: 'スカウト',
+  subtype_shaman: 'シャーマン', subtype_warlock: '邪術師', subtype_skeleton: 'スケルトン',
+  subtype_phyrexian: 'ファイレクシアン', subtype_worm: 'ワーム', subtype_pirate: '海賊',
+  subtype_horse: '馬', subtype_sphinx: 'スフィンクス', subtype_faerie: 'フェアリー',
+  subtype_turtle: '亀', subtype_construct: '構築物', subtype_wall: '壁',
+  subtype_djinn: 'ジン', subtype_shark: 'サメ', subtype_lizard: 'トカゲ',
+  subtype_dwarf: 'ドワーフ', subtype_berserker: '狂戦士', subtype_elder: 'エルダー',
+  subtype_dinosaur: '恐竜', subtype_druid: 'ドルイド', subtype_archer: '射手',
+  subtype_snake: '蛇', subtype_giant: '巨人', subtype_elemental: 'エレメンタル',
+  subtype_spider: '蜘蛛', subtype_treefolk: 'ツリーフォーク', subtype_ninja: '忍者',
   subtype_demon: '悪魔',
 }
+
+// カード色ごとのフレームスタイル
+const FRAME = {
+  white:     { outer: 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-300',    header: 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-gray-900',   typebar: 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-gray-800', textbox: 'bg-amber-50 text-gray-800',    pt: 'bg-yellow-100 text-gray-900 border-yellow-400' },
+  blue:      { outer: 'bg-gradient-to-b from-blue-300 to-blue-500 border-blue-600',          header: 'bg-gradient-to-r from-blue-200 to-blue-300 text-gray-900',      typebar: 'bg-gradient-to-r from-blue-200 to-blue-300 text-gray-800',   textbox: 'bg-blue-50 text-gray-800',     pt: 'bg-blue-200 text-gray-900 border-blue-400' },
+  black:     { outer: 'bg-gradient-to-b from-gray-600 to-gray-800 border-gray-900',          header: 'bg-gradient-to-r from-gray-700 to-gray-800 text-gray-100',      typebar: 'bg-gradient-to-r from-gray-700 to-gray-800 text-gray-200',   textbox: 'bg-gray-900 text-gray-200',    pt: 'bg-gray-700 text-gray-100 border-gray-500' },
+  red:       { outer: 'bg-gradient-to-b from-red-400 to-red-600 border-red-700',             header: 'bg-gradient-to-r from-red-200 to-red-300 text-gray-900',        typebar: 'bg-gradient-to-r from-red-200 to-red-300 text-gray-800',     textbox: 'bg-red-50 text-gray-800',      pt: 'bg-red-200 text-gray-900 border-red-400' },
+  green:     { outer: 'bg-gradient-to-b from-green-400 to-green-700 border-green-800',       header: 'bg-gradient-to-r from-green-200 to-green-300 text-gray-900',    typebar: 'bg-gradient-to-r from-green-200 to-green-300 text-gray-800', textbox: 'bg-green-50 text-gray-800',    pt: 'bg-green-200 text-gray-900 border-green-400' },
+  colorless: { outer: 'bg-gradient-to-b from-gray-300 to-gray-400 border-gray-500',          header: 'bg-gradient-to-r from-gray-200 to-gray-300 text-gray-900',      typebar: 'bg-gradient-to-r from-gray-200 to-gray-300 text-gray-800',   textbox: 'bg-gray-100 text-gray-800',    pt: 'bg-gray-200 text-gray-900 border-gray-400' },
+  multicolor:{ outer: 'bg-gradient-to-b from-yellow-300 via-amber-400 to-yellow-500 border-yellow-600', header: 'bg-gradient-to-r from-yellow-100 to-amber-200 text-gray-900', typebar: 'bg-gradient-to-r from-yellow-100 to-amber-200 text-gray-800', textbox: 'bg-amber-50 text-gray-800', pt: 'bg-yellow-200 text-gray-900 border-yellow-500' },
+}
+const DEFAULT_FRAME = FRAME.colorless
 
 function getSubtypeLabel(keywords) {
   const subtypes = (keywords || []).map(kw => SUBTYPE_LABELS[kw.type]).filter(Boolean)
@@ -130,145 +101,149 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
     return () => document.removeEventListener('keydown', handler)
   }, [card, onClose])
   if (!card) return null
+
   const keywords = Array.isArray(card.keywords) ? card.keywords : []
   const isCrea = card.card_type === 'creature'
   const dispPower = effectivePower ?? perm?.power ?? card.power
   const dispTough = effectiveToughness ?? perm?.toughness ?? card.toughness
+  const frame = FRAME[card.color] || DEFAULT_FRAME
+  const subtypeLabel = getSubtypeLabel(keywords)
+  const visibleKws = keywords.filter(kw => MTG_KW_LABELS[kw.type] || ORIG_KW.has(kw.type))
+
+  // キーワード能力のテキスト（実際のカードのような表示用）
+  const kwText = visibleKws.map(kw => kwLabel(kw)).join('、')
+
+  // 起動型能力ラベル
+  const ability = keywords.find(k => k.type === 'activated_ability')
+  let abilityLabel = null
+  if (ability) {
+    const costStr = ability.cost_str || (ability.cost != null ? `{${ability.cost}}` : '')
+    const costs = [costStr]
+    if (ability.tap_self) costs.push('Ｔ')
+    if (ability.sacrifice_self) costs.push('生け贄')
+    const costPart = costs.filter(Boolean).join('、')
+    if (ability.effect === 'draw_cards') {
+      abilityLabel = `${costPart}：カードを${ability.value ?? 1}枚引く`
+    } else if (ability.effect === 'put_counter_target') {
+      abilityLabel = `${costPart}：クリーチャー1体の上に+1/+1カウンターを1個置く`
+    } else if (ability.cost === 'discard_card') {
+      abilityLabel = `カードを1枚捨てる、Ｔ：このクリーチャーは破壊不能を得る`
+    } else {
+      abilityLabel = `${costPart}：+${ability.power ?? 0}/+${ability.toughness ?? 0}（ターン終了時まで）`
+    }
+  }
 
   return (
     <div
-      className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
+      {/* カード本体：縦長・実物比率に近い */}
       <div
-        className="relative bg-gray-900 border border-gray-600 rounded-2xl overflow-hidden shadow-2xl flex flex-col sm:flex-row max-w-xl w-full"
+        className={`relative rounded-2xl border-4 ${frame.outer} shadow-2xl`}
+        style={{ width: '340px', maxHeight: '95vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
         {/* 閉じるボタン */}
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 z-10 w-8 h-8 bg-black/60 hover:bg-black/80 text-white rounded-full flex items-center justify-center text-lg leading-none transition-colors"
+          className="absolute top-2 right-2 z-10 w-7 h-7 bg-black/50 hover:bg-black/80 text-white rounded-full flex items-center justify-center text-base leading-none transition-colors"
         >
           ×
         </button>
 
-        {/* 左: アート */}
-        <div className={`sm:w-48 shrink-0 ${COLOR_BG[card.color] || 'bg-gray-800'}`}>
-          {card.art_url ? (
-            <img
-              src={card.art_url}
-              alt={card.name}
-              className="w-full h-48 object-cover"
-            />
-          ) : (
-            <div className="w-full h-48 flex items-center justify-center text-6xl opacity-30">
-              🃏
-            </div>
-          )}
-        </div>
+        <div className="p-2 flex flex-col gap-1.5">
 
-        {/* 右: 詳細 */}
-        <div className="flex-1 p-5">
-          {/* 名前 + マナコスト */}
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <h2 className="text-white text-xl font-bold leading-tight">{card.name}</h2>
+          {/* ① 名前バー + マナコスト */}
+          <div className={`flex items-center justify-between px-3 py-1.5 rounded-lg border border-black/10 ${frame.header}`}>
+            <span className="font-bold text-base leading-tight pr-2">{card.name}</span>
             {card.mana_cost && (
-              <span className="text-gray-300 font-mono text-sm shrink-0 bg-gray-800 px-2 py-1 rounded">
-                {card.mana_cost}
-              </span>
+              <span className="font-mono text-sm font-bold shrink-0 tracking-wide">{card.mana_cost}</span>
             )}
           </div>
 
-          {/* タイプ行 */}
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            <span className="text-gray-300 text-sm">
+          {/* ② アート */}
+          <div className="rounded-lg overflow-hidden border-2 border-black/20" style={{ height: '180px' }}>
+            {card.art_url ? (
+              <img src={card.art_url} alt={card.name} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                <span className="text-7xl opacity-20">🃏</span>
+              </div>
+            )}
+          </div>
+
+          {/* ③ タイプ行 */}
+          <div className={`flex items-center px-3 py-1 rounded-lg border border-black/10 text-sm font-semibold ${frame.typebar}`}>
+            <span>
               {TYPE_LABELS[card.card_type] || card.card_type}
-              {getSubtypeLabel(keywords) && <span className="text-gray-400"> — {getSubtypeLabel(keywords)}</span>}
+              {subtypeLabel && <span className="font-normal"> — {subtypeLabel}</span>}
             </span>
-            <span className="text-gray-600">·</span>
-            <span className="text-gray-400 text-sm">{COLOR_LABELS[card.color] || card.color}</span>
+          </div>
+
+          {/* ④ テキストボックス */}
+          <div className={`rounded-lg border border-black/10 px-3 py-2.5 min-h-[100px] ${frame.textbox}`}>
+
+            {/* ゲーム内状態バッジ */}
+            {perm && (
+              <div className="flex flex-wrap gap-1 mb-2">
+                {perm.tapped && <span className="text-xs bg-yellow-200 text-yellow-900 border border-yellow-400 px-1.5 py-0.5 rounded">タップ済</span>}
+                {perm.summoning_sick && <span className="text-xs bg-gray-200 text-gray-700 border border-gray-400 px-1.5 py-0.5 rounded">召喚酔い</span>}
+                {perm.attacking && <span className="text-xs bg-red-200 text-red-900 border border-red-400 px-1.5 py-0.5 rounded">攻撃中</span>}
+                {perm.blocking && <span className="text-xs bg-blue-200 text-blue-900 border border-blue-400 px-1.5 py-0.5 rounded">ブロック中</span>}
+                {perm.damage > 0 && <span className="text-xs bg-red-100 text-red-800 border border-red-300 px-1.5 py-0.5 rounded">ダメージ {perm.damage}</span>}
+                {perm.kicked && <span className="text-xs bg-purple-100 text-purple-800 border border-purple-300 px-1.5 py-0.5 rounded">⚡キッカー済</span>}
+                {perm.unearthed && <span className="text-xs bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded">アンアース済</span>}
+              </div>
+            )}
+
+            {/* キーワード能力（イタリック表示） */}
+            {kwText && (
+              <p className="text-sm italic mb-2 leading-snug">{kwText}</p>
+            )}
+
+            {/* 起動型能力テキスト */}
+            {abilityLabel && (
+              <p className="text-sm mb-2 leading-snug">{abilityLabel}</p>
+            )}
+
+            {/* 効果テキスト */}
+            {card.effect_text && (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {card.effect_text.replace(/\\n/g, '\n')}
+              </p>
+            )}
+
+            {!kwText && !card.effect_text && !abilityLabel && (
+              <p className="text-sm opacity-40 italic">（効果なし）</p>
+            )}
+
+            {/* P/T（クリーチャーのみ） */}
             {isCrea && dispPower != null && dispTough != null && (
-              <span className="ml-auto text-white font-mono font-bold bg-gray-700 px-3 py-1 rounded-lg text-sm">
-                {dispPower}/{dispTough}
-                {effectivePower != null && effectivePower !== card.power && (
-                  <span className="text-green-400 text-xs ml-1">（装備込み）</span>
-                )}
-              </span>
+              <div className="flex justify-end mt-3">
+                <span className={`font-mono font-bold text-base px-3 py-0.5 rounded border-2 ${frame.pt}`}>
+                  {dispPower}/{dispTough}
+                  {effectivePower != null && effectivePower !== card.power && (
+                    <span className="text-green-700 text-xs ml-1">*</span>
+                  )}
+                </span>
+              </div>
             )}
           </div>
 
-          {/* ゲーム内状態 */}
-          {perm && (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {perm.tapped && <span className="text-xs bg-yellow-900/40 text-yellow-400 border border-yellow-700 px-2 py-0.5 rounded">タップ済</span>}
-              {perm.summoning_sick && <span className="text-xs bg-gray-700 text-gray-400 border border-gray-600 px-2 py-0.5 rounded">召喚酔い</span>}
-              {perm.attacking && <span className="text-xs bg-red-900/40 text-red-400 border border-red-700 px-2 py-0.5 rounded">攻撃中</span>}
-              {perm.blocking && <span className="text-xs bg-blue-900/40 text-blue-400 border border-blue-700 px-2 py-0.5 rounded">ブロック中</span>}
-              {perm.damage > 0 && <span className="text-xs bg-red-950 text-red-300 border border-red-800 px-2 py-0.5 rounded">ダメージ {perm.damage}</span>}
-              {perm.kicked && <span className="text-xs bg-yellow-900/40 text-yellow-400 border border-yellow-700 px-2 py-0.5 rounded">⚡キッカー済</span>}
-              {perm.unearthed && <span className="text-xs bg-emerald-900/40 text-emerald-400 border border-emerald-700 px-2 py-0.5 rounded">アンアース済</span>}
-            </div>
+          {/* ⑤ 起動型能力ボタン（ゲーム内のみ） */}
+          {onActivateAbility && ability && (
+            <button
+              onClick={() => { onActivateAbility() }}
+              disabled={!canActivateAbility}
+              className="w-full py-2 rounded-lg text-sm font-bold transition-colors
+                disabled:opacity-40 disabled:cursor-not-allowed
+                bg-indigo-700 hover:bg-indigo-600 text-white"
+            >
+              起動型能力を使う
+            </button>
           )}
 
-          {/* キーワード（MTG_KW_LABELSに登録済みのものだけ表示） */}
-          {keywords.filter(kw => MTG_KW_LABELS[kw.type]).length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {keywords.filter(kw => MTG_KW_LABELS[kw.type]).map((kw, i) => {
-                const tip = KW_TOOLTIPS[kw.type]
-                return (
-                  <span
-                    key={i}
-                    title={tip || ''}
-                    className="relative inline-block group text-xs px-2 py-0.5 rounded border cursor-help bg-gray-800 text-gray-300 border-gray-600"
-                  >
-                    {kwLabel(kw)}
-                    {tip && (
-                      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 bg-gray-950 text-gray-100 rounded normal-case opacity-0 group-hover:opacity-100 transition-opacity z-50 border border-gray-600 shadow-lg max-w-xs whitespace-normal text-center">
-                        {tip}
-                      </span>
-                    )}
-                  </span>
-                )
-              })}
-            </div>
-          )}
-
-          {/* 効果テキスト */}
-          {card.effect_text && (
-            <p className="text-gray-300 text-sm leading-relaxed whitespace-pre-wrap bg-gray-800/60 rounded-lg p-3">
-              {card.effect_text.replace(/\\n/g, '\n')}
-            </p>
-          )}
-          {!card.effect_text && keywords.length === 0 && (
-            <p className="text-gray-600 text-sm italic">効果なし</p>
-          )}
-
-          {/* 起動型能力ボタン */}
-          {onActivateAbility && (() => {
-            const ability = keywords.find(k => k.type === 'activated_ability')
-            if (!ability) return null
-            let label = `{${ability.cost}}：+${ability.power ?? 0}/+${ability.toughness ?? 0}（ターン終了時まで）`
-            if (ability.effect === 'draw_cards') {
-              const costs = [`{${ability.cost}}`]
-              if (ability.tap_self) costs.push('タップ')
-              if (ability.sacrifice_self) costs.push('生け贄')
-              label = `${costs.join('、')}：カードを${ability.value ?? 1}枚引く`
-            }
-            if (ability.cost === 'discard_card') {
-              label = `カードを1枚捨てる：タップして破壊不能（ターン終了時まで）`
-            }
-            return (
-              <button
-                onClick={() => { onActivateAbility(); }}
-                disabled={!canActivateAbility}
-                className="mt-3 w-full py-2 rounded-lg text-sm font-bold transition-colors
-                  disabled:opacity-40 disabled:cursor-not-allowed
-                  bg-red-700 hover:bg-red-600 text-white"
-              >
-                起動型能力を使う　{label}
-              </button>
-            )
-          })()}
         </div>
       </div>
     </div>
