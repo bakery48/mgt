@@ -401,6 +401,32 @@ function applyEtbTriggers(state, pid, card, cardData) {
       s = applyLifeGainTriggers(s, pid, cardData)
     }
   }
+
+  // ally_etb_trigger: 他のクリーチャーが戦場に出たとき誘発する能力（内陸の聖別者など）
+  // 新しいクリーチャーは常に battlefield の末尾に追加されるため、それ以外を対象とする
+  const isCreature = card?.card_type === 'creature'
+  if (isCreature) {
+    const bf = s.players[pid].battlefield
+    const newPermIid = bf.length > 0 ? bf[bf.length - 1].instance_id : null
+    for (const perm of bf) {
+      if (perm.instance_id === newPermIid) continue // 今入ったクリーチャー自身はスキップ
+      const permCard = cardData[perm.card_id] || {}
+      for (const kw of (permCard.keywords || [])) {
+        if (kw.type !== 'ally_etb_trigger') continue
+        if (kw.condition === 'other_creature') {
+          if (kw.effect === 'gain_life') {
+            const amount = kw.value ?? 1
+            const myPs = s.players[pid]
+            s = log(
+              { ...s, players: { ...s.players, [pid]: { ...myPs, life: myPs.life + amount } } },
+              `${permCard.name} 誘発 → ライフを${amount}点得た`
+            )
+            s = applyLifeGainTriggers(s, pid, cardData)
+          }
+        }
+      }
+    }
+  }
   return s
 }
 

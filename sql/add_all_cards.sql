@@ -81,8 +81,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"etb_choose_color"},{"type":"on_cast_trigger","condition":"chosen_color_spell","effect":"gain_life","value":1}]', 500),
 
 ('内陸の聖別者',     'creature', 'white', '{W}',       1, 1,
- '警戒を持つ。他のクリーチャーが自分のコントロール下で戦場に出るたびライフを1点得る。（誘発型能力は現在未実装）',
- '[{"type":"vigilance"}]', 400),
+ '警戒を持つ。他のクリーチャーが自分のコントロール下で戦場に出るたびライフを1点得る。',
+ '[{"type":"vigilance"},{"type":"ally_etb_trigger","condition":"other_creature","effect":"gain_life","value":1}]', 400),
 
 -- ── 白インスタント ───────────────────────────────────────────
 ('突き通し',         'instant',  'white', '{1}{W}',   null, null,
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の内陸の聖別者を更新（他クリーチャーETB誘発実装）
+UPDATE cards SET
+  effect_text = '警戒を持つ。他のクリーチャーが自分のコントロール下で戦場に出るたびライフを1点得る。',
+  keywords = '[{"type":"vigilance"},{"type":"ally_etb_trigger","condition":"other_creature","effect":"gain_life","value":1}]'::jsonb
+WHERE name = '内陸の聖別者';
 
 -- 既存行の金剛牝馬を更新（ETB色選択・呪文誘発実装）
 UPDATE cards SET
