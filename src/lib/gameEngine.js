@@ -607,6 +607,16 @@ function applyAttackTriggers(state, attackingPid, attackerIids, cardData) {
     for (const kw of (card.keywords || [])) {
       if (kw.type !== 'attack_trigger') continue
 
+      if (kw.effect === 'gain_life') {
+        const amount = kw.value ?? 2
+        const myPs = s.players[attackingPid]
+        s = log(
+          { ...s, players: { ...s.players, [attackingPid]: { ...myPs, life: myPs.life + amount } } },
+          `${card.name} 攻撃誘発 → ライフを${amount}点得た`
+        )
+        s = applyLifeGainTriggers(s, attackingPid, cardData)
+      }
+
       if (kw.effect === 'drakuseth_damage') {
         const primaryDmg   = kw.primary_dmg   ?? 4
         const secondaryDmg = kw.secondary_dmg ?? 3

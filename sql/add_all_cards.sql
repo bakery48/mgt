@@ -61,8 +61,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"vigilance"}]', 1400),
 
 ('信仰の伝令',       'creature', 'white', '{3}{W}{W}', 4, 3,
- '飛行、絆魂を持つ。信仰の伝令が攻撃するたび、ライフを2点得る。（攻撃誘発は現在未実装）',
- '[{"type":"flying"},{"type":"lifelink"}]', 1200),
+ '飛行、絆魂を持つ。信仰の伝令が攻撃するたび、ライフを2点得る。',
+ '[{"type":"flying"},{"type":"lifelink"},{"type":"attack_trigger","effect":"gain_life","value":2}]', 1200),
 
 ('光の模範',         'creature', 'white', '{2}{W}{W}', 3, 3,
  '飛行を持つ。ライフを得るたびこのクリーチャーの上に＋１/＋１カウンターを置く。このクリーチャーにカウンターが置かれるたびカードを引く。（カウンター/ドロー効果は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行の信仰の伝令を更新（攻撃誘発追加）
+UPDATE cards SET
+  effect_text = '飛行、絆魂を持つ。信仰の伝令が攻撃するたび、ライフを2点得る。',
+  keywords = '[{"type":"flying"},{"type":"lifelink"},{"type":"attack_trigger","effect":"gain_life","value":2}]'::jsonb
+WHERE name = '信仰の伝令';
 
 -- 既存行の ETB 実装カードを更新
 UPDATE cards SET effect_text='警戒を持つ。お手伝いする狩人が戦場に出たとき、カードを1枚引く。',
