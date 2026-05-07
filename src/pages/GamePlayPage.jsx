@@ -10,7 +10,7 @@ import {
   canPlaySorcerySpeed, canPlayInstantSpeed, hasMana, getOpponent, getValidBlockers,
   castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
   discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
-  activateAbility, activateAbilityTargeted, activateAbilityDiscard,
+  activateAbility, activateAbilityTargeted, activateAbilityDiscard, setChosenColor,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -34,7 +34,7 @@ const KEYWORD_LABELS = {
 // バッジ非表示の内部用キーワードタイプ
 const INTERNAL_KEYWORD_TYPES = new Set([
   'subtype_dragon', 'subtype_angel', 'on_cast_trigger', 'conditional_keyword',
-  'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', // 効果系は effect_text で説明
+  'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color', // 効果系は effect_text で説明
 ])
 
 const COLOR_BG = {
@@ -224,6 +224,7 @@ export default function GamePlayPage() {
   const [reanimateMode, setReanimateMode] = useState(null)
   const [activatedAbilityMode, setActivatedAbilityMode] = useState(null)
   const [discardForAbilityMode, setDiscardForAbilityMode] = useState(null)
+  const [chooseColorMode, setChooseColorMode] = useState(null) // { instanceId, cardName }
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -424,6 +425,21 @@ export default function GamePlayPage() {
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.phase, gs?.active_player, roundResult, savingGs])
+
+  // ETB 色選択が必要なクリーチャーを検出
+  useEffect(() => {
+    if (!gs || !myId || !cardData) return
+    const bf = gs.players[myId]?.battlefield || []
+    const perm = bf.find(p => {
+      const c = cardData[p.card_id] || {}
+      return (c.keywords || []).some(k => k.type === 'etb_choose_color') && !p.chosen_color
+    })
+    if (perm && !chooseColorMode) {
+      const c = cardData[perm.card_id] || {}
+      setChooseColorMode({ instanceId: perm.instance_id, cardName: c.name || '？' })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.players?.[myId]?.battlefield?.length])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -1249,6 +1265,37 @@ export default function GamePlayPage() {
                   </button>
                 )
               })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── ETB 色選択モーダル（金剛牝馬など） ─── */}
+      {chooseColorMode && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-yellow-600 rounded-xl p-5 w-full max-w-sm mx-4">
+            <p className="text-yellow-300 font-bold text-center mb-1">⚡ {chooseColorMode.cardName}</p>
+            <p className="text-gray-400 text-xs text-center mb-4">色を1色選んでください</p>
+            <div className="grid grid-cols-5 gap-2">
+              {[
+                { key: 'white',     label: '白', cls: 'bg-yellow-100 text-gray-900 border-yellow-300' },
+                { key: 'blue',      label: '青', cls: 'bg-blue-600 text-white border-blue-400' },
+                { key: 'black',     label: '黒', cls: 'bg-gray-900 text-white border-gray-500' },
+                { key: 'red',       label: '赤', cls: 'bg-red-600 text-white border-red-400' },
+                { key: 'green',     label: '緑', cls: 'bg-green-700 text-white border-green-500' },
+              ].map(({ key, label, cls }) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    const newGs = setChosenColor(gs, myId, chooseColorMode.instanceId, key)
+                    if (newGs !== gs) dispatch(newGs)
+                    setChooseColorMode(null)
+                  }}
+                  className={`py-3 rounded-lg border-2 font-bold text-sm transition-opacity hover:opacity-80 ${cls}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         </div>

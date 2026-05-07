@@ -489,6 +489,9 @@ function applyOnCastTriggers(state, castingPid, castCard, cardData) {
         const isDragon = (castCard.keywords || []).some(k => k.type === 'subtype_dragon')
         conditionMet = isNonCreature || isDragon
       }
+      if (kw.condition === 'chosen_color_spell') {
+        conditionMet = perm.chosen_color != null && castCard.color === perm.chosen_color
+      }
       if (!conditionMet) continue
 
       if (kw.effect === 'deal_each_opp') {
@@ -501,9 +504,32 @@ function applyOnCastTriggers(state, castingPid, castCard, cardData) {
           )
         }
       }
+      if (kw.effect === 'gain_life') {
+        const amount = kw.value || 1
+        const myPs2 = s.players[castingPid]
+        s = log(
+          { ...s, players: { ...s.players, [castingPid]: { ...myPs2, life: myPs2.life + amount } } },
+          `${permCard.name} 誘発 → ライフを${amount}点得た`
+        )
+        s = applyLifeGainTriggers(s, castingPid, cardData)
+      }
     }
   }
   return s
+}
+
+// ETBで選んだ色を永続に保存（金剛牝馬など）
+export function setChosenColor(state, pid, instanceId, color) {
+  const ps = state.players[pid]
+  const newBf = ps.battlefield.map(p =>
+    p.instance_id === instanceId ? { ...p, chosen_color: color } : p
+  )
+  const card = (ps.battlefield.find(p => p.instance_id === instanceId) || {})
+  const cardName = card.card_id ? '金剛牝馬' : 'クリーチャー'
+  return log(
+    { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf } } },
+    `${cardName} → ${color} を選んだ`
+  )
 }
 
 // スタック最上位を解決

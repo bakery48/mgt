@@ -77,8 +77,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"vigilance"},{"type":"lifelink"},{"type":"ally_attack_trigger","condition":"white_creature","effect":"gain_life","value":1}]', 2000),
 
 ('金剛牝馬',         'creature', 'white', '{2}',       1, 3,
- 'アーティファクト・クリーチャー。金剛牝馬が戦場に出るとき、色を1色選ぶ。その色の呪文を唱えるたびライフを1点得る。（色選択・誘発型能力は現在未実装）',
- '[]', 500),
+ 'アーティファクト・クリーチャー。金剛牝馬が戦場に出るとき、色を1色選ぶ。その色の呪文を唱えるたびライフを1点得る。',
+ '[{"type":"etb_choose_color"},{"type":"on_cast_trigger","condition":"chosen_color_spell","effect":"gain_life","value":1}]', 500),
 
 ('内陸の聖別者',     'creature', 'white', '{W}',       1, 1,
  '警戒を持つ。他のクリーチャーが自分のコントロール下で戦場に出るたびライフを1点得る。（誘発型能力は現在未実装）',
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の金剛牝馬を更新（ETB色選択・呪文誘発実装）
+UPDATE cards SET
+  effect_text = 'アーティファクト・クリーチャー。金剛牝馬が戦場に出るとき、色を1色選ぶ。その色の呪文を唱えるたびライフを1点得る。',
+  keywords = '[{"type":"etb_choose_color"},{"type":"on_cast_trigger","condition":"chosen_color_spell","effect":"gain_life","value":1}]'::jsonb
+WHERE name = '金剛牝馬';
 
 -- 既存行の不屈の古参兵を更新（起動型能力実装）
 UPDATE cards SET
