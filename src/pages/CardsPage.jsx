@@ -76,25 +76,6 @@ const COLOR_LABELS = {
   white: '白', blue: '青', black: '黒', red: '赤', green: '緑', colorless: '無色', multicolor: '多色',
 }
 
-const COLOR_DOT = {
-  white: 'bg-yellow-100 border border-yellow-300',
-  blue: 'bg-blue-500',
-  black: 'bg-gray-900 border border-gray-500',
-  red: 'bg-red-500',
-  green: 'bg-green-600',
-  colorless: 'bg-gray-400',
-  multicolor: 'bg-gradient-to-br from-yellow-400 to-purple-500',
-}
-
-const TYPE_BADGE = {
-  creature: 'bg-red-900/50 text-red-300 border-red-700',
-  instant: 'bg-blue-900/50 text-blue-300 border-blue-700',
-  sorcery: 'bg-purple-900/50 text-purple-300 border-purple-700',
-  enchantment: 'bg-green-900/50 text-green-300 border-green-700',
-  artifact: 'bg-gray-700/50 text-gray-300 border-gray-600',
-  land: 'bg-yellow-900/50 text-yellow-300 border-yellow-700',
-}
-
 const MTG_KEYWORD_LABELS = {
   flying: '飛行', haste: '速攻', vigilance: '警戒', trample: 'トランプル', reach: '到達',
   first_strike: '先制攻撃', double_strike: '二段攻撃', lifelink: '絆魂', deathtouch: '接死', menace: '威迫',
@@ -102,115 +83,94 @@ const MTG_KEYWORD_LABELS = {
   ward: '護法', protection: 'プロテクション', cycling: 'サイクリング', kicker: 'キッカー', flashback: 'フラッシュバック',
   equip: '装備', morph: '変異', unearth: '発掘', delve: '探査',
 }
-
 const ORIGINAL_KW = new Set(['拝金', '徴収', '栄光', '簒奪'])
 
-const KW_TOOLTIPS = {
-  flying:        '飛行持ちかリーチ持ちのクリーチャーにしかブロックされない',
-  haste:         '召喚酔いなし。出たターンから攻撃・能力使用が可能',
-  vigilance:     '攻撃してもタップしない',
-  trample:       'ブロッカーへの超過ダメージがプレイヤーに通る',
-  reach:         '飛行クリーチャーをブロックできる',
-  first_strike:  '通常クリーチャーより先にダメージを与える',
-  double_strike: '先制攻撃と通常攻撃の両方を行う',
-  lifelink:      '与えたダメージ分だけライフを得る',
-  deathtouch:    '与えたダメージは致死ダメージとして扱われる',
-  menace:        '2体以上でしかブロックできない',
-  defender:      '攻撃できない',
-  indestructible:'破壊されない',
-  hexproof:      '対戦相手の呪文・能力の対象にならない',
-  shroud:        '呪文・能力の対象にならない',
-  flash:         'インスタントのタイミングで唱えられる',
-  ward:          '対戦相手が対象にするには追加コストが必要',
-  cycling:       'コストを払ってこのカードを捨て、1枚引く',
-  kicker:        '追加コストを払うことで強化効果を得る',
-  flashback:     '墓地からコストを払って唱えられる（その後追放）',
-  equip:         'コストを払ってクリーチャーに装備する',
-  unearth:       '墓地からコストを払って戦場に戻す（次の終了ステップに追放）',
-  delve:         '墓地のカードを除外してマナコストを軽減できる',
-  '拝金':        '指定タイミングにGを獲得する',
-  '徴収':        '攻撃するたびに対戦相手からGを奪う',
-  '栄光':        'ダメージを与えるたびVPを獲得する',
-  '簒奪':        'ダメージを与えるたびに対戦相手からVPを奪う',
+// CardDetailModal と同じフレーム定義
+const FRAME = {
+  white:     { outer: 'bg-gradient-to-b from-yellow-100 to-yellow-200 border-yellow-300',    header: 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-gray-900',   typebar: 'bg-gradient-to-r from-yellow-50 to-yellow-100 text-gray-800', textbox: 'bg-amber-50 text-gray-800',    pt: 'bg-yellow-100 text-gray-900 border-yellow-400' },
+  blue:      { outer: 'bg-gradient-to-b from-blue-300 to-blue-500 border-blue-600',          header: 'bg-gradient-to-r from-blue-200 to-blue-300 text-gray-900',      typebar: 'bg-gradient-to-r from-blue-200 to-blue-300 text-gray-800',   textbox: 'bg-blue-50 text-gray-800',     pt: 'bg-blue-200 text-gray-900 border-blue-400' },
+  black:     { outer: 'bg-gradient-to-b from-gray-600 to-gray-800 border-gray-900',          header: 'bg-gradient-to-r from-gray-700 to-gray-800 text-gray-100',      typebar: 'bg-gradient-to-r from-gray-700 to-gray-800 text-gray-200',   textbox: 'bg-gray-900 text-gray-200',    pt: 'bg-gray-700 text-gray-100 border-gray-500' },
+  red:       { outer: 'bg-gradient-to-b from-red-400 to-red-600 border-red-700',             header: 'bg-gradient-to-r from-red-200 to-red-300 text-gray-900',        typebar: 'bg-gradient-to-r from-red-200 to-red-300 text-gray-800',     textbox: 'bg-red-50 text-gray-800',      pt: 'bg-red-200 text-gray-900 border-red-400' },
+  green:     { outer: 'bg-gradient-to-b from-green-400 to-green-700 border-green-800',       header: 'bg-gradient-to-r from-green-200 to-green-300 text-gray-900',    typebar: 'bg-gradient-to-r from-green-200 to-green-300 text-gray-800', textbox: 'bg-green-50 text-gray-800',    pt: 'bg-green-200 text-gray-900 border-green-400' },
+  colorless: { outer: 'bg-gradient-to-b from-gray-300 to-gray-400 border-gray-500',          header: 'bg-gradient-to-r from-gray-200 to-gray-300 text-gray-900',      typebar: 'bg-gradient-to-r from-gray-200 to-gray-300 text-gray-800',   textbox: 'bg-gray-100 text-gray-800',    pt: 'bg-gray-200 text-gray-900 border-gray-400' },
+  multicolor:{ outer: 'bg-gradient-to-b from-yellow-300 via-amber-400 to-yellow-500 border-yellow-600', header: 'bg-gradient-to-r from-yellow-100 to-amber-200 text-gray-900', typebar: 'bg-gradient-to-r from-yellow-100 to-amber-200 text-gray-800', textbox: 'bg-amber-50 text-gray-800', pt: 'bg-yellow-200 text-gray-900 border-yellow-500' },
 }
-
-function KeywordTag({ kw }) {
-  const label = MTG_KEYWORD_LABELS[kw.type] || (ORIGINAL_KW.has(kw.type) ? kw.type : null)
-  if (!label) return null  // 内部管理用キーワードは非表示
-  const isOriginal = ORIGINAL_KW.has(kw.type)
-  const tip = KW_TOOLTIPS[kw.type]
-  return (
-    <span
-      title={tip || ''}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border cursor-help bg-gray-700 text-gray-300 border-gray-600"
-    >
-      {label}
-    </span>
-  )
-}
+const DEFAULT_FRAME = FRAME.colorless
 
 function CardItem({ card, onClick }) {
   const keywords = Array.isArray(card.keywords) ? card.keywords : []
+  const frame = FRAME[card.color] || DEFAULT_FRAME
+  const subtypeLabel = getSubtypeLabel(keywords)
+  const isCrea = card.card_type === 'creature'
+
+  const visibleKws = keywords.filter(kw => MTG_KEYWORD_LABELS[kw.type] || ORIGINAL_KW.has(kw.type))
+  const kwText = visibleKws.map(kw => {
+    if (ORIGINAL_KW.has(kw.type)) return kw.type
+    return MTG_KEYWORD_LABELS[kw.type]
+  }).join('、')
 
   return (
     <div
-      className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden hover:border-purple-600 transition-colors group cursor-pointer"
+      className={`rounded-xl border-4 ${frame.outer} shadow-lg cursor-pointer hover:scale-[1.02] transition-transform`}
       onClick={onClick}
     >
-      {card.art_url ? (
-        <div className="aspect-[5/7] overflow-hidden bg-gray-900">
-          <img
-            src={card.art_url}
-            alt={card.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        </div>
-      ) : (
-        <div className="aspect-[5/7] bg-gray-900 flex items-center justify-center">
-          <span className="text-gray-600 text-5xl">🃏</span>
-        </div>
-      )}
+      <div className="p-1.5 flex flex-col gap-1">
 
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h3 className="font-semibold text-white text-sm leading-tight">{card.name}</h3>
-          <div
-            className={`w-4 h-4 rounded-full shrink-0 mt-0.5 ${COLOR_DOT[card.color] || 'bg-gray-500'}`}
-            title={COLOR_LABELS[card.color]}
-          />
-        </div>
-
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <span className={`text-xs px-2 py-0.5 rounded border ${TYPE_BADGE[card.card_type] || 'bg-gray-700 text-gray-300 border-gray-600'}`}>
-            {TYPE_LABELS[card.card_type] || card.card_type}
-            {getSubtypeLabel(card.keywords) && ` — ${getSubtypeLabel(card.keywords)}`}
-          </span>
+        {/* 名前バー */}
+        <div className={`flex items-center justify-between px-2 py-1 rounded-md border border-black/10 ${frame.header}`}>
+          <span className="font-bold text-xs leading-tight truncate pr-1">{card.name}</span>
           {card.mana_cost && (
-            <span className="text-xs text-gray-400 font-mono">{card.mana_cost}</span>
-          )}
-          {card.card_type === 'creature' && card.power != null && card.toughness != null && (
-            <span className="text-xs text-gray-300 font-mono bg-gray-700 px-2 py-0.5 rounded">
-              {card.power}/{card.toughness}
-            </span>
+            <span className="font-mono text-xs font-bold shrink-0">{card.mana_cost}</span>
           )}
         </div>
 
-        {card.effect_text && (
-          <p className="text-xs text-gray-400 leading-relaxed mb-3 line-clamp-3 whitespace-pre-wrap">
-            {card.effect_text.replace(/\\n/g, '\n')}
-          </p>
-        )}
+        {/* アート（MTGのアートボックスは横長：縦横比 約3:2） */}
+        <div className="rounded overflow-hidden border border-black/20 aspect-[3/2]">
+          {card.art_url ? (
+            <img
+              src={card.art_url}
+              alt={card.name}
+              className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full bg-gray-700/50 flex items-center justify-center">
+              <span className="text-4xl opacity-20">🃏</span>
+            </div>
+          )}
+        </div>
 
-        {keywords.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {keywords.slice(0, 4).map((kw, i) => (
-              <KeywordTag key={i} kw={kw} />
-            ))}
-            {keywords.length > 4 && (
-              <span className="text-xs text-gray-500">+{keywords.length - 4}</span>
+        {/* タイプ行 */}
+        <div className={`flex items-center px-2 py-0.5 rounded-md border border-black/10 text-xs font-semibold ${frame.typebar}`}>
+          <span className="truncate">
+            {TYPE_LABELS[card.card_type] || card.card_type}
+            {subtypeLabel && <span className="font-normal"> — {subtypeLabel}</span>}
+          </span>
+        </div>
+
+        {/* テキストボックス */}
+        <div className={`rounded-md border border-black/10 px-2 py-1.5 min-h-[56px] flex flex-col justify-between ${frame.textbox}`}>
+          <div>
+            {kwText && (
+              <p className="text-xs italic mb-1 leading-snug line-clamp-1">{kwText}</p>
+            )}
+            {card.effect_text && (
+              <p className="text-xs leading-snug line-clamp-3 whitespace-pre-wrap">
+                {card.effect_text.replace(/\\n/g, '\n')}
+              </p>
+            )}
+            {!kwText && !card.effect_text && (
+              <p className="text-xs opacity-30 italic">（効果なし）</p>
             )}
           </div>
-        )}
+          {isCrea && card.power != null && card.toughness != null && (
+            <div className="flex justify-end mt-1">
+              <span className={`font-mono font-bold text-xs px-2 py-0.5 rounded border-2 ${frame.pt}`}>
+                {card.power}/{card.toughness}
+              </span>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   )
@@ -292,7 +252,7 @@ export default function CardsPage() {
       ) : (
         <>
           <p className="text-gray-400 text-sm mb-4">{cards.length} 枚のカード</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
             {cards.map(card => <CardItem key={card.id} card={card} onClick={() => setDetailCard(card)} />)}
           </div>
         </>
