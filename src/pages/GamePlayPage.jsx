@@ -250,7 +250,7 @@ export default function GamePlayPage() {
 
       let currentGs = gameData?.game_state
       // ゲーム状態が未初期化ならホスト（turn_order=1）が初期化
-      if (!currentGs || Object.keys(currentGs).length === 0) {
+      if (!currentGs?.players) {
         const isHost = gpData?.[0]?.player_id === player.id
         if (isHost) {
           const playerOrder = gpData.map(gp => gp.player_id)
@@ -299,7 +299,7 @@ export default function GamePlayPage() {
         event: 'UPDATE', schema: 'public', table: 'games',
         filter: `id=eq.${gameId}`,
       }, async ({ new: newGame }) => {
-        if (!newGame.game_state || Object.keys(newGame.game_state).length === 0) return
+        if (!newGame.game_state?.players) return
         // カード追加ロード
         const ids = []
         if (newGame.game_state?.players) {
