@@ -191,8 +191,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 青エンチャント ───────────────────────────────────────────
 ('星明かりの罠',     'enchantment', 'blue', '{2}{U}',   null, null,
- 'エンチャント（クリーチャー）。星明かりの罠が戦場に出たとき、エンチャントされているクリーチャーをタップする。エンチャントされているクリーチャーはそのコントローラーのアンタップ・ステップにアンタップしない。（エンチャント効果は現在未実装）',
- '[]', 400),
+ 'エンチャント（クリーチャー）。星明かりの罠が戦場に出たとき、エンチャントされているクリーチャーをタップする。エンチャントされているクリーチャーはそのコントローラーのアンタップ・ステップにアンタップしない。',
+ '[{"type":"aura","enchant":"opp_creature"},{"type":"etb_trigger","effect":"tap_attached"},{"type":"prevent_untap"}]', 400),
 
 -- ════════════════════════════════════════════════════════════════
 -- 黒単デッキ
@@ -784,3 +784,4 @@ ALTER TABLE cards ENABLE TRIGGER USER;
 
 UPDATE cards SET effect_text='呪文1つを対象とし、そのコントローラーが{3}を支払わないかぎり、それを打ち消す。', keywords='[{"type":"counter_spell","unless_pay":"{3}"}]'::jsonb WHERE name='波の消去';
 UPDATE cards SET effect_text='呪文1つを対象とし、それを打ち消す。カードを1枚引き、その後カードを1枚捨てる。', keywords='[{"type":"counter_spell"},{"type":"draw_then_discard","value":1}]'::jsonb WHERE name='論破';
+UPDATE cards SET effect_text='エンチャント（クリーチャー）。星明かりの罠が戦場に出たとき、エンチャントされているクリーチャーをタップする。エンチャントされているクリーチャーはそのコントローラーのアンタップ・ステップにアンタップしない。', keywords='[{"type":"aura","enchant":"opp_creature"},{"type":"etb_trigger","effect":"tap_attached"},{"type":"prevent_untap"}]'::jsonb WHERE name='星明かりの罠';

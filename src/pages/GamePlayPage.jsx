@@ -715,7 +715,7 @@ export default function GamePlayPage() {
     if (!gs || (gs.cleanup_discard ?? 0) <= 0) return
     const newGs = discardCard(gs, myId, cardId)
     if ((newGs.cleanup_discard ?? 0) === 0) {
-      dispatch(finishCleanup(newGs))
+      dispatch(finishCleanup(newGs, cardData))
     } else {
       dispatch(newGs)
     }

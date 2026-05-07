@@ -405,6 +405,24 @@ function applyEtbTriggers(state, pid, card, cardData) {
       s = { ...s, pending_etb_exile: { pid, instanceId, gain: kw.gain ?? 0, cardName: card.name } }
       continue
     }
+    // オーラETB: エンチャント対象をタップ
+    if (kw.type === 'etb_trigger' && kw.effect === 'tap_attached') {
+      const bf = s.players[pid].battlefield
+      const aura = bf[bf.length - 1]
+      if (aura?.attached_to) {
+        for (const [oppId, oppPs] of Object.entries(s.players)) {
+          const idx = oppPs.battlefield.findIndex(p => p.instance_id === aura.attached_to)
+          if (idx >= 0) {
+            const newBf = oppPs.battlefield.map(p =>
+              p.instance_id === aura.attached_to ? { ...p, tapped: true } : p
+            )
+            s = log({ ...s, players: { ...s.players, [oppId]: { ...oppPs, battlefield: newBf } } },
+              `${card.name} ETB → ${cardData[oppPs.battlefield[idx].card_id]?.name ?? '対象'} をタップ`)
+          }
+        }
+      }
+      continue
+    }
     if (kw.type !== 'etb_trigger') continue
     if (kw.effect === 'draw_cards') {
       const count = kw.value ?? 1
@@ -785,14 +803,14 @@ export function passPriority(state, pid, cardData) {
     if (state.stack.length > 0) {
       return resolveStack({ ...state, priority_passed: [] }, cardData)
     }
-    return advancePhase({ ...state, priority_passed: [] })
+    return advancePhase({ ...state, priority_passed: [] }, cardData)
   }
   const next = order[(order.indexOf(pid) + 1) % order.length]
   return { ...state, priority: next, priority_passed: passed }
 }
 
 // フェーズ進行
-export function advancePhase(state) {
+export function advancePhase(state, cardData = {}) {
   const order = state.player_order
   const idx = PHASES.indexOf(state.phase)
   const next = PHASES[(idx + 1) % PHASES.length]
@@ -811,10 +829,16 @@ export function advancePhase(state) {
         ...ps,
         land_played: false,
         mana_pool: { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 },
-        battlefield: ps.battlefield.map(p => ({
-          ...p, tapped: false, damage: 0, attacking: false, blocking: null,
-          summoning_sick: false,
-        })),
+        battlefield: ps.battlefield.map(p => {
+          // prevent_untap オーラが付いているクリーチャーはアンタップしない
+          const hasPreventUntap = Object.values(state.players).some(anyPs =>
+            anyPs.battlefield.some(aura =>
+              aura.attached_to === p.instance_id &&
+              (cardData[aura.card_id]?.keywords || []).some(k => k.type === 'prevent_untap')
+            )
+          )
+          return { ...p, tapped: hasPreventUntap ? p.tapped : false, damage: 0, attacking: false, blocking: null, summoning_sick: false }
+        }),
       },
     }
     s = log(s, `ターン ${s.turn_number}: ${nextAP} のターン`)
@@ -874,7 +898,7 @@ export function advancePhase(state) {
 }
 
 // 手札整理後にクリーンアップ本体を実行（GamePlayPage から呼ぶ）
-export function finishCleanup(state) {
+export function finishCleanup(state, cardData = {}) {
   const ap = state.active_player
   const ps = state.players[ap]
   const cleaned = {
@@ -890,7 +914,7 @@ export function finishCleanup(state) {
     },
   }
   // クリーンアップ完了後は自動的に次のターン（アンタップ）へ進む
-  return advancePhase(cleaned)
+  return advancePhase(cleaned, cardData)
 }
 
 // 攻撃宣言（防衛クリーチャーを除外）
@@ -1544,6 +1568,7 @@ export function getSpellTargetingType(card) {
     if (kw.type === 'pump_creature') return (kw.power ?? 0) < 0 ? 'opp_creature' : 'own_creature'
     if (kw.type === 'reanimate') return 'own_graveyard_creature'
     if (kw.type === 'aura' && kw.enchant === 'creature') return 'own_creature'
+    if (kw.type === 'aura' && kw.enchant === 'opp_creature') return 'opp_creature'
   }
   return null
 }
