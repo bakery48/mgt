@@ -72,6 +72,9 @@ function HoverCardTooltip({ card, perm }) {
         )}
       </div>
       <p className="text-gray-400 text-xs">{TYPE_LABELS_JP[card.card_type] || card.card_type}</p>
+      {card.is_original && (
+        <span className="inline-block mt-1 text-xs bg-teal-900/60 text-teal-300 border border-teal-700 px-1.5 py-0.5 rounded">オリジナル</span>
+      )}
       {kws.filter(k => !INTERNAL_KEYWORD_TYPES.has(k.type) && KEYWORD_LABELS[k.type]).length > 0 && (
         <div className="flex flex-wrap gap-1 mt-1">
           {kws.filter(k => !INTERNAL_KEYWORD_TYPES.has(k.type) && KEYWORD_LABELS[k.type]).map((k, i) => (
