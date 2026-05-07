@@ -192,6 +192,7 @@ export default function GamePlayPage() {
   const navigate = useNavigate()
   const { player } = usePlayer()
   const chanRef = useRef(null)
+  const cpuBlockersDeclaredRef = useRef(false)
 
   const [gs, setGs] = useState(null)          // game state
   const [cardData, setCardData] = useState({}) // card_id → card object
@@ -332,7 +333,8 @@ export default function GamePlayPage() {
     if (roundResult) return
 
     const isCpuTurn = gs.active_player === cpuId
-    const isCpuBlock = gs.phase === 'declare_blockers' && gs.active_player === myId && (gs.combat.attackers?.length ?? 0) > 0
+    const isCpuBlock = gs.phase === 'declare_blockers' && gs.active_player === myId &&
+      (gs.combat.attackers?.length ?? 0) > 0 && !cpuBlockersDeclaredRef.current
     const cpuHasPriority = gs.priority === cpuId && !isCpuTurn
 
     if (!isCpuTurn && !isCpuBlock && !cpuHasPriority) return
@@ -342,9 +344,11 @@ export default function GamePlayPage() {
         const newGs = passPriority(gs, cpuId, cardData)
         if (newGs && newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
       } else if (isCpuTurn) {
+        cpuBlockersDeclaredRef.current = false
         const newGs = cpuTakeTurn(gs, cpuId, cardData)
         if (newGs && newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
       } else if (isCpuBlock) {
+        cpuBlockersDeclaredRef.current = true
         const newGs = cpuDeclareBlockers(gs, cpuId, cardData)
         if (newGs && newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
       }
@@ -353,6 +357,11 @@ export default function GamePlayPage() {
     return () => clearTimeout(t)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.phase, gs?.active_player, gs?.priority, cpuId, isCpuGame, savingGs, roundResult])
+
+  // ─── ブロック宣言フェーズを抜けたら CPU ブロック済みフラグをリセット ──
+  useEffect(() => {
+    if (gs?.phase !== 'declare_blockers') cpuBlockersDeclaredRef.current = false
+  }, [gs?.phase])
 
   // ─── 非インタラクティブフェーズの自動優先権パス ────────────
   const AUTO_PASS_PHASES = ['untap', 'upkeep', 'draw', 'combat_begin', 'combat_end', 'end_step']
@@ -769,6 +778,7 @@ export default function GamePlayPage() {
                       (card?.keywords || []).some(k => k.type === 'equip')
                     const hasDefender = (card?.keywords || []).some(k => k.type === 'defender')
                     const canAtt = gs.phase === 'declare_attackers' && isActive && isCrea && !perm.summoning_sick && !perm.tapped && !hasDefender
+                    const inAttackPhase = gs.phase === 'declare_attackers' && isActive && isCrea
                     const isSelAtt = selectedAttackers.includes(perm.instance_id)
                     const isBlockPhase = gs.phase === 'declare_blockers' && !isActive
                     const canBlk = isBlockPhase && isCrea && !perm.tapped && !perm.summoning_sick
@@ -789,9 +799,10 @@ export default function GamePlayPage() {
                           toughness: effPT?.toughness ?? perm.toughness,
                         }}
                         selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip)}
+                        dimmed={inAttackPhase && !canAtt && !isSelAtt}
                         onClick={() => {
                           if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
-                          else if (canAtt) handleToggleAttacker(perm.instance_id)
+                          else if (canAtt || inAttackPhase) handleToggleAttacker(perm.instance_id)
                           else if (canBlk) handleSelectBlocker(perm.instance_id)
                           else if (isEquipTarget && !isEquip) handleEquipTarget(perm.instance_id)
                           else if (canEquipThis) handleEquipClick(perm.instance_id)
@@ -803,7 +814,7 @@ export default function GamePlayPage() {
                         }}
                         onHover={handleHover}
                         equipped={equippedSet.has(perm.instance_id)}
-                        disabled={!isLand && !canAtt && !canBlk && !canEquipThis && !(isEquipTarget && !isEquip)}
+                        disabled={!isLand && !canAtt && !canBlk && !canEquipThis && !(isEquipTarget && !isEquip) && !inAttackPhase}
                       />
                     )
                   })}

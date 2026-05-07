@@ -430,9 +430,12 @@ export function declareAttackers(state, pid, attackerIids, cardData) {
     priority: pid,
   }, `${validIids.length} 体で攻撃`)
 
-  // 攻撃者0体のとき戦闘フェーズ全体をスキップしてメイン2へ
   if (validIids.length === 0) {
+    // 攻撃者0体のとき戦闘フェーズ全体をスキップしてメイン2へ
     while (next.phase !== 'main2') next = advancePhase(next)
+  } else {
+    // 攻撃者ありのときはブロック宣言フェーズへ進む
+    next = advancePhase(next)
   }
   return next
 }
