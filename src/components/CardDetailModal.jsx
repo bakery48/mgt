@@ -152,10 +152,10 @@ export default function CardDetailModal({ card, perm, effectivePower, effectiveT
             </div>
           )}
 
-          {/* キーワード */}
-          {keywords.length > 0 && (
+          {/* キーワード（MTG_KW_LABELSに登録済みのものだけ表示） */}
+          {keywords.filter(kw => MTG_KW_LABELS[kw.type]).length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3">
-              {keywords.map((kw, i) => {
+              {keywords.filter(kw => MTG_KW_LABELS[kw.type]).map((kw, i) => {
                 const tip = KW_TOOLTIPS[kw.type]
                 return (
                   <span
