@@ -701,6 +701,32 @@ function applyAttackTriggers(state, attackingPid, attackerIids, cardData) {
       }
     }
   }
+
+  // ally_attack_trigger: 攻撃側の全クリーチャーを参照して発動（リンデンなど）
+  for (const perm of s.players[attackingPid].battlefield) {
+    const card = cardData[perm.card_id] || {}
+    for (const kw of (card.keywords || [])) {
+      if (kw.type !== 'ally_attack_trigger') continue
+      // 条件に合う攻撃クリーチャー数をカウント
+      let count = 0
+      for (const iid of attackerIids) {
+        const attPerm = s.players[attackingPid].battlefield.find(p => p.instance_id === iid)
+        if (!attPerm) continue
+        const attCard = cardData[attPerm.card_id] || {}
+        if (kw.condition === 'white_creature' && attCard.color === 'white') count++
+      }
+      if (count === 0) continue
+      if (kw.effect === 'gain_life') {
+        const amount = (kw.value ?? 1) * count
+        const myPs = s.players[attackingPid]
+        s = log(
+          { ...s, players: { ...s.players, [attackingPid]: { ...myPs, life: myPs.life + amount } } },
+          `${card.name} 攻撃誘発 → ライフを${amount}点得た`
+        )
+        s = applyLifeGainTriggers(s, attackingPid, cardData)
+      }
+    }
+  }
   return s
 }
 

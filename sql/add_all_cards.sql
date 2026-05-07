@@ -73,8 +73,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"first_strike"},{"type":"lifelink"},{"type":"subtype_angel"},{"type":"lord_effect","subtype":"angel","power_bonus":1,"toughness_bonus":1,"grant_keywords":["lifelink"]}]', 2500),
 
 ('不動の女王、リンデン', 'creature', 'white', '{W}{W}{W}', 3, 3,
- '伝説のクリーチャー。警戒、絆魂を持つ。あなたのコントロールする白のクリーチャーが攻撃するたび、ライフを1点得る。（攻撃誘発は現在未実装）',
- '[{"type":"vigilance"},{"type":"lifelink"}]', 2000),
+ '伝説のクリーチャー。警戒、絆魂を持つ。あなたのコントロールする白のクリーチャーが攻撃するたび、ライフを1点得る。',
+ '[{"type":"vigilance"},{"type":"lifelink"},{"type":"ally_attack_trigger","condition":"white_creature","effect":"gain_life","value":1}]', 2000),
 
 ('金剛牝馬',         'creature', 'white', '{2}',       1, 3,
  'アーティファクト・クリーチャー。金剛牝馬が戦場に出るとき、色を1色選ぶ。その色の呪文を唱えるたびライフを1点得る。（色選択・誘発型能力は現在未実装）',
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の不動の女王、リンデンを更新（攻撃誘発実装）
+UPDATE cards SET
+  effect_text = '伝説のクリーチャー。警戒、絆魂を持つ。あなたのコントロールする白のクリーチャーが攻撃するたび、ライフを1点得る。',
+  keywords = '[{"type":"vigilance"},{"type":"lifelink"},{"type":"ally_attack_trigger","condition":"white_creature","effect":"gain_life","value":1}]'::jsonb
+WHERE name = '不動の女王、リンデン';
 
 -- 既存行の黎明をもたらす者ライラを更新（ロード効果実装）
 UPDATE cards SET
