@@ -17,6 +17,7 @@ import {
   resolveAttackSacrifice, declineAttackSacrifice,
   resolveVampireCounter,
   resolveVampireDeathPay, declineVampireDeathPay,
+  resolveVampireDrain, declineVampireDrain,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -244,6 +245,7 @@ export default function GamePlayPage() {
   const [attackSacrificeMode, setAttackSacrificeMode] = useState(null) // pending_attack_sacrifice for myId
   const [vampireCounterMode, setVampireCounterMode] = useState(null) // pending_vampire_counter for myId
   const [vampireDeathPayMode, setVampireDeathPayMode] = useState(null) // pending_vampire_death_pay for myId
+  const [vampireDrainMode, setVampireDrainMode] = useState(null) // pending_vampire_drain for myId
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -516,6 +518,12 @@ export default function GamePlayPage() {
     if (gs.pending_vampire_death_pay.pid === myId) setVampireDeathPayMode(gs.pending_vampire_death_pay)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_vampire_death_pay])
+
+  useEffect(() => {
+    if (!gs?.pending_vampire_drain) { setVampireDrainMode(null); return }
+    if (gs.pending_vampire_drain.pid === myId) setVampireDrainMode(gs.pending_vampire_drain)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_vampire_drain])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -1802,6 +1810,42 @@ export default function GamePlayPage() {
               <button
                 onClick={() => {
                   const newGs = declineVampireDeathPay(gs, myId)
+                  if (newGs !== gs) dispatch(newGs)
+                }}
+                className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+              >
+                しない
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── 吸血鬼死亡誘発ドレインモーダル（カラストリアの貴人）─── */}
+      {vampireDrainMode && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-purple-700 rounded-xl p-5 w-full max-w-sm mx-4 shadow-2xl text-center">
+            <p className="text-purple-300 font-bold text-lg mb-1">吸血鬼死亡誘発</p>
+            <p className="text-gray-300 text-sm mb-1">
+              {vampireDrainMode.cost ?? '{B}'} を支払ってもよい。そうしたなら、対戦相手は{vampireDrainMode.damage ?? 2}点のライフを失い、あなたは{vampireDrainMode.gain ?? 2}点のライフを得る。
+            </p>
+            {vampireDrainMode.count > 1 && (
+              <p className="text-gray-500 text-xs mb-1">（残り {vampireDrainMode.count} 回）</p>
+            )}
+            <p className="text-gray-600 text-xs mb-3">マナプール: {Object.entries(myPs?.mana_pool || {}).filter(([,v]) => v > 0).map(([k,v]) => `${k}×${v}`).join(' ') || '0'}</p>
+            <div className="flex gap-3 justify-center mt-2">
+              <button
+                onClick={() => {
+                  const newGs = resolveVampireDrain(gs, myId)
+                  if (newGs !== gs) dispatch(newGs)
+                }}
+                className="px-4 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 text-white text-sm font-bold"
+              >
+                支払う
+              </button>
+              <button
+                onClick={() => {
+                  const newGs = declineVampireDrain(gs, myId)
                   if (newGs !== gs) dispatch(newGs)
                 }}
                 className="px-4 py-2 rounded-lg bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
