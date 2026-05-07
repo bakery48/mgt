@@ -16,6 +16,38 @@ const COLOR_DOT = {
 }
 const TYPE_ORDER = ['creature', 'land', 'instant', 'sorcery', 'enchantment', 'artifact']
 
+const COLOR_BG = {
+  white: 'from-yellow-950 to-gray-900 border-yellow-700',
+  blue: 'from-blue-950 to-gray-900 border-blue-700',
+  black: 'from-gray-950 to-gray-900 border-gray-600',
+  red: 'from-red-950 to-gray-900 border-red-700',
+  green: 'from-green-950 to-gray-900 border-green-700',
+  colorless: 'from-gray-800 to-gray-900 border-gray-600',
+  multicolor: 'from-yellow-950 to-purple-950 border-yellow-600',
+}
+
+function CardTooltip({ card }) {
+  if (!card) return null
+  const bg = COLOR_BG[card.color] || COLOR_BG.colorless
+  return (
+    <div className={`w-56 bg-gradient-to-b ${bg} border rounded-xl p-3 shadow-2xl pointer-events-none`}>
+      <div className="flex items-start justify-between gap-2 mb-1">
+        <p className="text-white font-bold text-sm leading-tight">{card.name}</p>
+        {card.mana_cost && <span className="text-gray-300 text-xs font-mono shrink-0">{card.mana_cost}</span>}
+      </div>
+      <p className="text-gray-400 text-xs mb-2">
+        {TYPE_LABELS[card.card_type] || card.card_type}
+        {card.card_type === 'creature' && ` — ${card.power}/${card.toughness}`}
+      </p>
+      {card.effect_text && (
+        <p className="text-gray-300 text-xs leading-relaxed whitespace-pre-line border-t border-gray-700 pt-2">
+          {card.effect_text}
+        </p>
+      )}
+    </div>
+  )
+}
+
 const FORMAT_CONFIG = {
   standard:    { min: 60, maxCopies: 4, landUnlimited: false, label: 'スタンダード',    desc: '60枚以上・同名4枚まで' },
   limited:     { min: 40, maxCopies: 4, landUnlimited: true,  label: 'リミテッド',      desc: '40枚以上・土地無制限' },
@@ -38,6 +70,8 @@ export default function DeckEditPage() {
   const [search, setSearch] = useState('')
   const [dirty, setDirty] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
+  const [hoveredCard, setHoveredCard] = useState(null)
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const savedDeckRef = useRef({})  // tracks last-saved state for diff-based save
 
   useEffect(() => {
@@ -179,6 +213,14 @@ export default function DeckEditPage() {
 
   return (
     <Layout>
+      {hoveredCard && (
+        <div
+          className="fixed z-50"
+          style={{ left: tooltipPos.x + 16, top: tooltipPos.y - 8 }}
+        >
+          <CardTooltip card={hoveredCard} />
+        </div>
+      )}
       <div className="mb-4 bg-yellow-900/30 border border-yellow-700/50 rounded-lg px-4 py-2 text-yellow-400 text-xs">
         このデッキはバトル練習専用です。ゲームでは参加時にスターターデッキが自動付与されます。
       </div>
@@ -255,7 +297,13 @@ export default function DeckEditPage() {
                   const maxCopies = (fCfg.landUnlimited && isLand) ? Infinity : fCfg.maxCopies
                   const canAdd = inDeck < maxCopies && inDeck < owned
                   return (
-                    <div key={card.id} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-750 group">
+                    <div
+                      key={card.id}
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-gray-750 group"
+                      onMouseEnter={e => { setHoveredCard(card); setTooltipPos({ x: e.clientX, y: e.clientY }) }}
+                      onMouseMove={e => setTooltipPos({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setHoveredCard(null)}
+                    >
                       <div className={`w-3 h-3 rounded-full shrink-0 ${COLOR_DOT[card.color] || 'bg-gray-500'}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-medium truncate">{card.name}</p>
@@ -313,7 +361,13 @@ export default function DeckEditPage() {
                   const isLand = card?.card_type === 'land'
                   const maxCopies = (fCfg.landUnlimited && isLand) ? Infinity : fCfg.maxCopies
                   return (
-                    <div key={card_id} className="flex items-center gap-3 px-4 py-3">
+                    <div
+                      key={card_id}
+                      className="flex items-center gap-3 px-4 py-3"
+                      onMouseEnter={e => { setHoveredCard(card); setTooltipPos({ x: e.clientX, y: e.clientY }) }}
+                      onMouseMove={e => setTooltipPos({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setHoveredCard(null)}
+                    >
                       <div className={`w-3 h-3 rounded-full shrink-0 ${COLOR_DOT[card?.color] || 'bg-gray-500'}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-white text-sm font-medium truncate">{card?.name}</p>
