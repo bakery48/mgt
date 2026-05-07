@@ -809,3 +809,93 @@ UPDATE cards SET keywords = '[{"type":"flying"},{"type":"haste"},{"type":"subtyp
 UPDATE cards SET keywords = '[{"type":"tap_for_mana","mana":"G"},{"type":"subtype_elf"}]'::jsonb WHERE name = 'ラノワールのエルフ';
 UPDATE cards SET keywords = '[{"type":"etb_trigger","effect":"pending_return_hand_from_gy","restriction":"any"},{"type":"subtype_elf"}]'::jsonb WHERE name = 'エルフの再生家';
 UPDATE cards SET keywords = '[{"type":"haste"},{"type":"subtype_goblin"}]'::jsonb WHERE name = '爆走のゴブリン';
+
+-- ─── 全クリーチャーサブタイプ付与 ───────────────────────────────
+
+-- 白: 鳥
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_bird"}]'::jsonb WHERE name = '癒し手の鷹' AND NOT keywords @> '[{"type":"subtype_bird"}]'::jsonb;
+-- 白: 猫
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_cat"}]'::jsonb WHERE name IN ('アジャニの群れ仲間', 'お手伝いする狩人') AND NOT keywords @> '[{"type":"subtype_cat"}]'::jsonb;
+-- 白: 人間
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"}]'::jsonb WHERE name IN ('不屈の古参兵', '鼓舞する監視者', 'オドリックの十字軍', '不動の女王、リンデン', '内陸の聖別者') AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+-- 白: 人間・兵士
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"},{"type":"subtype_soldier"}]'::jsonb WHERE name = '司教の兵士' AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+-- 白: 人間・騎士
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"},{"type":"subtype_knight"}]'::jsonb WHERE name = '聖戦士の奇襲兵' AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+-- 白: 精霊
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_spirit"}]'::jsonb WHERE name = '光の模範' AND NOT keywords @> '[{"type":"subtype_spirit"}]'::jsonb;
+-- 白: 天使
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_angel"}]'::jsonb WHERE name IN ('信仰の伝令', '神の守護者') AND NOT keywords @> '[{"type":"subtype_angel"}]'::jsonb;
+-- 白: 馬
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_horse"}]'::jsonb WHERE name = '金剛牝馬' AND NOT keywords @> '[{"type":"subtype_horse"}]'::jsonb;
+
+-- 青: 海賊
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_pirate"}]'::jsonb WHERE name IN ('帆凧の海賊', '風雲艦隊のスパイ') AND NOT keywords @> '[{"type":"subtype_pirate"}]'::jsonb;
+-- 青: 精霊
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_spirit"}]'::jsonb WHERE name IN ('幽体の船乗り', '氷嵐の精霊') AND NOT keywords @> '[{"type":"subtype_spirit"}]'::jsonb;
+-- 青: スフィンクス
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_sphinx"}]'::jsonb WHERE name = '終止符のスフィンクス' AND NOT keywords @> '[{"type":"subtype_sphinx"}]'::jsonb;
+-- 青: ウィザード
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_wizard"}]'::jsonb WHERE name = '全能なる者アルカニス' AND NOT keywords @> '[{"type":"subtype_wizard"}]'::jsonb;
+-- 青: フェアリー
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_faerie"}]'::jsonb WHERE name = '嘲笑するスプライト' AND NOT keywords @> '[{"type":"subtype_faerie"}]'::jsonb;
+-- 青: 鳥
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_bird"}]'::jsonb WHERE name = '大梟の見張り' AND NOT keywords @> '[{"type":"subtype_bird"}]'::jsonb;
+-- 青: 亀
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_turtle"}]'::jsonb WHERE name IN ('神盾の海亀', '温厚な司書') AND NOT keywords @> '[{"type":"subtype_turtle"}]'::jsonb;
+-- 青: 人魚
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_merfolk"}]'::jsonb WHERE name = '大ヒレの用心棒' AND NOT keywords @> '[{"type":"subtype_merfolk"}]'::jsonb;
+-- 青: 構築物
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_construct"}]'::jsonb WHERE name = 'ルーン封じの壁' AND NOT keywords @> '[{"type":"subtype_construct"}]'::jsonb;
+-- 青: ジン
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_djinn"}]'::jsonb WHERE name = '大嵐のジン' AND NOT keywords @> '[{"type":"subtype_djinn"}]'::jsonb;
+
+-- 黒: ゾンビ
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_zombie"}]'::jsonb WHERE name IN ('腑抜けの略奪者', 'マラキールの門番', '鼓動の追跡者', '墓掘りの亡者', '死の収穫者') AND NOT keywords @> '[{"type":"subtype_zombie"}]'::jsonb;
+-- 黒: 吸血鬼
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_vampire"}]'::jsonb WHERE name = '税血の徴収者' AND NOT keywords @> '[{"type":"subtype_vampire"}]'::jsonb;
+-- 黒: ワーム
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_worm"}]'::jsonb WHERE name = '虐殺のワーム' AND NOT keywords @> '[{"type":"subtype_worm"}]'::jsonb;
+-- 黒: ウィザード
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_wizard"}]'::jsonb WHERE name = '復讐に燃えた血術師' AND NOT keywords @> '[{"type":"subtype_wizard"}]'::jsonb;
+
+-- 赤: ドラゴン
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_dragon"}]'::jsonb WHERE name IN ('火吹きラガーク', 'ヴェリュス山の恐怖', '原初の嵐、エターリ') AND NOT keywords @> '[{"type":"subtype_dragon"}]'::jsonb;
+-- 赤: 巨人
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_giant"}]'::jsonb WHERE name IN ('空荒らしの巨人', '荒ぶる巨人', '野心の発動者') AND NOT keywords @> '[{"type":"subtype_giant"}]'::jsonb;
+-- 赤: ゴブリン
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_goblin"}]'::jsonb WHERE name = '狂信的扇動者' AND NOT keywords @> '[{"type":"subtype_goblin"}]'::jsonb;
+-- 赤: エレメンタル
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_elemental"}]'::jsonb WHERE name = '真鎖の炎い魔' AND NOT keywords @> '[{"type":"subtype_elemental"}]'::jsonb;
+-- 赤: 人間・騎士
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"},{"type":"subtype_knight"}]'::jsonb WHERE name IN ('カルガの竜騎兵', 'アクスガルドの騎兵') AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+-- 赤: 人間
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"}]'::jsonb WHERE name = '龍王の召使い' AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+
+-- 緑: エルフ
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_elf"}]'::jsonb WHERE name IN ('マグニゴスの歩哨', '春花のドルイド', 'ソーンウィールドの射手', '生類の侍臣', '到達の射手') AND NOT keywords @> '[{"type":"subtype_elf"}]'::jsonb;
+-- 緑: 人間
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"}]'::jsonb WHERE name IN ('狩猟の統率者、スーラク', '用心深い演劇役者') AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+-- 緑: 野獣
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_beast"}]'::jsonb WHERE name IN ('打ち壊すブロントドン', '優しいインドリク', '森の暴君') AND NOT keywords @> '[{"type":"subtype_beast"}]'::jsonb;
+-- 緑: 蜘蛛
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_spider"}]'::jsonb WHERE name IN ('樹上の罠紡ぎ', '毒の蜘蛛') AND NOT keywords @> '[{"type":"subtype_spider"}]'::jsonb;
+-- 緑: ツリーフォーク
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_treefolk"}]'::jsonb WHERE name = '古代の巨木' AND NOT keywords @> '[{"type":"subtype_treefolk"}]'::jsonb;
+
+-- 多色・追加: 騎士
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"},{"type":"subtype_knight"}]'::jsonb WHERE name IN ('鉄壁の騎士', '光輝の護衛', '二段の聖騎士', '疫病の騎士') AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+-- 多色・追加: 天使
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_angel"}]'::jsonb WHERE name IN ('聖別の精霊') AND NOT keywords @> '[{"type":"subtype_angel"}]'::jsonb;
+-- 多色・追加: 人魚
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_merfolk"}]'::jsonb WHERE name = '深海の番人' AND NOT keywords @> '[{"type":"subtype_merfolk"}]'::jsonb;
+-- 多色・追加: ウィザード
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_wizard"}]'::jsonb WHERE name = '時の賢者' AND NOT keywords @> '[{"type":"subtype_wizard"}]'::jsonb;
+-- 多色・追加: エレメンタル
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_elemental"}]'::jsonb WHERE name IN ('波紋の精霊', '炎と氷の精') AND NOT keywords @> '[{"type":"subtype_elemental"}]'::jsonb;
+-- 多色・追加: 忍者
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_ninja"}]'::jsonb WHERE name = '霧の忍者' AND NOT keywords @> '[{"type":"subtype_ninja"}]'::jsonb;
+-- 多色・追加: 戦士
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"},{"type":"subtype_warrior"}]'::jsonb WHERE name IN ('二段攻撃の戦士', '黒赤の略奪者') AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;
+-- 多色・追加: 人間
+UPDATE cards SET keywords = keywords || '[{"type":"subtype_human"}]'::jsonb WHERE name IN ('緑白の守護者', '青緑の探求者') AND NOT keywords @> '[{"type":"subtype_human"}]'::jsonb;

@@ -27,6 +27,22 @@ const SUBTYPE_LABELS = {
   subtype_merfolk: '人魚',
   subtype_beast: '野獣',
   subtype_spirit: '精霊',
+  subtype_bird: '鳥',
+  subtype_cat: '猫',
+  subtype_soldier: '兵士',
+  subtype_horse: '馬',
+  subtype_sphinx: 'スフィンクス',
+  subtype_faerie: 'フェアリー',
+  subtype_turtle: '亀',
+  subtype_construct: '構築物',
+  subtype_djinn: 'ジン',
+  subtype_pirate: '海賊',
+  subtype_worm: 'ワーム',
+  subtype_giant: '巨人',
+  subtype_elemental: 'エレメンタル',
+  subtype_spider: '蜘蛛',
+  subtype_treefolk: 'ツリーフォーク',
+  subtype_ninja: '忍者',
 }
 
 function getSubtypeLabel(keywords) {
