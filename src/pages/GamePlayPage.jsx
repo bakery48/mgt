@@ -18,6 +18,7 @@ import {
   resolveVampireCounter,
   resolveVampireDeathPay, declineVampireDeathPay,
   resolveVampireDrain, declineVampireDrain,
+  resolveForcedSacrifice,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -246,6 +247,7 @@ export default function GamePlayPage() {
   const [vampireCounterMode, setVampireCounterMode] = useState(null) // pending_vampire_counter for myId
   const [vampireDeathPayMode, setVampireDeathPayMode] = useState(null) // pending_vampire_death_pay for myId
   const [vampireDrainMode, setVampireDrainMode] = useState(null) // pending_vampire_drain for myId
+  const [forcedSacrificeMode, setForcedSacrificeMode] = useState(null) // pending_sacrifice_creature for myId
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -524,6 +526,12 @@ export default function GamePlayPage() {
     if (gs.pending_vampire_drain.pid === myId) setVampireDrainMode(gs.pending_vampire_drain)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.pending_vampire_drain])
+
+  useEffect(() => {
+    if (!gs?.pending_sacrifice_creature) { setForcedSacrificeMode(null); return }
+    if (gs.pending_sacrifice_creature.pid === myId) setForcedSacrificeMode(gs.pending_sacrifice_creature)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.pending_sacrifice_creature])
 
   const handleHover = useCallback((card, perm) => {
     setHoverCard(card || null)
@@ -1022,9 +1030,15 @@ export default function GamePlayPage() {
                           toughness: effPT?.toughness ?? perm.toughness,
                         }}
                         effectiveKwTypes={effKws}
-                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea) || (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode?.attackerInstanceId) || (vampireCounterMode && isCrea && (cardData[perm.card_id]?.keywords || []).some(k => k.type === 'subtype_vampire'))}
+                        selected={isSelAtt || isSelBlk || isAssignedBlk || isSelEquip || (isEquipTarget && !isEquip) || (sacrificeForSpellMode && isCrea) || (attackSacrificeMode && isCrea && perm.instance_id !== attackSacrificeMode?.attackerInstanceId) || (vampireCounterMode && isCrea && (cardData[perm.card_id]?.keywords || []).some(k => k.type === 'subtype_vampire')) || (forcedSacrificeMode && isCrea)}
                         dimmed={inAttackPhase && !canAtt && !isSelAtt}
                         onClick={() => {
+                          if (forcedSacrificeMode && isCrea) {
+                            const newGs = resolveForcedSacrifice(gs, myId, perm.instance_id, cardData)
+                            if (newGs !== gs) dispatch(newGs)
+                            setForcedSacrificeMode(null)
+                            return
+                          }
                           if (vampireCounterMode && isCrea && (cardData[perm.card_id]?.keywords || []).some(k => k.type === 'subtype_vampire')) {
                             const newGs = resolveVampireCounter(gs, myId, perm.instance_id, cardData)
                             if (newGs !== gs) dispatch(newGs)
@@ -1783,6 +1797,14 @@ export default function GamePlayPage() {
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900 border border-yellow-500 text-white px-4 py-3 rounded-xl shadow-2xl text-sm max-w-sm text-center">
           <p className="font-bold text-yellow-300">{vampireCounterMode.triggerName} 誘発</p>
           <p className="text-gray-400 text-xs">+1/+1カウンターを乗せる吸血鬼を選択してください</p>
+        </div>
+      )}
+
+      {/* ─── 強制生け贄バナー（マラキールの門番など）─── */}
+      {forcedSacrificeMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-40 bg-gray-900 border border-orange-500 text-white px-4 py-3 rounded-xl shadow-2xl text-sm max-w-sm text-center">
+          <p className="font-bold text-orange-300">{forcedSacrificeMode.triggerName} 誘発</p>
+          <p className="text-gray-400 text-xs">生け贄に捧げるクリーチャーを選択してください</p>
         </div>
       )}
 

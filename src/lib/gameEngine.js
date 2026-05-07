@@ -395,7 +395,7 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
 }
 
 // パーマネントが戦場に出たとき誘発する ETB 能力を処理する
-function applyEtbTriggers(state, pid, card, cardData) {
+function applyEtbTriggers(state, pid, card, cardData, kicked = false) {
   let s = state
   for (const kw of (card?.keywords || [])) {
     // 強襲ETB: このターン攻撃していた場合に誘発
@@ -416,6 +416,16 @@ function applyEtbTriggers(state, pid, card, cardData) {
       const bf = s.players[pid].battlefield
       const instanceId = bf.length > 0 ? bf[bf.length - 1].instance_id : null
       s = { ...s, pending_etb_exile: { pid, instanceId, gain: kw.gain ?? 0, cardName: card.name } }
+      continue
+    }
+    // キッカーETB: キッカーされていた場合にのみ誘発
+    if (kw.type === 'etb_trigger' && kw.condition === 'kicked') {
+      if (!kicked) continue
+      if (kw.effect === 'opponent_sacrifice_creature') {
+        const opp = getOpponent(s, pid)
+        s = log({ ...s, pending_sacrifice_creature: { pid: opp, triggerName: card.name } },
+          `${card.name} キッカー誘発 → 対戦相手はクリーチャー1体を生け贄に捧げる`)
+      }
       continue
     }
     // オーラETB: エンチャント対象をタップ
@@ -842,7 +852,7 @@ function resolveStack(state, cardData) {
     }
     newState = log(newState, `${card?.name} が戦場に出た${top.kicked ? '（キッカー済）' : ''}${isAura && top.target ? '（エンチャント）' : ''}`)
     // ETB 誘発能力を処理
-    newState = applyEtbTriggers(newState, top.controller, card, cardData)
+    newState = applyEtbTriggers(newState, top.controller, card, cardData, top.kicked ?? false)
   } else {
     // instant/sorcery: 呪文効果を適用
     for (const effect of (card?.keywords || [])) {
@@ -1661,6 +1671,26 @@ export function declineVampireDrain(state, pid) {
   if (!pvd || pvd.pid !== pid) return state
   const remaining = pvd.count - 1
   return log({ ...state, pending_vampire_drain: remaining > 0 ? { ...pvd, count: remaining } : null }, '吸血鬼死亡誘発 → スキップ')
+}
+
+// 強制生け贄（マラキールの門番キッカーETBなど）
+export function resolveForcedSacrifice(state, pid, instanceId, cardData) {
+  const psc = state.pending_sacrifice_creature
+  if (!psc || psc.pid !== pid) return state
+  const ps = state.players[pid]
+  const perm = ps.battlefield.find(p => p.instance_id === instanceId)
+  if (!perm) return state
+  const card = cardData[perm.card_id] || {}
+  const newBf = ps.battlefield
+    .filter(p => p.instance_id !== instanceId)
+    .map(p => p.attached_to === instanceId ? { ...p, attached_to: null } : p)
+  let s = log({
+    ...state,
+    pending_sacrifice_creature: null,
+    players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: [...ps.graveyard, perm.card_id] } },
+  }, `${psc.triggerName} 誘発 → ${card.name} を生け贄に捧げた`)
+  if (card.card_type === 'creature') s = checkVampireDeathTriggers(s, pid, [perm.card_id], cardData)
+  return s
 }
 
 export function hasAdditionalCost(card) {

@@ -252,8 +252,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"etb_trigger","condition":"opp_lost_life","effect":"opponent_discard","count":1}]', 800),
 
 ('マラキールの門番',   'creature', 'black', '{B}{B}',       2, 2,
- 'キッカー（黒）。マラキールの門番が戦場に出たとき、それがキッカーされていた場合、プレイヤー1人を対象とする。そのプレイヤーはクリーチャーを1体生け贄に捧げる。（キッカー/ETB効果は現在未実装）',
- '[]', 800),
+ 'キッカー{B}。マラキールの門番が戦場に出たとき、それがキッカーされていた場合、対戦相手はクリーチャーを1体生け贄に捧げる。',
+ '[{"type":"kicker","value":"B"},{"type":"etb_trigger","condition":"kicked","effect":"opponent_sacrifice_creature"}]', 800),
 
 ('血なまぐさい吸血者', 'creature', 'black', '{1}{B}',       1, 3,
  '血なまぐさい吸血者が攻撃するたび、各対戦相手は1点のライフを失い、あなたは1点のライフを得る。',
@@ -794,3 +794,4 @@ UPDATE cards SET effect_text='あなたがコントロールする攻撃して�
 UPDATE cards SET effect_text='このクリーチャーか他の吸血鬼があなたのコントロール下で墓地に置かれるたび、あなたは{B}を支払ってもよい。そうしたなら、対戦相手1人は2点のライフを失い、あなたは2点のライフを得る。', keywords='[{"type":"subtype_vampire"},{"type":"death_trigger","subtype":"vampire","effect":"pay_mana_drain","cost":"{B}","damage":2,"gain":2}]'::jsonb WHERE name='カラストリアの貴人';
 UPDATE cards SET effect_text='このクリーチャーか他のクリーチャーがあなたのコントロール下で死亡するたび、対戦相手1人は1点のライフを失い、あなたは1点のライフを得る。', keywords='[{"type":"death_trigger","effect":"auto_drain","damage":1,"gain":1}]'::jsonb WHERE name='復讐に燃えた血術師';
 UPDATE cards SET effect_text='飛行を持つ。税血の徴収者が戦場に出たとき、このターンに対戦相手がライフを失っていた場合、各対戦相手はカードを1枚捨てる。', keywords='[{"type":"flying"},{"type":"etb_trigger","condition":"opp_lost_life","effect":"opponent_discard","count":1}]'::jsonb WHERE name='\''税血の徴収者'\'';
+UPDATE cards SET effect_text='キッカー{B}。マラキールの門番が戦場に出たとき、それがキッカーされていた場合、対戦相手はクリーチャーを1体生け贄に捧げる。', keywords='[{"type":"kicker","value":"B"},{"type":"etb_trigger","condition":"kicked","effect":"opponent_sacrifice_creature"}]'::jsonb WHERE name='マラキールの門番';
