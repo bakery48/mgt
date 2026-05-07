@@ -207,6 +207,22 @@ function CardItem({ card, onClick }) {
   )
 }
 
+async function fetchScryfallArt(name) {
+  try {
+    const res = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}&lang=ja`)
+    if (res.ok) {
+      const data = await res.json()
+      return data.image_uris?.art_crop ?? null
+    }
+    const enRes = await fetch(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(name)}`)
+    if (!enRes.ok) return null
+    const enData = await enRes.json()
+    return enData.image_uris?.art_crop ?? null
+  } catch {
+    return null
+  }
+}
+
 export default function CardsPage() {
   const navigate = useNavigate()
   const [cards, setCards] = useState([])
@@ -214,6 +230,30 @@ export default function CardsPage() {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState({ card_type: '', color: '', search: '' })
   const [detailCard, setDetailCard] = useState(null)
+  const [bulkStatus, setBulkStatus] = useState(null)
+
+  const handleBulkFetchArt = async () => {
+    setBulkStatus({ running: true, log: ['画像なしカードを取得中...'], updated: 0, notFound: 0 })
+    const { data: targets, error: fetchErr } = await supabase
+      .from('cards').select('id,name').is('art_url', null)
+    if (fetchErr) { setBulkStatus(s => ({ ...s, running: false, log: [...s.log, 'エラー: ' + fetchErr.message] })); return }
+    setBulkStatus(s => ({ ...s, log: [...s.log, `${targets.length} 枚を処理中...`] }))
+    let updated = 0, notFound = 0
+    for (const card of targets) {
+      await new Promise(r => setTimeout(r, 150))
+      const artUrl = await fetchScryfallArt(card.name)
+      if (artUrl) {
+        await supabase.from('cards').update({ art_url: artUrl }).eq('id', card.id)
+        updated++
+        setBulkStatus(s => ({ ...s, updated, log: [...s.log, `✅ ${card.name}`] }))
+      } else {
+        notFound++
+        setBulkStatus(s => ({ ...s, notFound, log: [...s.log, `❌ ${card.name}`] }))
+      }
+    }
+    setBulkStatus(s => ({ ...s, running: false, log: [...s.log, `完了: ${updated}枚更新, ${notFound}枚未登録`] }))
+    setFilter(f => ({ ...f }))
+  }
 
   useEffect(() => {
     const fetchCards = async () => {
@@ -261,6 +301,24 @@ export default function CardsPage() {
             {COLORS.map(c => <option key={c} value={c}>{COLOR_LABELS[c]}</option>)}
           </select>
         </div>
+      </div>
+
+      {/* 一括アート取得 */}
+      <div className="mb-4">
+        <button
+          onClick={handleBulkFetchArt}
+          disabled={bulkStatus?.running}
+          className="bg-blue-700 hover:bg-blue-600 disabled:bg-blue-900 disabled:cursor-not-allowed text-white text-sm px-4 py-2 rounded-lg transition-colors"
+        >
+          {bulkStatus?.running ? '取得中...' : 'Scryfallから画像を一括取得'}
+        </button>
+        {bulkStatus && (
+          <div className="mt-2 bg-gray-900 border border-gray-700 rounded-lg p-3 max-h-40 overflow-y-auto text-xs font-mono">
+            {bulkStatus.log.slice(-30).map((line, i) => (
+              <div key={i} className={line.startsWith('✅') ? 'text-green-400' : line.startsWith('❌') ? 'text-red-400' : 'text-gray-300'}>{line}</div>
+            ))}
+          </div>
+        )}
       </div>
 
       {loading ? (
