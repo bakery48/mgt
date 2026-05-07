@@ -478,7 +478,7 @@ export default function GamePlayPage() {
     if (!targetingMode) return
     const { cardId, card, kickerPaid } = targetingMode
     const target = { type: 'creature', id: instanceId }
-    const newGs = castSpellTargeted(gs, myId, cardId, card, target, kickerPaid)
+    const newGs = castSpellTargeted(gs, myId, cardId, card, target, kickerPaid, 0, cardData)
     if (newGs !== gs) dispatch(newGs)
     else setTargetingMode(null)
   }
@@ -488,7 +488,7 @@ export default function GamePlayPage() {
     if (!targetingMode) return
     const { cardId, card, kickerPaid } = targetingMode
     const target = { type: 'player', id: playerId }
-    const newGs = castSpellTargeted(gs, myId, cardId, card, target, kickerPaid)
+    const newGs = castSpellTargeted(gs, myId, cardId, card, target, kickerPaid, 0, cardData)
     if (newGs !== gs) dispatch(newGs)
     else setTargetingMode(null)
   }
@@ -498,7 +498,7 @@ export default function GamePlayPage() {
     if (!reanimateMode) return
     const { cardId, card } = reanimateMode
     const target = { type: 'graveyard_card', id: graveyardCardId }
-    const newGs = castSpellTargeted(gs, myId, cardId, card, target, false)
+    const newGs = castSpellTargeted(gs, myId, cardId, card, target, false, 0, cardData)
     if (newGs !== gs) dispatch(newGs)
     else setReanimateMode(null)
   }
@@ -506,7 +506,7 @@ export default function GamePlayPage() {
   const handleCastSpell = () => {
     if (!selectedHandCard) return
     const card = cardData[selectedHandCard]
-    const newGs = castSpell(gs, myId, selectedHandCard, card, kickerPaid, delveCount)
+    const newGs = castSpell(gs, myId, selectedHandCard, card, kickerPaid, delveCount, cardData)
     if (newGs !== gs) dispatch(newGs)
   }
 

@@ -292,8 +292,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 赤クリーチャー ───────────────────────────────────────────
 ('炎吐きの仔竜',       'creature', 'red', '{2}{R}',       2, 2,
- '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。（誘発型能力は現在未実装）',
- '[{"type":"flying"}]', 400),
+ '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
+ '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]', 400),
 
 ('カルガの竜騎兵',     'creature', 'red', '{1}{R}',       2, 2,
  'あなたがドラゴンをコントロールしているかぎり、カルガの竜騎兵は飛行を持つ。（条件付き飛行は現在未実装）',
@@ -619,5 +619,11 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行の炎吐きの仔竜を更新（誘発型能力を追加）
+UPDATE cards SET
+  effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
+  keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
+WHERE name = '炎吐きの仔竜';
 
 ALTER TABLE cards ENABLE TRIGGER USER;

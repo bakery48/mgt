@@ -193,7 +193,7 @@ export function playLand(state, pid, cardId, card) {
 }
 
 // 呪文をスタックに積む（kicker / delve 対応）
-export function castSpell(state, pid, cardId, card, kicker = false, delveCount = 0) {
+export function castSpell(state, pid, cardId, card, kicker = false, delveCount = 0, cardData = {}) {
   const ps = state.players[pid]
   if (!ps.hand.includes(cardId)) return state
   const isFlash = (card.keywords || []).some(k => k.type === 'flash')
@@ -232,7 +232,7 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
 
   const entry = { id: uuidv4(), type: 'spell', card_id: cardId, card, controller: pid, kicked: kicker }
 
-  return log({
+  const afterCast = log({
     ...state,
     priority_passed: [],
     stack: [...state.stack, entry],
@@ -247,6 +247,41 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
       },
     },
   }, `${card.name} をスタックに積んだ${kicker ? '（キッカー）' : ''}${actualDelve > 0 ? `（探査×${actualDelve}）` : ''}`)
+  return applyOnCastTriggers(afterCast, pid, card, cardData)
+}
+
+// 呪文を唱えたとき誘発する能力を処理する
+function applyOnCastTriggers(state, castingPid, castCard, cardData) {
+  let s = state
+  const ps = s.players[castingPid]
+  const opponents = Object.keys(s.players).filter(id => id !== castingPid)
+
+  for (const perm of ps.battlefield) {
+    const permCard = cardData[perm.card_id] || {}
+    for (const kw of (permCard.keywords || [])) {
+      if (kw.type !== 'on_cast_trigger') continue
+
+      let conditionMet = false
+      if (kw.condition === 'noncreature_or_dragon') {
+        const isNonCreature = castCard.card_type !== 'creature'
+        const isDragon = (castCard.keywords || []).some(k => k.type === 'subtype_dragon')
+        conditionMet = isNonCreature || isDragon
+      }
+      if (!conditionMet) continue
+
+      if (kw.effect === 'deal_each_opp') {
+        const dmg = kw.value || 1
+        for (const oppId of opponents) {
+          const oppPs = s.players[oppId]
+          s = log(
+            { ...s, players: { ...s.players, [oppId]: { ...oppPs, life: oppPs.life - dmg } } },
+            `${permCard.name} 誘発 → 相手に${dmg}点ダメージ`
+          )
+        }
+      }
+    }
+  }
+  return s
 }
 
 // スタック最上位を解決
@@ -1054,7 +1089,7 @@ function _bouncePermanent(state, instanceId, cardData) {
 }
 
 // 目標付き呪文詠唱
-export function castSpellTargeted(state, pid, cardId, card, target, kicker = false, delveCount = 0) {
+export function castSpellTargeted(state, pid, cardId, card, target, kicker = false, delveCount = 0, cardData = {}) {
   const ps = state.players[pid]
   if (!ps.hand.includes(cardId)) return state
   const isFlash = (card.keywords || []).some(k => k.type === 'flash')
@@ -1077,7 +1112,7 @@ export function castSpellTargeted(state, pid, cardId, card, target, kicker = fal
   }
 
   const entry = { id: uuidv4(), type: 'spell', card_id: cardId, card, controller: pid, kicked: kicker, target }
-  return log({
+  const afterCast = log({
     ...state,
     priority_passed: [],
     stack: [...state.stack, entry],
@@ -1086,6 +1121,7 @@ export function castSpellTargeted(state, pid, cardId, card, target, kicker = fal
       [pid]: { ...ps, hand: removeOne(ps.hand, cardId), mana_pool: newPool },
     },
   }, `${card.name} をスタックに積んだ（目標: ${target?.type}）`)
+  return applyOnCastTriggers(afterCast, pid, card, cardData)
 }
 
 // 威迫（menace）チェック: 威迫クリーチャーは2体未満でブロックできない
