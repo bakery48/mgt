@@ -171,14 +171,14 @@ export function tapForMana(state, pid, instanceId, card) {
 }
 
 // 土地プレイ
-export function playLand(state, pid, cardId, card) {
+export function playLand(state, pid, cardId, card, cardData = {}) {
   const ps = state.players[pid]
   if (!canPlaySorcerySpeed(state, pid)) return state
   if (ps.land_played) return state
   if (!ps.hand.includes(cardId)) return state
   const perm = mkPermanent(cardId, card)
   perm.summoning_sick = false
-  return log({
+  const afterLand = log({
     ...state,
     players: {
       ...state.players,
@@ -190,6 +190,7 @@ export function playLand(state, pid, cardId, card) {
       },
     },
   }, `${card.name} をプレイ（土地）`)
+  return applyLandfallTriggers(afterLand, pid, cardData)
 }
 
 // 呪文をスタックに積む（kicker / delve 対応）
@@ -248,6 +249,30 @@ export function castSpell(state, pid, cardId, card, kicker = false, delveCount =
     },
   }, `${card.name} をスタックに積んだ${kicker ? '（キッカー）' : ''}${actualDelve > 0 ? `（探査×${actualDelve}）` : ''}`)
   return applyOnCastTriggers(afterCast, pid, card, cardData)
+}
+
+// 土地が戦場に出たとき誘発する上陸能力を処理する
+function applyLandfallTriggers(state, pid, cardData) {
+  let s = state
+  const opponents = Object.keys(s.players).filter(id => id !== pid)
+
+  for (const perm of s.players[pid].battlefield) {
+    const card = cardData[perm.card_id] || {}
+    for (const kw of (card.keywords || [])) {
+      if (kw.type !== 'landfall_trigger') continue
+      if (kw.effect === 'deal_each_opp') {
+        const dmg = kw.value || 1
+        for (const oppId of opponents) {
+          const oppPs = s.players[oppId]
+          s = log(
+            { ...s, players: { ...s.players, [oppId]: { ...oppPs, life: oppPs.life - dmg } } },
+            `${card.name} 上陸誘発 → 相手に${dmg}点ダメージ`
+          )
+        }
+      }
+    }
+  }
+  return s
 }
 
 // 呪文を唱えたとき誘発する能力を処理する

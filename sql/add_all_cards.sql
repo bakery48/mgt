@@ -304,8 +304,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"attack_trigger","effect":"drakuseth_damage","primary_dmg":4,"secondary_dmg":3,"secondary_count":2}]', 1500),
 
 ('火吹きラガーク',     'creature', 'red', '{3}{R}',       3, 4,
- '上陸 ― あなたのコントロール下で土地が戦場に出るたび、火吹きラガークは各対戦相手に１点のダメージを与える。（上陸は現在未実装）',
- '[]', 400),
+ '上陸 ― あなたのコントロール下で土地が戦場に出るたび、火吹きラガークは各対戦相手に１点のダメージを与える。',
+ '[{"type":"landfall_trigger","effect":"deal_each_opp","value":1}]', 400),
 
 ('龍王の召使い',       'creature', 'red', '{1}{R}',       1, 3,
  'あなたがドラゴン呪文を唱えるためのコストは（１）少なくなる。（コスト軽減は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行の火吹きラガークを更新（上陸誘発を追加）
+UPDATE cards SET
+  effect_text = '上陸 ― あなたのコントロール下で土地が戦場に出るたび、火吹きラガークは各対戦相手に１点のダメージを与える。',
+  keywords = '[{"type":"landfall_trigger","effect":"deal_each_opp","value":1}]'::jsonb
+WHERE name = '火吹きラガーク';
 
 -- 既存行の炎の大口、ドラクセスを更新（攻撃誘発を追加）
 UPDATE cards SET

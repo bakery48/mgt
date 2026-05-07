@@ -444,7 +444,7 @@ export default function GamePlayPage() {
     if (!card || !gs) return
 
     if (card.card_type === 'land') {
-      const newGs = playLand(gs, myId, cardId, card)
+      const newGs = playLand(gs, myId, cardId, card, cardData)
       if (newGs !== gs) dispatch(newGs)
       return
     }
