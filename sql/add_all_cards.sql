@@ -37,8 +37,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"lifelink"}]', 400),
 
 ('聖戦士の奇襲兵',   'creature', 'white', '{1}{W}',    2, 1,
- '瞬速を持つ。（1）、このクリーチャーを生け贄に捧げる：アーティファクトかエンチャント1つを破壊する。（起動型能力は現在未実装）',
- '[{"type":"flash"}]', 600),
+ '瞬速を持つ。（1）、このクリーチャーを生け贄に捧げる：アーティファクトかエンチャント1つを破壊する。',
+ '[{"type":"flash"},{"type":"activated_ability","cost":"1","sacrifice_self":true,"effect":"destroy_artifact_or_enchantment","targeting":"any_artifact_or_enchantment"}]', 600),
 
 ('不屈の古参兵',     'creature', 'white', '{1}{W}',    3, 1,
  'カードを1枚捨てる：不屈の古参兵をタップする。それはターン終了時まで破壊不能を得る。（起動型能力は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行の聖戦士の奇襲兵を更新（起動型能力追加）
+UPDATE cards SET
+  effect_text = '瞬速を持つ。（1）、このクリーチャーを生け贄に捧げる：アーティファクトかエンチャント1つを破壊する。',
+  keywords = '[{"type":"flash"},{"type":"activated_ability","cost":"1","sacrifice_self":true,"effect":"destroy_artifact_or_enchantment","targeting":"any_artifact_or_enchantment"}]'::jsonb
+WHERE name = '聖戦士の奇襲兵';
 
 -- 既存行の信仰の伝令を更新（攻撃誘発追加）
 UPDATE cards SET

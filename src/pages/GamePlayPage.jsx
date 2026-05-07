@@ -9,7 +9,8 @@ import {
   resolveFirstStrikeDamage, resolveCombatDamage,
   canPlaySorcerySpeed, canPlayInstantSpeed, hasMana, getOpponent, getValidBlockers,
   castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
-  discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType, activateAbility,
+  discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
+  activateAbility, activateAbilityTargeted,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -221,6 +222,8 @@ export default function GamePlayPage() {
   const [targetingMode, setTargetingMode] = useState(null)
   // { cardId, card, kickerPaid, targetingType }
   const [reanimateMode, setReanimateMode] = useState(null)
+  const [activatedAbilityMode, setActivatedAbilityMode] = useState(null)
+  // { instanceId, card, ability }
   // { cardId, card }
 
   const myId = player?.id
@@ -437,6 +440,7 @@ export default function GamePlayPage() {
     setBlockingAssignments({})
     setTargetingMode(null)
     setReanimateMode(null)
+    setActivatedAbilityMode(null)
   }, [saveGs])
 
   const handleHandCardClick = (cardId) => {
@@ -513,6 +517,16 @@ export default function GamePlayPage() {
     const card = cardData[selectedHandCard]
     const newGs = castSpell(gs, myId, selectedHandCard, card, kickerPaid, delveCount, cardData)
     if (newGs !== gs) dispatch(newGs)
+  }
+
+  // 起動型能力の対象選択
+  const handleActivatedAbilityTarget = (instanceId) => {
+    if (!activatedAbilityMode) return
+    const { instanceId: abilityInstanceId } = activatedAbilityMode
+    const target = { type: 'permanent', id: instanceId }
+    const newGs = activateAbilityTargeted(gs, myId, abilityInstanceId, cardData, target)
+    if (newGs !== gs) dispatch(newGs)
+    else setActivatedAbilityMode(null)
   }
 
   const handleCycleCard = (cardId) => {
@@ -810,11 +824,12 @@ export default function GamePlayPage() {
                       ...perm,
                       blocking: isAssigned ? assignedBlocker : perm.blocking,
                     }}
-                    selected={canAssign || isAssigned || (targetingMode && ['opp_creature','opp_creature_or_player','any_creature','any_permanent'].includes(targetingMode.targetingType))}
+                    selected={canAssign || isAssigned || (targetingMode && ['opp_creature','opp_creature_or_player','any_creature','any_permanent'].includes(targetingMode.targetingType)) || (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type))}
                     onClick={() => {
                       if (canAssign) handleAssignBlocker(perm.instance_id)
                       else if (targetingMode && ['opp_creature','opp_creature_or_player','any_creature'].includes(targetingMode.targetingType) && card?.card_type === 'creature') handleTargetCreature(perm.instance_id)
                       else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
+                      else if (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type)) handleActivatedAbilityTarget(perm.instance_id)
                     }}
                     onDetail={() => { setDetailCard(card); setDetailPerm(perm) }}
                     onHover={handleHover}
@@ -870,6 +885,7 @@ export default function GamePlayPage() {
                           if (targetingMode?.targetingType === 'own_creature' && isCrea) handleTargetCreature(perm.instance_id)
                           else if (targetingMode?.targetingType === 'any_creature' && isCrea) handleTargetCreature(perm.instance_id)
                           else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
+                          else if (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type)) handleActivatedAbilityTarget(perm.instance_id)
                           else if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
                           else if (canAtt || inAttackPhase) handleToggleAttacker(perm.instance_id)
                           else if (canBlk) handleSelectBlocker(perm.instance_id)
@@ -1112,6 +1128,17 @@ export default function GamePlayPage() {
             </div>
           )}
 
+          {/* 起動型能力ターゲット選択パネル */}
+          {activatedAbilityMode && (
+            <div className="bg-orange-950/60 border border-orange-500 rounded-lg px-2 py-2 text-orange-300 text-xs">
+              <p className="font-bold mb-1 text-center">⚡ {activatedAbilityMode.card?.name}</p>
+              <p className="text-orange-400 text-center mb-2">アーティファクト/エンチャントを選択</p>
+              <button onClick={() => setActivatedAbilityMode(null)} className="block w-full text-orange-500 hover:text-orange-300 text-xs py-1">
+                キャンセル
+              </button>
+            </div>
+          )}
+
           {/* ログ */}
           <div className="flex-1 bg-gray-950 rounded-lg p-2 overflow-y-auto max-h-48">
             <p className="text-gray-600 text-xs mb-1">ログ</p>
@@ -1263,8 +1290,16 @@ export default function GamePlayPage() {
         onActivateAbility={
           detailPerm && gs && myPs?.battlefield.some(p => p.instance_id === detailPerm.instance_id)
             ? () => {
-                const newGs = activateAbility(gs, myId, detailPerm.instance_id, cardData)
-                if (newGs !== gs) dispatch(newGs)
+                const c = cardData[detailPerm.card_id] || {}
+                const ability = (c.keywords || []).find(k => k.type === 'activated_ability')
+                if (ability?.targeting) {
+                  // ターゲット選択が必要 → モードをセットしてモーダルを閉じる
+                  setActivatedAbilityMode({ instanceId: detailPerm.instance_id, card: c, ability })
+                  setDetailCard(null); setDetailPerm(null)
+                } else {
+                  const newGs = activateAbility(gs, myId, detailPerm.instance_id, cardData)
+                  if (newGs !== gs) dispatch(newGs)
+                }
               }
             : undefined
         }

@@ -178,6 +178,39 @@ export function activateAbility(state, pid, instanceId, cardData) {
   return state
 }
 
+// 対象が必要な起動型能力（生け贄コストを伴うものなど）
+export function activateAbilityTargeted(state, pid, instanceId, cardData, target) {
+  if (!canPlayInstantSpeed(state, pid)) return state
+  const ps = state.players[pid]
+  const perm = ps.battlefield.find(p => p.instance_id === instanceId)
+  if (!perm) return state
+  const card = cardData[perm.card_id] || {}
+  const ability = (card.keywords || []).find(k => k.type === 'activated_ability' && k.targeting)
+  if (!ability) return state
+
+  // マナコスト支払い
+  const costStr = ability.cost ? `{${ability.cost}}` : null
+  let newPool = { ...ps.mana_pool }
+  if (costStr) {
+    if (!hasMana(newPool, costStr)) return state
+    newPool = spendMana(newPool, costStr)
+  }
+
+  // 生け贄コスト：自身を墓地へ
+  let newBf = ps.battlefield.filter(p => p.instance_id !== instanceId)
+  let newGy = [...ps.graveyard, perm.card_id]
+  let s = log(
+    { ...state, players: { ...state.players, [pid]: { ...ps, battlefield: newBf, graveyard: newGy, mana_pool: newPool } } },
+    `${card.name} を生け贄に捧げた`
+  )
+
+  // 対象への効果
+  if (ability.effect === 'destroy_artifact_or_enchantment' && target) {
+    s = _destroyPermanent(s, target.id, cardData)
+  }
+  return s
+}
+
 // 土地タップ（マナ生成）
 export function tapForMana(state, pid, instanceId, card) {
   const ps = state.players[pid]
