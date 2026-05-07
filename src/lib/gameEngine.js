@@ -211,6 +211,38 @@ export function activateAbilityTargeted(state, pid, instanceId, cardData, target
   return s
 }
 
+// 手札を捨てる起動型能力（不屈の古参兵など）
+export function activateAbilityDiscard(state, pid, instanceId, discardCardId, cardData) {
+  if (!canPlayInstantSpeed(state, pid)) return state
+  const ps = state.players[pid]
+  const perm = ps.battlefield.find(p => p.instance_id === instanceId)
+  if (!perm) return state
+  const card = cardData[perm.card_id] || {}
+  const ability = (card.keywords || []).find(k => k.type === 'activated_ability' && k.cost === 'discard_card')
+  if (!ability) return state
+  if (!ps.hand.includes(discardCardId)) return state
+
+  // コスト：手札1枚を捨てる
+  const newHand = ps.hand.filter(id => id !== discardCardId)
+  const discardCard2 = cardData[discardCardId] || {}
+  const newGy = [...ps.graveyard, discardCardId]
+
+  // 効果：自身をタップ + ターン終了時まで破壊不能
+  const newBf = ps.battlefield.map(p => {
+    if (p.instance_id !== instanceId) return p
+    return {
+      ...p,
+      tapped: ability.tap_self ? true : p.tapped,
+      temp_effects: [...(p.temp_effects || []), { grant_keywords: ['indestructible'] }],
+    }
+  })
+
+  return log(
+    { ...state, players: { ...state.players, [pid]: { ...ps, hand: newHand, graveyard: newGy, battlefield: newBf } } },
+    `${card.name} 起動型能力 → ${discardCard2.name || '?'} を捨て、破壊不能を得た`
+  )
+}
+
 // 土地タップ（マナ生成）
 export function tapForMana(state, pid, instanceId, card) {
   const ps = state.players[pid]

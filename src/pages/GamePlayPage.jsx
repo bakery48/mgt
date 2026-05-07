@@ -10,7 +10,7 @@ import {
   canPlaySorcerySpeed, canPlayInstantSpeed, hasMana, getOpponent, getValidBlockers,
   castFlashback, unearthCreature, equipArtifact, getEffectivePT, getEffectiveKeywords,
   discardCard, finishCleanup, spellNeedsTarget, getSpellTargetingType,
-  activateAbility, activateAbilityTargeted,
+  activateAbility, activateAbilityTargeted, activateAbilityDiscard,
 } from '../lib/gameEngine'
 import {
   processETB, processUpkeep, processAttack, processDamage,
@@ -223,6 +223,7 @@ export default function GamePlayPage() {
   // { cardId, card, kickerPaid, targetingType }
   const [reanimateMode, setReanimateMode] = useState(null)
   const [activatedAbilityMode, setActivatedAbilityMode] = useState(null)
+  const [discardForAbilityMode, setDiscardForAbilityMode] = useState(null)
   // { instanceId, card, ability }
   // { cardId, card }
 
@@ -1253,6 +1254,38 @@ export default function GamePlayPage() {
         </div>
       )}
 
+      {/* ─── 起動型能力：手札を捨てる選択モーダル ─── */}
+      {discardForAbilityMode && (
+        <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-40 pb-4">
+          <div className="bg-gray-800 border border-orange-600 rounded-xl p-4 w-full max-w-2xl mx-4">
+            <p className="text-orange-300 font-bold text-center mb-1">⚡ {discardForAbilityMode.card?.name}</p>
+            <p className="text-gray-400 text-xs text-center mb-3">捨てるカードを選択（ターン終了時まで破壊不能）</p>
+            <div className="flex gap-2 overflow-x-auto justify-center pb-1">
+              {(myPs?.hand || []).map(cardId => {
+                const card = cardData[cardId]
+                return (
+                  <button
+                    key={cardId}
+                    onClick={() => {
+                      const newGs = activateAbilityDiscard(gs, myId, discardForAbilityMode.instanceId, cardId, cardData)
+                      if (newGs !== gs) dispatch(newGs)
+                      setDiscardForAbilityMode(null)
+                    }}
+                    className={`shrink-0 w-20 h-28 rounded-lg p-1.5 border-2 border-orange-500 hover:border-orange-300 text-left text-xs flex flex-col ${COLOR_BG[card?.color] || 'bg-gray-700 text-white'}`}
+                  >
+                    {card?.art_url && <img src={card.art_url} alt="" className="w-full h-12 object-cover rounded mb-1" />}
+                    <p className="font-bold leading-tight line-clamp-2">{card?.name || '?'}</p>
+                  </button>
+                )
+              })}
+            </div>
+            <button onClick={() => setDiscardForAbilityMode(null)} className="block w-full mt-2 text-gray-500 hover:text-gray-300 text-xs py-1">
+              キャンセル
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ─── 再アニメイト：墓地選択モーダル ─── */}
       {reanimateMode && (
         <div className="fixed inset-0 bg-black/70 flex items-end justify-center z-40 pb-4">
@@ -1297,8 +1330,10 @@ export default function GamePlayPage() {
                 const c = cardData[detailPerm.card_id] || {}
                 const ability = (c.keywords || []).find(k => k.type === 'activated_ability')
                 if (ability?.targeting) {
-                  // ターゲット選択が必要 → モードをセットしてモーダルを閉じる
                   setActivatedAbilityMode({ instanceId: detailPerm.instance_id, card: c, ability })
+                  setDetailCard(null); setDetailPerm(null)
+                } else if (ability?.cost === 'discard_card') {
+                  setDiscardForAbilityMode({ instanceId: detailPerm.instance_id, card: c })
                   setDetailCard(null); setDetailPerm(null)
                 } else {
                   const newGs = activateAbility(gs, myId, detailPerm.instance_id, cardData)
@@ -1313,6 +1348,8 @@ export default function GamePlayPage() {
                 const c = cardData[detailPerm?.card_id] || {}
                 const ability = (c.keywords || []).find(k => k.type === 'activated_ability')
                 if (!ability) return false
+                if (ability.cost === 'discard_card')
+                  return (myPs?.hand?.length ?? 0) > 0 && canPlayInstantSpeed(gs, myId)
                 return hasMana(myPs?.mana_pool || {}, `{${ability.cost}}`) &&
                   canPlayInstantSpeed(gs, myId)
               })()

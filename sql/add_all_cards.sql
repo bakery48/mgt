@@ -41,8 +41,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"activated_ability","cost":"1","sacrifice_self":true,"effect":"destroy_artifact_or_enchantment","targeting":"any_artifact_or_enchantment"}]', 600),
 
 ('不屈の古参兵',     'creature', 'white', '{1}{W}',    3, 1,
- 'カードを1枚捨てる：不屈の古参兵をタップする。それはターン終了時まで破壊不能を得る。（起動型能力は現在未実装）',
- '[]', 700),
+ 'カードを1枚捨てる：不屈の古参兵をタップする。それはターン終了時まで破壊不能を得る。',
+ '[{"type":"activated_ability","cost":"discard_card","tap_self":true,"effect":"grant_indestructible_eot"}]', 700),
 
 ('鼓舞する監視者',   'creature', 'white', '{2}{W}',    2, 1,
  '飛行、絆魂を持つ。鼓舞する監視者が戦場に出たとき、ライフを1点得てカードを1枚引く。',
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の不屈の古参兵を更新（起動型能力実装）
+UPDATE cards SET
+  effect_text = 'カードを1枚捨てる：不屈の古参兵をタップする。それはターン終了時まで破壊不能を得る。',
+  keywords = '[{"type":"activated_ability","cost":"discard_card","tap_self":true,"effect":"grant_indestructible_eot"}]'::jsonb
+WHERE name = '不屈の古参兵';
 
 -- 既存行の不動の女王、リンデンを更新（攻撃誘発実装）
 UPDATE cards SET
