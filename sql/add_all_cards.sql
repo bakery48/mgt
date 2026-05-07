@@ -236,8 +236,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"subtype_vampire"},{"type":"death_trigger","subtype":"vampire","effect":"pay_mana_drain","cost":"{B}","damage":2,"gain":2}]', 1000),
 
 ('復讐に燃えた血術師', 'creature', 'black', '{1}{B}',       1, 1,
- 'このクリーチャーか他のクリーチャーがあなたのコントロール下で死亡するたび、対戦相手1人は1点のライフを失い、あなたは1点のライフを得る。（誘発型能力は現在未実装）',
- '[]', 700),
+ 'このクリーチャーか他のクリーチャーがあなたのコントロール下で死亡するたび、対戦相手1人は1点のライフを失い、あなたは1点のライフを得る。',
+ '[{"type":"death_trigger","effect":"auto_drain","damage":1,"gain":1}]', 700),
 
 ('吸血鬼の落とし子',   'creature', 'black', '{2}{B}',       2, 2,
  '吸血鬼の落とし子が戦場に出たとき、各対戦相手は2点のライフを失い、あなたは2点のライフを得る。',
@@ -792,3 +792,4 @@ UPDATE cards SET effect_text='吸血鬼の大食家が攻撃するたび、あ�
 UPDATE cards SET effect_text='あなたのエンドステップの開始時に、対戦相手がこのターンにライフを失っていた場合、あなたのコントロールする吸血鬼1体の上に+1/+1カウンターを1個置く。', keywords='[{"type":"subtype_vampire"},{"type":"end_step_trigger","condition":"opp_lost_life","effect":"counter_on_vampire","counter":{"p":1,"t":1}}]'::jsonb WHERE name='流城の血泥棒';
 UPDATE cards SET effect_text='あなたがコントロールする攻撃している吸血鬼はすべて接死と絆魂を持つ。あなたがコントロールする吸血鬼1体が死亡するたび、あなたは2点のライフを支払ってもよい。そうしたなら、カードを1枚引く。', keywords='[{"type":"subtype_vampire"},{"type":"lord_effect","subtype":"vampire","condition":"attacking","grant_keywords":["deathtouch","lifelink"]},{"type":"death_trigger","subtype":"vampire","effect":"pay_life_draw","life_cost":2,"draw":1}]'::jsonb WHERE name='交叉路の騒動屋';
 UPDATE cards SET effect_text='このクリーチャーか他の吸血鬼があなたのコントロール下で墓地に置かれるたび、あなたは{B}を支払ってもよい。そうしたなら、対戦相手1人は2点のライフを失い、あなたは2点のライフを得る。', keywords='[{"type":"subtype_vampire"},{"type":"death_trigger","subtype":"vampire","effect":"pay_mana_drain","cost":"{B}","damage":2,"gain":2}]'::jsonb WHERE name='カラストリアの貴人';
+UPDATE cards SET effect_text='このクリーチャーか他のクリーチャーがあなたのコントロール下で死亡するたび、対戦相手1人は1点のライフを失い、あなたは1点のライフを得る。', keywords='[{"type":"death_trigger","effect":"auto_drain","damage":1,"gain":1}]'::jsonb WHERE name='復讐に燃えた血術師';

@@ -2149,10 +2149,6 @@ function _damageCreature(state, instanceId, dmg, cardData) {
 
 function checkVampireDeathTriggers(state, pid, deadCardIds, cardData) {
   if (!deadCardIds || deadCardIds.length === 0) return state
-  const vampireDeaths = deadCardIds.filter(cid =>
-    (cardData[cid]?.keywords || []).some(k => k.type === 'subtype_vampire')
-  ).length
-  if (vampireDeaths === 0) return state
   const ps = state.players[pid]
   // 生存中と死亡したカード両方からトリガーを探す（自己死亡にも対応）
   const allSourceCards = [
@@ -2160,22 +2156,56 @@ function checkVampireDeathTriggers(state, pid, deadCardIds, cardData) {
     ...deadCardIds.map(cid => cardData[cid] || {}),
   ]
   let s = state
-  // pay_life_draw （交叉路の騒動屋）
-  const lifeDrawKw = allSourceCards.flatMap(c => c.keywords || []).find(k =>
-    k.type === 'death_trigger' && k.subtype === 'vampire' && k.effect === 'pay_life_draw'
-  )
-  if (lifeDrawKw) {
-    const existing = s.pending_vampire_death_pay?.count || 0
-    s = { ...s, pending_vampire_death_pay: { pid, count: existing + vampireDeaths, life_cost: lifeDrawKw.life_cost ?? 2, draw: lifeDrawKw.draw ?? 1 } }
+
+  // 吸血鬼死亡カウント（吸血鬼固有トリガー用）
+  const vampireDeaths = deadCardIds.filter(cid =>
+    (cardData[cid]?.keywords || []).some(k => k.type === 'subtype_vampire')
+  ).length
+
+  // クリーチャー死亡カウント（全クリーチャー対象トリガー用）
+  const creatureDeaths = deadCardIds.filter(cid =>
+    (cardData[cid]?.card_type) === 'creature'
+  ).length
+
+  if (vampireDeaths > 0) {
+    // pay_life_draw （交叉路の騒動屋）
+    const lifeDrawKw = allSourceCards.flatMap(c => c.keywords || []).find(k =>
+      k.type === 'death_trigger' && k.subtype === 'vampire' && k.effect === 'pay_life_draw'
+    )
+    if (lifeDrawKw) {
+      const existing = s.pending_vampire_death_pay?.count || 0
+      s = { ...s, pending_vampire_death_pay: { pid, count: existing + vampireDeaths, life_cost: lifeDrawKw.life_cost ?? 2, draw: lifeDrawKw.draw ?? 1 } }
+    }
+    // pay_mana_drain （カラストリアの貴人）
+    const drainKw = allSourceCards.flatMap(c => c.keywords || []).find(k =>
+      k.type === 'death_trigger' && k.subtype === 'vampire' && k.effect === 'pay_mana_drain'
+    )
+    if (drainKw) {
+      const existing = s.pending_vampire_drain?.count || 0
+      s = { ...s, pending_vampire_drain: { pid, count: existing + vampireDeaths, cost: drainKw.cost ?? '{B}', damage: drainKw.damage ?? 2, gain: drainKw.gain ?? 2 } }
+    }
   }
-  // pay_mana_drain （カラストリアの貴人）
-  const drainKw = allSourceCards.flatMap(c => c.keywords || []).find(k =>
-    k.type === 'death_trigger' && k.subtype === 'vampire' && k.effect === 'pay_mana_drain'
-  )
-  if (drainKw) {
-    const existing = s.pending_vampire_drain?.count || 0
-    s = { ...s, pending_vampire_drain: { pid, count: existing + vampireDeaths, cost: drainKw.cost ?? '{B}', damage: drainKw.damage ?? 2, gain: drainKw.gain ?? 2 } }
+
+  if (creatureDeaths > 0) {
+    // auto_drain （復讐に燃えた血術師）- 自動適用、支払い不要
+    const autoDrainKw = allSourceCards.flatMap(c => c.keywords || []).find(k =>
+      k.type === 'death_trigger' && k.effect === 'auto_drain'
+    )
+    if (autoDrainKw) {
+      const opp = getOpponent(s, pid)
+      const dmg = (autoDrainKw.damage ?? 1) * creatureDeaths
+      const gain = (autoDrainKw.gain ?? 1) * creatureDeaths
+      s = log({
+        ...s,
+        players: {
+          ...s.players,
+          [pid]: { ...s.players[pid], life: s.players[pid].life + gain },
+          [opp]: { ...s.players[opp], life: s.players[opp].life - dmg },
+        },
+      }, `死亡誘発 → 対戦相手${dmg}点ロス、${gain}点ライフ獲得`)
+    }
   }
+
   return s
 }
 
