@@ -95,8 +95,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 白エンチャント ───────────────────────────────────────────
 ('平和な心',         'enchantment', 'white', '{1}{W}', null, null,
- 'エンチャント（クリーチャー）。エンチャントされているクリーチャーは攻撃もブロックもできない。（エンチャント効果は現在未実装）',
- '[]', 500),
+ 'エンチャント（クリーチャー）。エンチャントされているクリーチャーは攻撃もブロックもできない。',
+ '[{"type":"aura","enchant":"creature"},{"type":"prevent_combat"}]', 500),
 
 ('払拭の光',         'enchantment', 'white', '{2}{W}', null, null,
  '払拭の光が戦場に出たとき、対戦相手のコントロールする土地でないパーマネント1つを追放する。払拭の光が戦場を離れたとき、そのカードを戦場に戻す。（追放効果は現在未実装）',
@@ -701,6 +701,12 @@ UPDATE cards SET
   effect_text = '飛行を持つ。あなたがクリーチャーでない呪文かドラゴン呪文を唱えるたび、炎吐きの仔竜は各対戦相手に１点のダメージを与える。',
   keywords = '[{"type":"flying"},{"type":"subtype_dragon"},{"type":"on_cast_trigger","condition":"noncreature_or_dragon","effect":"deal_each_opp","value":1}]'::jsonb
 WHERE name = '炎吐きの仔竜';
+
+-- 既存行の平和な心を更新（攻撃・ブロック禁止実装）
+UPDATE cards SET
+  effect_text = 'エンチャント（クリーチャー）。エンチャントされているクリーチャーは攻撃もブロックもできない。',
+  keywords = '[{"type":"aura","enchant":"creature"},{"type":"prevent_combat"}]'::jsonb
+WHERE name = '平和な心';
 
 -- 既存行の束縛の祈り手を更新（ETB追放実装）
 UPDATE cards SET

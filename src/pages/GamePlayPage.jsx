@@ -34,7 +34,7 @@ const KEYWORD_LABELS = {
 // バッジ非表示の内部用キーワードタイプ
 const INTERNAL_KEYWORD_TYPES = new Set([
   'subtype_dragon', 'subtype_angel', 'on_cast_trigger', 'conditional_keyword',
-  'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color', 'ally_etb_trigger', 'etb_exile_target', // 効果系は effect_text で説明
+  'protection', 'spell_effect', 'lord_effect', 'ally_attack_trigger', 'etb_choose_color', 'ally_etb_trigger', 'etb_exile_target', 'prevent_combat', // 効果系は effect_text で説明
 ])
 
 const COLOR_BG = {

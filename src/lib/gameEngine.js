@@ -850,12 +850,14 @@ function applyAttackTriggers(state, attackingPid, attackerIids, cardData) {
 export function declareAttackers(state, pid, attackerIids, cardData) {
   if (state.phase !== 'declare_attackers' || state.active_player !== pid) return state
   const ps = state.players[pid]
-  // defender 持ちは攻撃不可
+  // defender・prevent_combat 持ちは攻撃不可
   const validIids = attackerIids.filter(iid => {
     const perm = ps.battlefield.find(p => p.instance_id === iid)
     if (!perm) return false
     const card = cardData[perm.card_id] || {}
-    return !(card.keywords || []).some(k => k.type === 'defender')
+    if ((card.keywords || []).some(k => k.type === 'defender')) return false
+    if (hasPacifism(perm, ps.battlefield, cardData)) return false
+    return true
   })
   const newBf = ps.battlefield.map(p => {
     if (!validIids.includes(p.instance_id)) return p
@@ -1060,6 +1062,15 @@ export function discardCard(state, pid, cardId) {
 // 状況起因処理（ライフ0チェック等）
 export function checkStateBasedActions(state) {
   return state
+}
+
+// prevent_combat オーラが付いているか（平和な心など）
+function hasPacifism(perm, battlefield, cardData) {
+  return battlefield.some(a => {
+    if (a.attached_to !== perm.instance_id) return false
+    const ac = cardData[a.card_id] || {}
+    return (ac.keywords || []).some(k => k.type === 'prevent_combat')
+  })
 }
 
 // 装備品・オーラの有効P/T計算（同一プレイヤーの戦場を参照）
@@ -1282,9 +1293,12 @@ export function getValidBlockers(state, defId, cardData) {
     .map(iid => state.players[ap].battlefield.find(p => p.instance_id === iid))
     .filter(Boolean)
 
-  const defenderPerms = (state.players[defId]?.battlefield || []).filter(p => {
+  const defBf = state.players[defId]?.battlefield || []
+  const defenderPerms = defBf.filter(p => {
     const card = cardData[p.card_id] || {}
-    return card.card_type === 'creature' && !p.tapped && !p.summoning_sick
+    if (card.card_type !== 'creature' || p.tapped || p.summoning_sick) return false
+    if (hasPacifism(p, defBf, cardData)) return false
+    return true
   })
 
   const result = {}
