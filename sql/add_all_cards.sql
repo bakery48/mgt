@@ -265,7 +265,7 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 黒インスタント ───────────────────────────────────────────
 ('英雄の破滅',         'instant',  'black', '{1}{B}{B}',   null, null,
- 'クリーチャー1体かプレインズウォーカー1体を対象とし、それを破壊する。',
+ 'クリーチャー1体を対象とし、それを破壊する。',
  '[{"type":"destroy_creature"}]', 1000),
 
 -- ── 黒ソーサリー ─────────────────────────────────────────────
@@ -795,3 +795,4 @@ UPDATE cards SET effect_text='このクリーチャーか他の吸血鬼があ�
 UPDATE cards SET effect_text='このクリーチャーか他のクリーチャーがあなたのコントロール下で死亡するたび、対戦相手1人は1点のライフを失い、あなたは1点のライフを得る。', keywords='[{"type":"death_trigger","effect":"auto_drain","damage":1,"gain":1}]'::jsonb WHERE name='復讐に燃えた血術師';
 UPDATE cards SET effect_text='飛行を持つ。税血の徴収者が戦場に出たとき、このターンに対戦相手がライフを失っていた場合、各対戦相手はカードを1枚捨てる。', keywords='[{"type":"flying"},{"type":"etb_trigger","condition":"opp_lost_life","effect":"opponent_discard","count":1}]'::jsonb WHERE name='\''税血の徴収者'\'';
 UPDATE cards SET effect_text='キッカー{B}。マラキールの門番が戦場に出たとき、それがキッカーされていた場合、対戦相手はクリーチャーを1体生け贄に捧げる。', keywords='[{"type":"kicker","value":"B"},{"type":"etb_trigger","condition":"kicked","effect":"opponent_sacrifice_creature"}]'::jsonb WHERE name='マラキールの門番';
+UPDATE cards SET effect_text='クリーチャー1体を対象とし、それを破壊する。', keywords='[{"type":"destroy_creature"}]'::jsonb WHERE name='英雄の破滅';
