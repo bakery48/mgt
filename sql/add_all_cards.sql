@@ -3,6 +3,9 @@
 
 ALTER TABLE cards DISABLE TRIGGER USER;
 
+-- name カラムに UNIQUE 制約がなければ追加
+ALTER TABLE cards ADD CONSTRAINT IF NOT EXISTS cards_name_key UNIQUE (name);
+
 INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price) VALUES
 
 -- ════════════════════════════════════════════════════════════════
