@@ -887,6 +887,10 @@ export default function GamePlayPage() {
                           else if (targetingMode?.targetingType === 'any_permanent') handleTargetCreature(perm.instance_id)
                           else if (activatedAbilityMode && ['artifact','enchantment'].includes(card?.card_type)) handleActivatedAbilityTarget(perm.instance_id)
                           else if (isLand && !perm.tapped) handleTapLand(perm.instance_id)
+                          else if (isCrea && !perm.tapped && !perm.summoning_sick && (card?.keywords || []).some(k => k.type === 'tap_for_mana')) {
+                            const newGs = tapForMana(gs, myId, perm.instance_id, card)
+                            if (newGs !== gs) dispatch(newGs)
+                          }
                           else if (canAtt || inAttackPhase) handleToggleAttacker(perm.instance_id)
                           else if (canBlk) handleSelectBlocker(perm.instance_id)
                           else if (isEquipTarget && !isEquip) handleEquipTarget(perm.instance_id)

@@ -364,8 +364,8 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
 
 -- ── 緑クリーチャー ───────────────────────────────────────────
 ('ラノワールのエルフ',     'creature', 'green', '{G}',           1, 1,
- 'タップ：（緑）を加える。（マナ能力は現在未実装）',
- '[]', 300),
+ 'タップ：（緑）を加える。',
+ '[{"type":"tap_for_mana","mana":"G"}]', 300),
 
 ('打ち壊すブロントドン',   'creature', 'green', '{1}{G}{G}',     3, 4,
  '（１）、打ち壊すブロントドンを生け贄に捧げる：アーティファクト１つかエンチャント１つを対象とし、それを破壊する。（起動型能力は現在未実装）',
@@ -619,6 +619,12 @@ INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_t
  '[{"type":"flash"},{"type":"reach"}]', 1400)
 
 ON CONFLICT (name) DO NOTHING;
+
+-- 既存行のラノワールのエルフを更新（タップマナ能力追加）
+UPDATE cards SET
+  effect_text = 'タップ：（緑）を加える。',
+  keywords = '[{"type":"tap_for_mana","mana":"G"}]'::jsonb
+WHERE name = 'ラノワールのエルフ';
 
 -- 既存行の光の模範を更新
 UPDATE cards SET
