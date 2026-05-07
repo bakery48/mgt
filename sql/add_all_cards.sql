@@ -3,8 +3,15 @@
 
 ALTER TABLE cards DISABLE TRIGGER USER;
 
--- name カラムに UNIQUE 制約がなければ追加
-ALTER TABLE cards ADD CONSTRAINT IF NOT EXISTS cards_name_key UNIQUE (name);
+-- name カラムに UNIQUE 制約がなければ追加（DO ブロックで既存時はスキップ）
+DO $$BEGIN
+  -- 重複行を先に削除（id が小さい方を残す）
+  DELETE FROM cards WHERE id NOT IN (
+    SELECT MIN(id) FROM cards GROUP BY name
+  );
+  ALTER TABLE cards ADD CONSTRAINT cards_name_key UNIQUE (name);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 INSERT INTO cards (name, card_type, color, mana_cost, power, toughness, effect_text, keywords, price) VALUES
 
