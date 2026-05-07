@@ -368,6 +368,21 @@ export default function GamePlayPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gs?.phase, gs?.priority, roundResult, savingGs])
 
+  // ─── 自分のターンのメインフェーズでスタックに積まれたら自動パス ──
+  useEffect(() => {
+    if (!gs || !myId || roundResult || savingGs) return
+    if (gs.priority !== myId) return
+    if (!['main1', 'main2'].includes(gs.phase)) return
+    if (gs.active_player !== myId) return
+    if ((gs.stack || []).length === 0) return
+    const t = setTimeout(() => {
+      const newGs = passPriority(gs, myId, cardData)
+      if (newGs !== gs) { dispatch(newGs); checkForRoundEnd(newGs) }
+    }, 600)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gs?.stack?.length, gs?.priority, roundResult, savingGs])
+
   // ─── 攻撃可能クリーチャーが0体なら自動で攻撃宣言スキップ ──
   useEffect(() => {
     if (!gs || !myId || roundResult || savingGs) return
