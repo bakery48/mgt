@@ -53,9 +53,13 @@ export default function BattleRoomPage() {
   const allReady = isFull && participants.every(p => p.deck_id)
 
   const joinBattle = async () => {
-    if (!selectedDeckId) { alert('デッキを選択してください'); return }
     setJoining(true)
     try {
+      let deckId = selectedDeckId
+      if (!deckId) {
+        const { assignStarterDeck } = await import('../lib/assignStarterDeck')
+        deckId = await assignStarterDeck(player.id)
+      }
       await supabase.from('game_players').insert({
         game_id: gameId,
         player_id: player.id,
@@ -64,7 +68,7 @@ export default function BattleRoomPage() {
         balance: 0,
         bye_last_round: false,
         is_winner: false,
-        deck_id: selectedDeckId,
+        deck_id: deckId,
       })
       await fetchRoom()
     } catch (err) {
@@ -176,18 +180,22 @@ export default function BattleRoomPage() {
       {!myEntry && !isFull && (
         <div className="bg-gray-800 border border-purple-700 rounded-xl p-5 mb-5">
           <h2 className="text-sm font-semibold text-purple-400 mb-3">デッキを選んで参加</h2>
-          <select
-            value={selectedDeckId}
-            onChange={e => setSelectedDeckId(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500 mb-3"
-          >
-            {decks.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+          {decks.length > 0 ? (
+            <select
+              value={selectedDeckId}
+              onChange={e => setSelectedDeckId(e.target.value)}
+              className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:border-purple-500 mb-3"
+            >
+              {decks.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-gray-400 text-xs mb-3">デッキがないため、ランダムなスターターデッキで参加します。</p>
+          )}
           <button
             onClick={joinBattle}
-            disabled={joining || !selectedDeckId}
+            disabled={joining}
             className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
           >
             {joining ? '参加中...' : '参加する'}
