@@ -328,20 +328,26 @@ export function tapForMana(state, pid, instanceId, card) {
   const ps = state.players[pid]
   const perm = ps.battlefield.find(p => p.instance_id === instanceId)
   if (!perm || perm.tapped) return state
-  const col = COLOR_TO_MANA[card.color] || 'C'
+  const tapCfg = (card.keywords || []).find(k => k.type === 'land_tap_config')
+  const col = tapCfg?.mana_color || COLOR_TO_MANA[card.color] || 'C'
+  const amount = tapCfg?.mana_amount ?? 1
+  const selfDmg = tapCfg?.self_damage ?? 0
+  const manaStr = Array(amount).fill(`{${col}}`).join('')
+  const dmgStr = selfDmg > 0 ? `（自分に${selfDmg}点ダメージ）` : ''
   return log({
     ...state,
     players: {
       ...state.players,
       [pid]: {
         ...ps,
+        life: ps.life - selfDmg,
         battlefield: ps.battlefield.map(p =>
           p.instance_id === instanceId ? { ...p, tapped: true } : p
         ),
-        mana_pool: { ...ps.mana_pool, [col]: (ps.mana_pool[col] || 0) + 1 },
+        mana_pool: { ...ps.mana_pool, [col]: (ps.mana_pool[col] || 0) + amount },
       },
     },
-  }, `${card.name} をタップ → {${col}}`)
+  }, `${card.name} をタップ → ${manaStr}${dmgStr}`)
 }
 
 // 土地プレイ
