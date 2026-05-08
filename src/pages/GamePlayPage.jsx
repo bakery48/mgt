@@ -225,6 +225,7 @@ export default function GamePlayPage() {
   const [pendingBlocker, setPendingBlocker] = useState(null)
   const [blockingAssignments, setBlockingAssignments] = useState({})
   const [savingGs, setSavingGs] = useState(false)
+  const savingGsRef = useRef(false)
   const [roundResult, setRoundResult] = useState(null)
   const [detailCard, setDetailCard] = useState(null)
   const [detailPerm, setDetailPerm] = useState(null)
@@ -265,9 +266,11 @@ export default function GamePlayPage() {
   const saveGs = useCallback(async (newGs) => {
     if (savingGs) return
     setSavingGs(true)
+    savingGsRef.current = true
     setGs(newGs)
     await supabase.from('games').update({ game_state: newGs }).eq('id', gameId)
     setSavingGs(false)
+    savingGsRef.current = false
   }, [gameId, savingGs])
 
   // ─── カードデータをまとめてロード ──────────────────────────
@@ -373,7 +376,15 @@ export default function GamePlayPage() {
       })
       .subscribe()
 
-    return () => chanRef.current?.unsubscribe()
+    // Realtimeが届かない環境（ngrok等）のフォールバック用ポーリング
+    const poll = setInterval(async () => {
+      if (savingGsRef.current) return
+      const { data: g } = await supabase.from('games').select('game_state').eq('id', gameId).single()
+      if (!g?.game_state?.players) return
+      setGs(g.game_state)
+    }, 2000)
+
+    return () => { chanRef.current?.unsubscribe(); clearInterval(poll) }
   }, [gameId, player])
 
   // ─── CPU自動プレイ ─────────────────────────────────────────
