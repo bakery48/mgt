@@ -19,6 +19,7 @@ export default function Layout({ children }) {
               { to: '/decks', label: 'デッキ' },
               { to: '/battle', label: '対戦' },
               { to: '/game', label: 'ゲーム' },
+              { to: '/rules', label: 'ルール' },
             ].map(({ to, label }) => (
               <NavLink
                 key={to}
