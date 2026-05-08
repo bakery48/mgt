@@ -44,7 +44,8 @@ export default function BattleRoomPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, fetchRoom)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'game_players', filter: `game_id=eq.${gameId}` }, fetchRoom)
       .subscribe()
-    return () => chanRef.current?.unsubscribe()
+    const poll = setInterval(fetchRoom, 3000)
+    return () => { chanRef.current?.unsubscribe(); clearInterval(poll) }
   }, [gameId, player])
 
   const myEntry = participants.find(p => p.player_id === player?.id)
