@@ -300,14 +300,24 @@ export default function GamePlayPage() {
           const playerOrder = gpData.map(gp => gp.player_id)
           // 各プレイヤーのデッキをロード
           const deckMap = {}
+          const { assignStarterDeck } = await import('../lib/assignStarterDeck')
           for (const gp of gpData) {
+            let deckId = gp.deck_id
             const { data: dcData } = await supabase
               .from('deck_cards')
               .select('card_id, quantity')
-              .eq('deck_id', gp.deck_id)
+              .eq('deck_id', deckId)
             const expanded = []
             for (const dc of (dcData || [])) {
               for (let i = 0; i < dc.quantity; i++) expanded.push(dc.card_id)
+            }
+            if (expanded.length === 0) {
+              deckId = await assignStarterDeck(gp.player_id)
+              const { data: fallbackDc } = await supabase
+                .from('deck_cards').select('card_id, quantity').eq('deck_id', deckId)
+              for (const dc of (fallbackDc || [])) {
+                for (let i = 0; i < dc.quantity; i++) expanded.push(dc.card_id)
+              }
             }
             deckMap[gp.player_id] = expanded
           }
