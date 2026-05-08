@@ -55,4 +55,36 @@ export const EVENT_CARDS = [
       ],
     },
   },
+  {
+    id: 'ev11', name: '富の再分配',
+    description: '資産最多のプレイヤーから1000Gを取り、資産最少のプレイヤーに渡す。',
+    effect_type: 'gold_rich_to_poor', effect_params: { amount: 1000 },
+  },
+  {
+    id: 'ev12', name: '繁栄の波',
+    description: '全員の資産が25%増加する。',
+    effect_type: 'gold_percent_all', effect_params: { multiplier: 1.25 },
+  },
+  {
+    id: 'ev13', name: '死の霧',
+    description: '今ラウンドのバトル開始ライフが4減少する。',
+    effect_type: 'life_modifier', effect_params: { amount: -4 },
+  },
+  {
+    id: 'ev14', name: '呪詛の嵐',
+    description: '全員の勝利点が2減少する（0未満にならない）。',
+    effect_type: 'vp_all', effect_params: { amount: -2 },
+  },
+  {
+    id: 'ev15', name: '試練のサイコロ',
+    description: 'サイコロを振る。1〜2: 全員500G失う / 3〜4: 変化なし / 5〜6: 全員VP+1',
+    effect_type: 'dice_random',
+    effect_params: {
+      results: [
+        { min: 1, max: 2, sub_type: 'gold_all', amount: -500 },
+        { min: 3, max: 4, sub_type: 'none', amount: 0 },
+        { min: 5, max: 6, sub_type: 'vp_all', amount: 1 },
+      ],
+    },
+  },
 ]

@@ -49,4 +49,29 @@ export const ACTION_CARDS = [
     description: 'ランダムなカードを3枚入手する。',
     effect_type: 'pack_self', effect_params: {},
   },
+  {
+    id: 'ac11', name: '逆転の一手',
+    description: '自分と相手の勝利点を入れ替える。',
+    effect_type: 'vp_swap', effect_params: {},
+  },
+  {
+    id: 'ac12', name: '血の誓約',
+    description: 'このバトルの開始ライフを5減らし、勝利点を3得る。',
+    effect_type: 'life_for_vp', effect_params: { life_cost: 5, vp_gain: 3 },
+  },
+  {
+    id: 'ac13', name: '愚者の賭け',
+    description: 'サイコロを振る。1〜3: 勝利点-1 / 4〜6: 勝利点+2',
+    effect_type: 'random_vp_self', effect_params: { bad: -1, good: 2, threshold: 3 },
+  },
+  {
+    id: 'ac14', name: '魂の取引',
+    description: '勝利点を1失い、1500Gを得る。',
+    effect_type: 'vp_for_gold', effect_params: { vp_cost: 1, gold_gain: 1500 },
+  },
+  {
+    id: 'ac15', name: '錬金術師の秘薬',
+    description: '自分の所持金を1.5倍にする（増加分の上限は2000G）。',
+    effect_type: 'gold_boost', effect_params: { multiplier: 1.5, max_gain: 2000 },
+  },
 ]

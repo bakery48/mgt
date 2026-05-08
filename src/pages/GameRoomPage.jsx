@@ -174,6 +174,33 @@ export default function GameRoomPage() {
         supabase.from('game_players').update({ balance: Math.max(0, (humanGp.balance || 0) - steal) }).eq('game_id', gameId).eq('player_id', humanGp.player_id),
         supabase.from('game_players').update({ balance: (cpuGp?.balance || 0) + steal }).eq('game_id', gameId).eq('player_id', cpuId),
       ])
+    } else if (t === 'vp_swap' && humanGp) {
+      const cpuVp = cpuGp?.victory_points || 0
+      const humanVp = humanGp.victory_points || 0
+      await Promise.all([
+        supabase.from('game_players').update({ victory_points: humanVp }).eq('game_id', gameId).eq('player_id', cpuId),
+        supabase.from('game_players').update({ victory_points: cpuVp }).eq('game_id', gameId).eq('player_id', humanGp.player_id),
+      ])
+    } else if (t === 'life_for_vp') {
+      await supabase.from('game_players')
+        .update({ victory_points: (cpuGp?.victory_points || 0) + ep.vp_gain })
+        .eq('game_id', gameId).eq('player_id', cpuId)
+      return { life_bonus: -ep.life_cost }
+    } else if (t === 'random_vp_self') {
+      const roll = Math.floor(Math.random() * 6) + 1
+      const delta = roll <= ep.threshold ? ep.bad : ep.good
+      await supabase.from('game_players')
+        .update({ victory_points: Math.max(0, (cpuGp?.victory_points || 0) + delta) })
+        .eq('game_id', gameId).eq('player_id', cpuId)
+    } else if (t === 'vp_for_gold') {
+      await Promise.all([
+        supabase.from('game_players').update({ victory_points: Math.max(0, (cpuGp?.victory_points || 0) - ep.vp_cost) }).eq('game_id', gameId).eq('player_id', cpuId),
+        supabase.from('game_players').update({ balance: (cpuGp?.balance || 0) + ep.gold_gain }).eq('game_id', gameId).eq('player_id', cpuId),
+      ])
+    } else if (t === 'gold_boost') {
+      const current = cpuGp?.balance || 0
+      const gain = Math.min(Math.round(current * (ep.multiplier - 1)), ep.max_gain)
+      await supabase.from('game_players').update({ balance: current + gain }).eq('game_id', gameId).eq('player_id', cpuId)
     } else if (t === 'mana_bonus') return { mana_bonus: ep.amount }
     else if (t === 'life_bonus') return { life_bonus: ep.amount }
     else if (t === 'go_first') return { go_first: true }
@@ -303,12 +330,38 @@ export default function GameRoomPage() {
           }
         }
       }
+    } else if (t === 'gold_rich_to_poor') {
+      if (ps.length >= 2) {
+        const sorted = [...ps].sort((a, b) => (b.balance || 0) - (a.balance || 0))
+        const rich = sorted[0]
+        const poor = sorted[sorted.length - 1]
+        if (rich.player_id !== poor.player_id) {
+          const transfer = Math.min(ep.amount, rich.balance || 0)
+          await Promise.all([
+            supabase.from('game_players').update({ balance: Math.max(0, (rich.balance || 0) - transfer) }).eq('game_id', gameId).eq('player_id', rich.player_id),
+            supabase.from('game_players').update({ balance: (poor.balance || 0) + transfer }).eq('game_id', gameId).eq('player_id', poor.player_id),
+          ])
+        }
+      }
+    } else if (t === 'gold_percent_all') {
+      await Promise.all(ps.map(gp => {
+        const gain = Math.round((gp.balance || 0) * (ep.multiplier - 1))
+        return supabase.from('game_players')
+          .update({ balance: (gp.balance || 0) + gain })
+          .eq('game_id', gameId).eq('player_id', gp.player_id)
+      }))
     } else if (t === 'dice_random' && diceResult != null) {
       const result = (ep.results || []).find(r => diceResult >= r.min && diceResult <= r.max)
       if (result?.sub_type === 'vp_all') {
         await Promise.all(ps.map(gp =>
           supabase.from('game_players')
             .update({ victory_points: Math.max(0, (gp.victory_points || 0) + result.amount) })
+            .eq('game_id', gameId).eq('player_id', gp.player_id)
+        ))
+      } else if (result?.sub_type === 'gold_all') {
+        await Promise.all(ps.map(gp =>
+          supabase.from('game_players')
+            .update({ balance: Math.max(0, (gp.balance || 0) + result.amount) })
             .eq('game_id', gameId).eq('player_id', gp.player_id)
         ))
       }
@@ -359,6 +412,35 @@ export default function GameRoomPage() {
           }
         }
       }
+    } else if (t === 'vp_swap') {
+      if (oppGp) {
+        const myVp = myGp?.victory_points || 0
+        const oppVp = oppGp.victory_points || 0
+        await Promise.all([
+          supabase.from('game_players').update({ victory_points: oppVp }).eq('game_id', gameId).eq('player_id', player.id),
+          supabase.from('game_players').update({ victory_points: myVp }).eq('game_id', gameId).eq('player_id', oppGp.player_id),
+        ])
+      }
+    } else if (t === 'life_for_vp') {
+      await supabase.from('game_players')
+        .update({ victory_points: (myGp?.victory_points || 0) + ep.vp_gain })
+        .eq('game_id', gameId).eq('player_id', player.id)
+      return { life_bonus: -ep.life_cost }
+    } else if (t === 'random_vp_self') {
+      const roll = Math.floor(Math.random() * 6) + 1
+      const delta = roll <= ep.threshold ? ep.bad : ep.good
+      await supabase.from('game_players')
+        .update({ victory_points: Math.max(0, (myGp?.victory_points || 0) + delta) })
+        .eq('game_id', gameId).eq('player_id', player.id)
+    } else if (t === 'vp_for_gold') {
+      await Promise.all([
+        supabase.from('game_players').update({ victory_points: Math.max(0, (myGp?.victory_points || 0) - ep.vp_cost) }).eq('game_id', gameId).eq('player_id', player.id),
+        supabase.from('game_players').update({ balance: (myGp?.balance || 0) + ep.gold_gain }).eq('game_id', gameId).eq('player_id', player.id),
+      ])
+    } else if (t === 'gold_boost') {
+      const current = myGp?.balance || 0
+      const gain = Math.min(Math.round(current * (ep.multiplier - 1)), ep.max_gain)
+      await supabase.from('game_players').update({ balance: current + gain }).eq('game_id', gameId).eq('player_id', player.id)
     } else if (t === 'mana_bonus') {
       return { mana_bonus: ep.amount }
     } else if (t === 'life_bonus') {
